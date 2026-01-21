@@ -7,7 +7,7 @@ interface ConfessScreenProps {
   onBack: () => void
 }
 
-export default function ConfessScreen({ state, onConfess, onBack }: ConfessScreenProps) {
+export default function ConfessScreen({ onConfess, onBack }: ConfessScreenProps) {
   return (
     <div className="confess-screen">
       <div className="confess-header">

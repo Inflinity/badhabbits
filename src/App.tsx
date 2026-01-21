@@ -108,7 +108,7 @@ function App() {
   }
 
   // Confess a slip-up (costs 1 point as penalty)
-  const handleConfess = (categoryId: string) => {
+  const handleConfess = (_categoryId: string) => {
     setState(prev => ({
       ...prev,
       points: Math.max(0, prev.points - 1), // Penalty: lose 1 point
