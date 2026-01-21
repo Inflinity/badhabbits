@@ -6,11 +6,13 @@ interface MoodScreenProps {
   state: AppState
   onMoodSelect: (moodId: string) => void
   onRedeem: () => void
+  onSchweinehund: () => void
   onConfess: () => void
+  onSendPoints: () => void
   onSettings: () => void
 }
 
-export default function MoodScreen({ state, onMoodSelect, onRedeem, onConfess, onSettings }: MoodScreenProps) {
+export default function MoodScreen({ state, onMoodSelect, onRedeem, onSchweinehund, onConfess, onSendPoints, onSettings }: MoodScreenProps) {
   const [selectedMood, setSelectedMood] = useState<string | null>(null)
 
   const handleMoodClick = (moodId: string) => {
@@ -80,7 +82,15 @@ export default function MoodScreen({ state, onMoodSelect, onRedeem, onConfess, o
         </button>
 
         <button className="btn-secondary" onClick={onRedeem}>
-          Spend points instead!
+          Spend points on myself!
+        </button>
+
+        <button className="btn-schweinehund" onClick={onSchweinehund}>
+          Feed the Schweinehund!
+        </button>
+
+        <button className="btn-send" onClick={onSendPoints}>
+          Send points to a friend
         </button>
 
         <button className="btn-confess" onClick={onConfess}>

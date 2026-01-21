@@ -4,6 +4,27 @@
   flex-direction: column;
   padding: 48px 24px 32px;
   background: var(--bg);
+  transition: background 0.3s ease;
+}
+
+.active-screen.warning {
+  background: #fff5e6;
+}
+
+.active-screen.critical {
+  background: #ffe6e6;
+  animation: pulse-bg 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-bg {
+  from { background: #ffe6e6; }
+  to { background: #ffcccc; }
+}
+
+.active-screen.exploded {
+  background: #1a1a1a;
+  justify-content: center;
+  align-items: center;
 }
 
 .active-content {
@@ -15,26 +36,67 @@
 }
 
 .active-label {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--warning);
   letter-spacing: 3px;
   margin-bottom: 16px;
 }
 
 .active-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
   color: var(--text);
-  margin-bottom: 48px;
-  max-width: 280px;
+  margin-bottom: 24px;
+  max-width: 300px;
+}
+
+/* Big Countdown Display */
+.countdown-display {
+  margin-bottom: 24px;
+  padding: 16px 32px;
+  background: var(--bg);
+  border-radius: 20px;
+  box-shadow: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
+}
+
+.countdown-display.warning {
+  box-shadow: inset 8px 8px 16px #e6c99e, inset -8px -8px 16px #fff5e6;
+}
+
+.countdown-display.critical {
+  box-shadow: inset 8px 8px 16px #e6b3b3, inset -8px -8px 16px #ffe6e6;
+  animation: shake 0.1s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.countdown-value {
+  font-size: 64px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.countdown-display.warning .countdown-value {
+  color: #e67e22;
+}
+
+.countdown-display.critical .countdown-value {
+  color: #cc0000;
 }
 
 /* Neumorphism Timer Ring */
 .timer-container {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -44,17 +106,25 @@
   position: absolute;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(8px 8px 16px #D1D9E6) drop-shadow(-8px -8px 16px #FFFFFF);
+  filter: drop-shadow(6px 6px 12px #D1D9E6) drop-shadow(-6px -6px 12px #FFFFFF);
 }
 
 .timer-ring-bg {
-  stroke: var(--bg-dark);
+  stroke: #e0e0e0;
 }
 
 .timer-ring-progress {
   stroke: var(--accent);
   stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear;
+  transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
+}
+
+.timer-ring-progress.warning {
+  stroke: #e67e22;
+}
+
+.timer-ring-progress.critical {
+  stroke: #cc0000;
 }
 
 .timer-inner {
@@ -62,31 +132,68 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 160px;
-  height: 160px;
+  width: 130px;
+  height: 130px;
   background: var(--bg);
   border-radius: 50%;
-  box-shadow: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
+  box-shadow: inset 6px 6px 12px #D1D9E6, inset -6px -6px 12px #FFFFFF;
 }
 
-.timer-value {
-  font-size: 42px;
+.bomb-emoji {
+  font-size: 48px;
+  animation: bomb-wiggle 1s ease-in-out infinite;
+}
+
+.critical .bomb-emoji {
+  animation: bomb-wiggle 0.2s ease-in-out infinite;
+}
+
+@keyframes bomb-wiggle {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* Explosion */
+.explosion-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: explosion-appear 0.3s ease-out;
+}
+
+@keyframes explosion-appear {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.explosion-emoji {
+  font-size: 120px;
+  animation: explosion-pulse 0.5s ease-out infinite alternate;
+}
+
+@keyframes explosion-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+
+.explosion-text {
+  font-size: 48px;
+  font-weight: 900;
+  color: #ff4444;
+  text-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+  margin: 16px 0 8px;
+}
+
+.explosion-penalty {
+  font-size: 24px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-
-.timer-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 2px;
-}
-
-.timer-done {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--success);
+  color: #ff6666;
 }
 
 /* Buttons */
@@ -103,7 +210,7 @@
   font-size: 18px;
   font-weight: 700;
   color: #fff;
-  background: var(--accent);
+  background: var(--success);
   border-radius: 20px;
   box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
   transition: all 0.2s ease;
@@ -112,20 +219,4 @@
 .btn-complete:active {
   box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
   transform: scale(0.98);
-}
-
-.btn-cancel {
-  width: 100%;
-  padding: 16px;
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg);
-  border-radius: 16px;
-  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
-  transition: all 0.2s ease;
-}
-
-.btn-cancel:active {
-  box-shadow: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
 }

@@ -1,0 +1,179 @@
+.schweinehund-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px 24px 40px;
+  background: var(--bg);
+}
+
+.schweinehund-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.points-badge {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 6px 12px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+}
+
+.schweinehund-content {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.schweinehund-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #e67e22;
+  margin: 0 0 24px;
+  text-align: center;
+}
+
+.schweinehund-display {
+  text-align: center;
+  padding: 32px;
+  background: var(--bg);
+  border-radius: 24px;
+  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+  margin-bottom: 32px;
+}
+
+.schweinehund-avatar {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.schweinehund-emoji {
+  font-size: 80px;
+}
+
+.schweinehund-items {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  font-size: 20px;
+}
+
+.item-emoji {
+  animation: item-bounce 2s ease-in-out infinite;
+}
+
+.item-emoji:nth-child(2) { animation-delay: 0.2s; }
+.item-emoji:nth-child(3) { animation-delay: 0.4s; }
+.item-emoji:nth-child(4) { animation-delay: 0.6s; }
+
+@keyframes item-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.schweinehund-level {
+  font-size: 24px;
+  font-weight: 700;
+  color: #e67e22;
+  margin: 0 0 8px;
+}
+
+.schweinehund-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.next-upgrade {
+  margin-bottom: 24px;
+}
+
+.upgrade-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+
+.upgrade-card {
+  padding: 16px;
+  background: var(--bg);
+  border-radius: 16px;
+  box-shadow: 6px 6px 12px #D1D9E6, -6px -6px 12px #FFFFFF;
+}
+
+.upgrade-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.upgrade-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.upgrade-cost {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e67e22;
+}
+
+.upgrade-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.upgrade-btn.available {
+  color: white;
+  background: #e67e22;
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+}
+
+.upgrade-btn.available:active {
+  transform: scale(0.98);
+}
+
+.upgrade-btn.locked {
+  color: var(--text-muted);
+  background: var(--bg);
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+}
+
+.max-level {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.max-level h2 {
+  font-size: 24px;
+  margin: 0 0 8px;
+  color: white;
+}
+
+.max-level p {
+  font-size: 14px;
+  margin: 0;
+  color: rgba(255,255,255,0.9);
+}
+
+.schweinehund-stats {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}

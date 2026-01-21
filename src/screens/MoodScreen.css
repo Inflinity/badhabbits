@@ -161,6 +161,36 @@
   box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
 }
 
+.btn-schweinehund {
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e67e22;
+  background: var(--bg);
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  border-radius: 14px;
+  transition: all 0.3s ease;
+}
+
+.btn-schweinehund:active {
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+}
+
+.btn-send {
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #9b59b6;
+  background: var(--bg);
+  box-shadow: 3px 3px 6px #D1D9E6, -3px -3px 6px #FFFFFF;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-send:active {
+  box-shadow: inset 3px 3px 6px #D1D9E6, inset -3px -3px 6px #FFFFFF;
+}
+
 .btn-confess {
   padding: 12px;
   font-size: 13px;

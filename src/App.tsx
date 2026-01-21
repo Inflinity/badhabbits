@@ -4,11 +4,13 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import MoodScreen from './screens/MoodScreen'
 import ActiveTaskScreen from './screens/ActiveTaskScreen'
 import RedeemScreen from './screens/RedeemScreen'
+import SchweinehundScreen from './screens/SchweinehundScreen'
 import ConfessScreen from './screens/ConfessScreen'
+import SendPointsScreen from './screens/SendPointsScreen'
 import SettingsScreen from './screens/SettingsScreen'
 import { loadState, saveState, clearState, AppState, getInitialState, getRandomTask, REWARD_CATEGORIES, SCHWEINEHUND_ITEMS } from './lib/state'
 
-type Screen = 'install' | 'welcome' | 'mood' | 'active' | 'redeem' | 'confess' | 'settings'
+type Screen = 'install' | 'welcome' | 'mood' | 'active' | 'redeem' | 'schweinehund' | 'confess' | 'sendpoints' | 'settings'
 
 // Check if running as installed PWA
 function isStandalone(): boolean {
@@ -111,9 +113,11 @@ function App() {
     setScreen('mood')
   }
 
-  const handleTaskCancel = () => {
+  // Task expired - lost a point!
+  const handleTaskExpired = () => {
     setState(prev => ({
       ...prev,
+      points: Math.max(0, prev.points - 1),
       currentTask: null,
     }))
     setScreen('mood')
@@ -161,6 +165,14 @@ function App() {
     setScreen('mood')
   }
 
+  // Send points to a friend (for now just deduct locally - would need backend for real transfer)
+  const handleSendPoints = (_recipientId: string, amount: number) => {
+    setState(prev => ({
+      ...prev,
+      points: Math.max(0, prev.points - amount),
+    }))
+  }
+
   if (!isLoaded) {
     return <div style={{ background: 'var(--bg)', height: '100%' }} />
   }
@@ -178,7 +190,9 @@ function App() {
           state={state}
           onMoodSelect={handleMoodSelect}
           onRedeem={() => setScreen('redeem')}
+          onSchweinehund={() => setScreen('schweinehund')}
           onConfess={() => setScreen('confess')}
+          onSendPoints={() => setScreen('sendpoints')}
           onSettings={() => setScreen('settings')}
         />
       )}
@@ -186,7 +200,7 @@ function App() {
         <ActiveTaskScreen
           task={state.currentTask}
           onComplete={handleTaskComplete}
-          onCancel={handleTaskCancel}
+          onExpired={handleTaskExpired}
         />
       )}
       {screen === 'redeem' && (
@@ -197,10 +211,24 @@ function App() {
           onBack={() => setScreen('mood')}
         />
       )}
+      {screen === 'schweinehund' && (
+        <SchweinehundScreen
+          state={state}
+          onFeed={handleRedeemForPet}
+          onBack={() => setScreen('mood')}
+        />
+      )}
       {screen === 'confess' && (
         <ConfessScreen
           state={state}
           onConfess={handleConfess}
+          onBack={() => setScreen('mood')}
+        />
+      )}
+      {screen === 'sendpoints' && (
+        <SendPointsScreen
+          state={state}
+          onSend={handleSendPoints}
           onBack={() => setScreen('mood')}
         />
       )}
