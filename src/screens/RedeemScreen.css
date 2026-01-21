@@ -1,0 +1,187 @@
+.redeem-screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 24px;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.redeem-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.back-btn {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  padding: 8px 0;
+}
+
+.redeem-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+
+/* Schweinehund Section */
+.schweinehund-section {
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+}
+
+.pet-display {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pet-image {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 16px;
+  background: var(--bg-dark);
+}
+
+.pet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pet-level {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pet-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.upgrade-pet-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--bg);
+  border-radius: 14px;
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.upgrade-pet-btn.can-afford {
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  color: var(--text);
+}
+
+.upgrade-pet-btn.can-afford:active {
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+}
+
+.upgrade-pet-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upgrade-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upgrade-cost {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Self Rewards Section */
+.self-rewards-section {
+  flex: 1;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.reward-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  background: var(--bg);
+  border-radius: 16px;
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  position: relative;
+}
+
+.reward-card.can-afford {
+  box-shadow: 6px 6px 12px #D1D9E6, -6px -6px 12px #FFFFFF;
+  color: var(--text);
+}
+
+.reward-card.can-afford:active {
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+}
+
+.reward-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reward-icon {
+  font-size: 32px;
+}
+
+.reward-name {
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.reward-cost {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.reward-balance {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--success);
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 8px;
+  box-shadow: 2px 2px 4px #D1D9E6, -2px -2px 4px #FFFFFF;
+}

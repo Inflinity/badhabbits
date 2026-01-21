@@ -1,0 +1,212 @@
+.welcome-screen {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.welcome-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 60px 24px 40px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-title {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.welcome-title-small {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 32px;
+  color: var(--accent);
+}
+
+.welcome-subtitle {
+  font-size: 24px;
+  color: var(--text-muted);
+  margin-bottom: 48px;
+}
+
+.welcome-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.welcome-text p {
+  color: var(--text);
+}
+
+.welcome-text strong {
+  color: var(--accent);
+}
+
+.welcome-highlight {
+  color: var(--text-muted) !important;
+  font-style: italic;
+}
+
+.welcome-bold {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--warning) !important;
+}
+
+.welcome-rules {
+  font-size: 16px;
+}
+
+.welcome-rules .accent {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.welcome-cta {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--success) !important;
+  margin-top: auto;
+}
+
+/* Neumorphism button */
+.welcome-button {
+  width: 100%;
+  padding: 20px;
+  font-size: 20px;
+  font-weight: 600;
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 20px;
+  margin-top: 32px;
+  transition: all 0.2s;
+  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+}
+
+.welcome-button:active {
+  box-shadow: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
+}
+
+.welcome-button.start {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+}
+
+.welcome-button.start:active {
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  transform: scale(0.98);
+}
+
+/* Step 2 styles */
+.first-task {
+  margin-bottom: 32px;
+}
+
+.task-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.task-card {
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+}
+
+.task-text {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.task-timer {
+  font-size: 14px;
+  color: var(--warning);
+}
+
+.reward-preview {
+  margin-top: 24px;
+}
+
+.reward-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.reward-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
+}
+
+.reward-emoji {
+  font-size: 32px;
+}
+
+.reward-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.rewards-list {
+  margin-bottom: 24px;
+}
+
+.rewards-title {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.rewards-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reward-badge {
+  background: var(--bg);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--text);
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+}

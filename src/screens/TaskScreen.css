@@ -1,0 +1,313 @@
+.task-screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border-bottom: 1px solid #222;
+}
+
+.streak {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.points {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-yellow);
+}
+
+/* Section title */
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  padding: 24px 20px 16px;
+}
+
+/* Tasks View */
+.tasks-view {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 100px;
+}
+
+.tasks-list {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: left;
+  border: 1px solid #333;
+  transition: all 0.2s;
+}
+
+.task-item:active {
+  transform: scale(0.98);
+  border-color: var(--accent-green);
+}
+
+.task-item-content {
+  flex: 1;
+}
+
+.task-item-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.task-item-meta {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.task-item-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-left: 16px;
+}
+
+.task-reward-emoji {
+  font-size: 28px;
+}
+
+.task-reward-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+/* Active Task View */
+.active-task-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 20px 20px;
+}
+
+.active-task-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.active-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+
+.active-title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 48px;
+  max-width: 300px;
+}
+
+.timer-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 48px;
+}
+
+.timer-value {
+  font-size: 72px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-yellow);
+}
+
+.timer-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.timer-display.expired .timer-done {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent-green);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.active-reward {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  padding: 16px 24px;
+  border-radius: 12px;
+  border: 1px solid var(--accent-green);
+}
+
+.active-reward-emoji {
+  font-size: 32px;
+}
+
+.active-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-complete {
+  width: 100%;
+  padding: 20px;
+  font-size: 18px;
+  font-weight: 600;
+  background: var(--accent-green);
+  color: #000;
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.btn-complete:active {
+  transform: scale(0.98);
+}
+
+.btn-cancel {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 12px;
+  border: 1px solid #333;
+}
+
+/* Rewards View */
+.rewards-view {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 100px;
+}
+
+.rewards-list-full {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reward-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px 20px;
+  border: 1px solid #333;
+}
+
+.reward-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.reward-emoji-large {
+  font-size: 36px;
+}
+
+.reward-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.reward-count {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.btn-spend {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.btn-spend:active {
+  transform: scale(0.95);
+}
+
+.btn-spend.disabled {
+  background: #333;
+  color: #666;
+  pointer-events: none;
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--bg-card);
+  border-top: 1px solid #333;
+  padding: 8px 0;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.nav-btn.active {
+  color: var(--text);
+}
+
+.nav-icon {
+  font-size: 24px;
+}
+
+.nav-label {
+  font-size: 12px;
+  font-weight: 500;
+}
