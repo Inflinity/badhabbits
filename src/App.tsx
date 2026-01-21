@@ -1,31 +1,60 @@
 import { useState, useEffect } from 'react'
+import InstallScreen from './screens/InstallScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import MoodScreen from './screens/MoodScreen'
 import ActiveTaskScreen from './screens/ActiveTaskScreen'
 import RedeemScreen from './screens/RedeemScreen'
 import ConfessScreen from './screens/ConfessScreen'
-import { loadState, saveState, AppState, getInitialState, getRandomTask, REWARD_CATEGORIES, SCHWEINEHUND_ITEMS } from './lib/state'
+import SettingsScreen from './screens/SettingsScreen'
+import { loadState, saveState, clearState, AppState, getInitialState, getRandomTask, REWARD_CATEGORIES, SCHWEINEHUND_ITEMS } from './lib/state'
 
-type Screen = 'welcome' | 'mood' | 'active' | 'redeem' | 'confess'
+type Screen = 'install' | 'welcome' | 'mood' | 'active' | 'redeem' | 'confess' | 'settings'
+
+// Check if running as installed PWA
+function isStandalone(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || (window.navigator as { standalone?: boolean }).standalone === true
+}
+
+// Check if install prompt was already shown
+function hasSeenInstallPrompt(): boolean {
+  return localStorage.getItem('badhabits_install_seen') === 'true'
+}
+
+function setInstallPromptSeen(): void {
+  localStorage.setItem('badhabits_install_seen', 'true')
+}
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('welcome')
+  const [screen, setScreen] = useState<Screen>('install')
   const [state, setState] = useState<AppState>(getInitialState)
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Load saved state on mount
   useEffect(() => {
     const saved = loadState()
-    if (saved) {
-      setState(saved)
-      if (saved.onboardingComplete) {
-        if (saved.currentTask) {
-          setScreen('active')
+
+    // Determine initial screen
+    if (isStandalone() || hasSeenInstallPrompt()) {
+      // Skip install screen
+      if (saved) {
+        setState(saved)
+        if (saved.onboardingComplete) {
+          setScreen(saved.currentTask ? 'active' : 'mood')
         } else {
-          setScreen('mood')
+          setScreen('welcome')
         }
+      } else {
+        setScreen('welcome')
       }
+    } else {
+      // Show install screen first time
+      if (saved) {
+        setState(saved)
+      }
+      setScreen('install')
     }
+
     setIsLoaded(true)
   }, [])
 
@@ -36,9 +65,25 @@ function App() {
     }
   }, [state, isLoaded])
 
+  const handleInstallContinue = () => {
+    setInstallPromptSeen()
+    if (state.onboardingComplete) {
+      setScreen(state.currentTask ? 'active' : 'mood')
+    } else {
+      setScreen('welcome')
+    }
+  }
+
   const handleOnboardingComplete = () => {
     setState(prev => ({ ...prev, onboardingComplete: true }))
     setScreen('mood')
+  }
+
+  const handleReset = () => {
+    clearState()
+    localStorage.removeItem('badhabits_install_seen')
+    setState(getInitialState())
+    setScreen('welcome')
   }
 
   const handleMoodSelect = (moodId: string) => {
@@ -122,6 +167,9 @@ function App() {
 
   return (
     <>
+      {screen === 'install' && (
+        <InstallScreen onContinue={handleInstallContinue} />
+      )}
       {screen === 'welcome' && (
         <WelcomeScreen onComplete={handleOnboardingComplete} />
       )}
@@ -131,6 +179,7 @@ function App() {
           onMoodSelect={handleMoodSelect}
           onRedeem={() => setScreen('redeem')}
           onConfess={() => setScreen('confess')}
+          onSettings={() => setScreen('settings')}
         />
       )}
       {screen === 'active' && state.currentTask && (
@@ -152,6 +201,13 @@ function App() {
         <ConfessScreen
           state={state}
           onConfess={handleConfess}
+          onBack={() => setScreen('mood')}
+        />
+      )}
+      {screen === 'settings' && (
+        <SettingsScreen
+          state={state}
+          onReset={handleReset}
           onBack={() => setScreen('mood')}
         />
       )}

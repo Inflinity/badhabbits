@@ -165,6 +165,14 @@ export function saveState(state: AppState): void {
   }
 }
 
+export function clearState(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch (e) {
+    console.error('Failed to clear state:', e)
+  }
+}
+
 export function getRandomTask(moodId: string): Task | null {
   const tasks = TASKS_BY_MOOD[moodId]
   if (!tasks || tasks.length === 0) return null

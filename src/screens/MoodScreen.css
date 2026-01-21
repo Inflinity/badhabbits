@@ -21,6 +21,12 @@
   font-family: monospace;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .points-display {
   font-size: 14px;
   font-weight: 600;
@@ -29,6 +35,25 @@
   padding: 6px 12px;
   border-radius: 12px;
   box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+}
+
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--bg);
+  border: none;
+  border-radius: 10px;
+  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-btn:active {
+  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
 }
 
 .mood-title {

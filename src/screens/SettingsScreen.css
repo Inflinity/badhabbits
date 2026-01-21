@@ -1,0 +1,131 @@
+.settings-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px 24px 40px;
+  background: var(--bg);
+}
+
+.settings-header {
+  margin-bottom: 24px;
+}
+
+.settings-content {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.settings-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 32px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.settings-info {
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.info-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+
+.info-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-danger {
+  padding: 24px;
+  background: #fff5f5;
+  border-radius: 16px;
+  border: 1px solid #ffcccc;
+}
+
+.danger-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #cc0000;
+  margin: 0 0 16px;
+}
+
+.reset-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #cc0000;
+  background: white;
+  border: 2px solid #cc0000;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.reset-btn:active {
+  background: #cc0000;
+  color: white;
+}
+
+.confirm-reset {
+  text-align: center;
+}
+
+.confirm-text {
+  font-size: 14px;
+  color: #cc0000;
+  margin: 0 0 16px;
+  font-weight: 500;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm-cancel {
+  flex: 1;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.confirm-delete {
+  flex: 1;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  background: #cc0000;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.confirm-cancel:active {
+  background: var(--card-bg);
+}
+
+.confirm-delete:active {
+  background: #990000;
+}

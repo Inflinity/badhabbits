@@ -1,0 +1,99 @@
+.install-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 60px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+}
+
+.install-logo {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 32px;
+}
+
+.install-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.install-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.install-subtitle {
+  font-size: 16px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0 0 40px;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+.install-steps {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.install-step {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.step-icon {
+  margin-left: auto;
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.install-desktop {
+  text-align: center;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.install-skip {
+  margin-top: auto;
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.install-skip:active {
+  opacity: 0.7;
+}
