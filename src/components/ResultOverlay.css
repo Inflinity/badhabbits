@@ -1,0 +1,151 @@
+.result-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.result-overlay.fail {
+  background: linear-gradient(180deg, var(--bg) 0%, #e0d5ce 100%);
+}
+
+/* Confetti */
+.confetti-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  top: -10px;
+  animation: confettiFall 3s ease-out forwards;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* Content */
+.result-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: bounceIn 0.5s ease-out;
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.result-image {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  margin-bottom: 20px;
+  animation: float 2s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.result-title {
+  font-size: 28px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.result-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.result-points {
+  font-size: 20px;
+  color: var(--accent);
+  padding: 12px 24px;
+  background: var(--bg);
+  border-radius: 20px;
+  box-shadow: var(--shadow-out-sm);
+  transition: all 0.8s ease-out;
+}
+
+.result-points.negative {
+  color: var(--danger);
+}
+
+.result-points.flying {
+  transform: translateY(-200px) scale(0.5);
+  opacity: 0;
+}
+
+/* Sparkle effect for success */
+.result-overlay.success .result-image {
+  filter: drop-shadow(0 0 20px rgba(107, 127, 86, 0.3));
+}
+
+/* Stars/sparkles */
+.result-overlay.success::before,
+.result-overlay.success::after {
+  content: '✨';
+  position: absolute;
+  font-size: 24px;
+  animation: sparkle 1s ease-in-out infinite;
+}
+
+.result-overlay.success::before {
+  top: 25%;
+  left: 20%;
+  animation-delay: 0s;
+}
+
+.result-overlay.success::after {
+  top: 30%;
+  right: 20%;
+  animation-delay: 0.5s;
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}

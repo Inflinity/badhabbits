@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import MoodScreen from './screens/MoodScreen'
 import ActiveTaskScreen from './screens/ActiveTaskScreen'
 import SettingsScreen from './screens/SettingsScreen'
+import ResultOverlay from './components/ResultOverlay'
 import { loadState, saveState, clearState, AppState, getInitialState, getRandomTask } from './lib/state'
 
-type Screen = 'main' | 'active' | 'spend' | 'invest' | 'track' | 'settings'
+type Screen = 'main' | 'active' | 'spend' | 'invest' | 'track' | 'messages' | 'settings'
+type ResultType = 'success' | 'fail' | null
 
 function App() {
   const [screen, setScreen] = useState<Screen>('main')
   const [state, setState] = useState<AppState>(getInitialState)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [showResult, setShowResult] = useState<ResultType>(null)
 
   // Load saved state on mount
   useEffect(() => {
@@ -48,25 +51,30 @@ function App() {
     }
   }
 
-  const handleTaskComplete = () => {
+  const handleTaskComplete = useCallback(() => {
     setState(prev => ({
       ...prev,
       points: prev.points + 1,
       completedTasks: prev.completedTasks + 1,
       currentTask: null,
     }))
+    setShowResult('success')
+  }, [])
+
+  const handleResultComplete = useCallback(() => {
+    setShowResult(null)
     setScreen('main')
-  }
+  }, [])
 
   // Task expired - lost a point!
-  const handleTaskExpired = () => {
+  const handleTaskExpired = useCallback(() => {
     setState(prev => ({
       ...prev,
       points: Math.max(0, prev.points - 1),
       currentTask: null,
     }))
-    setScreen('main')
-  }
+    setShowResult('fail')
+  }, [])
 
   // Go back to main screen while keeping task running
   const handleBackToMain = () => {
@@ -86,6 +94,11 @@ function App() {
 
   return (
     <>
+      {/* Result Overlay - shows on top of everything */}
+      {showResult && (
+        <ResultOverlay type={showResult} onComplete={handleResultComplete} />
+      )}
+
       {screen === 'main' && (
         <MoodScreen
           state={state}
@@ -96,6 +109,7 @@ function App() {
           onTrackRecord={() => setScreen('track')}
           onSettings={() => setScreen('settings')}
           onResumeTask={handleResumeTask}
+          onMessages={() => setScreen('messages')}
         />
       )}
       {screen === 'active' && state.currentTask && (
@@ -108,23 +122,32 @@ function App() {
       )}
       {screen === 'spend' && (
         <div className="placeholder-screen" style={{ padding: 20, background: 'var(--bg)', height: '100%' }}>
-          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>Back</button>
-          <h2>Spend Coins (bad!)</h2>
-          <p>Coming soon...</p>
+          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>back</button>
+          <h2>spend coins (bad!)</h2>
+          <p>coming soon...</p>
         </div>
       )}
       {screen === 'invest' && (
         <div className="placeholder-screen" style={{ padding: 20, background: 'var(--bg)', height: '100%' }}>
-          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>Back</button>
-          <h2>Invest Coins (good!)</h2>
-          <p>Coming soon...</p>
+          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>back</button>
+          <h2>invest coins (good!)</h2>
+          <p>coming soon...</p>
         </div>
       )}
       {screen === 'track' && (
         <div className="placeholder-screen" style={{ padding: 20, background: 'var(--bg)', height: '100%' }}>
-          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>Back</button>
-          <h2>Track Record</h2>
-          <p>Coming soon...</p>
+          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>back</button>
+          <h2>track record</h2>
+          <img src="/graphics/trackrecord_512x512.png" alt="Track Record" style={{ width: 150, marginTop: 20 }} />
+          <p>coming soon...</p>
+        </div>
+      )}
+      {screen === 'messages' && (
+        <div className="placeholder-screen" style={{ padding: 20, background: 'var(--bg)', height: '100%' }}>
+          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>back</button>
+          <h2>messages</h2>
+          <p>no new messages</p>
+          <p style={{ fontSize: 12, color: '#5C4D42', marginTop: 20 }}>challenges and invitations from other players will appear here</p>
         </div>
       )}
       {screen === 'settings' && (
