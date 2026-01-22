@@ -5,7 +5,7 @@ import SettingsScreen from './screens/SettingsScreen'
 import ResultOverlay from './components/ResultOverlay'
 import { loadState, saveState, clearState, AppState, getInitialState, getRandomTask } from './lib/state'
 
-type Screen = 'main' | 'active' | 'spend' | 'invest' | 'track' | 'messages' | 'settings'
+type Screen = 'main' | 'active' | 'spend' | 'invest' | 'track' | 'messages' | 'settings' | 'profile'
 type ResultType = 'success' | 'fail' | null
 
 function App() {
@@ -110,6 +110,7 @@ function App() {
           onSettings={() => setScreen('settings')}
           onResumeTask={handleResumeTask}
           onMessages={() => setScreen('messages')}
+          onProfile={() => setScreen('profile')}
         />
       )}
       {screen === 'active' && state.currentTask && (
@@ -148,6 +149,16 @@ function App() {
           <h2>messages</h2>
           <p>no new messages</p>
           <p style={{ fontSize: 12, color: '#5C4D42', marginTop: 20 }}>challenges and invitations from other players will appear here</p>
+        </div>
+      )}
+      {screen === 'profile' && (
+        <div className="placeholder-screen" style={{ padding: 20, background: 'var(--bg)', height: '100%' }}>
+          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>back</button>
+          <h2>profile / custom menu</h2>
+          <img src="/graphics/defaultavatar_512x512.png" alt="Avatar" style={{ width: 120, marginTop: 20, borderRadius: '50%' }} />
+          <p style={{ marginTop: 20 }}>User ID: {state.oderId}</p>
+          <p style={{ fontSize: 12, color: '#5C4D42', marginTop: 20 }}>customize your avatar and settings here</p>
+          <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 10 }}>⚠️ profile incomplete - add your info!</p>
         </div>
       )}
       {screen === 'settings' && (

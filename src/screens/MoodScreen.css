@@ -17,7 +17,11 @@
 }
 
 .avatar-container {
-  width: 50px;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .avatar {
@@ -32,8 +36,36 @@
   overflow: hidden;
 }
 
-.avatar-emoji {
-  font-size: 28px;
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-badge {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--danger);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.badge-icon {
+  font-size: 9px;
+  font-weight: bold;
+}
+
+.badge-text {
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .header-spacer {
@@ -45,12 +77,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+}
+
+.points-diamond {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .points-value {
-  font-size: 36px;
+  font-size: 18px;
   color: var(--text);
   line-height: 1;
+  margin-top: 4px;
 }
 
 .points-label {
@@ -117,13 +157,13 @@
   margin-top: 8px;
 }
 
-/* Mood Grid */
+/* Mood Grid - 5 cards layout */
 .mood-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 20px;
-  padding-right: 60px; /* Space for action bubbles */
+  /* No padding-right - action bubbles overlay the grid */
 }
 
 .mood-card {
@@ -165,6 +205,16 @@
   color: var(--text);
   text-align: center;
   background: var(--bg);
+}
+
+/* 5th card - Spend Points */
+.spend-card {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.spend-label {
+  color: var(--danger);
 }
 
 /* Action Buttons */

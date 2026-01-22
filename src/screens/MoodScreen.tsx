@@ -12,6 +12,7 @@ interface MoodScreenProps {
   onSettings: () => void
   onResumeTask: () => void
   onMessages: () => void
+  onProfile: () => void
 }
 
 export default function MoodScreen({
@@ -23,13 +24,17 @@ export default function MoodScreen({
   onTrackRecord,
   onSettings,
   onResumeTask,
-  onMessages
+  onMessages,
+  onProfile
 }: MoodScreenProps) {
   const [timerDisplay, setTimerDisplay] = useState<string | null>(null)
 
   const handleMoodClick = (moodId: string) => {
     onMoodSelect(moodId)
   }
+
+  // Check if profile is incomplete (for missing info badge)
+  const isProfileIncomplete = !state.onboardingComplete
 
   // Update timer display every second
   useEffect(() => {
@@ -55,16 +60,30 @@ export default function MoodScreen({
     <div className="mood-screen">
       {/* Header with avatar */}
       <div className="mood-header">
-        <div className="avatar-container">
+        <button className="avatar-container" onClick={onProfile}>
           <div className="avatar">
-            <span className="avatar-emoji">🙂</span>
+            <img
+              src="/graphics/defaultavatar_512x512.png"
+              alt="Avatar"
+              className="avatar-image"
+            />
           </div>
-        </div>
+          {isProfileIncomplete && (
+            <div className="avatar-badge">
+              <span className="badge-icon">!</span>
+              <span className="badge-text">missing info</span>
+            </div>
+          )}
+        </button>
 
-        {/* Points display - centered */}
+        {/* Points display with diamond - centered */}
         <div className="points-section">
+          <img
+            src="/graphics/point_512x512.png"
+            alt="Points"
+            className="points-diamond"
+          />
           <span className="points-value" id="points-target">{state.points}</span>
-          <span className="points-label">points</span>
         </div>
 
         {/* Empty spacer for balance */}
@@ -94,7 +113,7 @@ export default function MoodScreen({
       {/* Main instruction */}
       <p className="mood-instruction">earn points by completing a task:</p>
 
-      {/* Mood grid */}
+      {/* Mood grid - 4 moods + 1 spend card */}
       <div className="mood-grid">
         {MOODS.map((mood) => (
           <button
@@ -117,14 +136,22 @@ export default function MoodScreen({
             <span className="mood-label">{mood.name}</span>
           </button>
         ))}
+
+        {/* 5th card - Spend Points */}
+        <button className="mood-card spend-card" onClick={onSpendCoins}>
+          <div className="mood-image-container">
+            <img
+              src="/graphics/spend_512x512.png"
+              alt="Spend Points"
+              className="mood-image"
+            />
+          </div>
+          <span className="mood-label spend-label">spend points!</span>
+        </button>
       </div>
 
       {/* Action buttons */}
       <div className="mood-buttons">
-        <button className="btn-action btn-spend" onClick={onSpendCoins}>
-          spend coins (bad!)
-        </button>
-
         <button className="btn-action btn-invest" onClick={onInvestCoins}>
           invest coins (good!)
         </button>
