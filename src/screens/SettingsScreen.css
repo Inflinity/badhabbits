@@ -30,9 +30,9 @@
 
 .settings-info {
   padding: 16px;
-  background: var(--card-bg);
+  background: var(--bg);
   border-radius: 12px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-out-sm);
 }
 
 .info-label {
@@ -53,15 +53,15 @@
 
 .settings-danger {
   padding: 24px;
-  background: #fff5f5;
+  background: #fdf5f5;
   border-radius: 16px;
-  border: 1px solid #ffcccc;
+  box-shadow: var(--shadow-in);
 }
 
 .danger-title {
   font-size: 16px;
   font-weight: 600;
-  color: #cc0000;
+  color: var(--danger);
   margin: 0 0 16px;
 }
 
@@ -70,16 +70,16 @@
   padding: 14px;
   font-size: 16px;
   font-weight: 600;
-  color: #cc0000;
-  background: white;
-  border: 2px solid #cc0000;
+  color: var(--danger);
+  background: var(--bg);
+  border: none;
   border-radius: 12px;
+  box-shadow: var(--shadow-out-sm);
   cursor: pointer;
 }
 
 .reset-btn:active {
-  background: #cc0000;
-  color: white;
+  box-shadow: var(--shadow-in);
 }
 
 .confirm-reset {
@@ -88,7 +88,7 @@
 
 .confirm-text {
   font-size: 14px;
-  color: #cc0000;
+  color: var(--danger);
   margin: 0 0 16px;
   font-weight: 500;
 }
@@ -104,9 +104,10 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-  background: white;
-  border: 1px solid var(--border);
+  background: var(--bg);
+  border: none;
   border-radius: 10px;
+  box-shadow: var(--shadow-out-sm);
   cursor: pointer;
 }
 
@@ -116,16 +117,17 @@
   font-size: 14px;
   font-weight: 600;
   color: white;
-  background: #cc0000;
+  background: var(--danger);
   border: none;
   border-radius: 10px;
+  box-shadow: var(--shadow-out-sm);
   cursor: pointer;
 }
 
 .confirm-cancel:active {
-  background: var(--card-bg);
+  box-shadow: var(--shadow-in);
 }
 
 .confirm-delete:active {
-  background: #990000;
+  opacity: 0.9;
 }

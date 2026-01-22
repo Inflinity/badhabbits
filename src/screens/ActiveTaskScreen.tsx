@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ActiveTask } from '../lib/state'
 import './ActiveTaskScreen.css'
 
@@ -12,13 +12,13 @@ export default function ActiveTaskScreen({ task, onComplete, onExpired }: Active
   const [timeLeft, setTimeLeft] = useState<number>(0)
   const [progress, setProgress] = useState<number>(0)
   const [exploded, setExploded] = useState(false)
+  const animationRef = useRef<number | null>(null)
 
   const totalDuration = task.task.duration * 60 * 1000 // in ms
 
   // Vibrate function
   const vibrate = useCallback(() => {
     if ('vibrate' in navigator) {
-      // Pattern: vibrate 200ms, pause 100ms, vibrate 200ms, pause 100ms, vibrate 400ms
       navigator.vibrate([200, 100, 200, 100, 400])
     }
   }, [])
@@ -38,28 +38,49 @@ export default function ActiveTaskScreen({ task, onComplete, onExpired }: Active
       if (remaining === 0 && !exploded) {
         setExploded(true)
         vibrate()
-        // Wait for explosion animation, then trigger penalty
         setTimeout(() => {
           onExpired()
         }, 2000)
+        return
       }
+
+      // Continue animation loop
+      animationRef.current = requestAnimationFrame(updateTimer)
     }
 
-    updateTimer()
-    const interval = setInterval(updateTimer, 100) // Update more frequently for smoother countdown
+    // Start animation loop
+    animationRef.current = requestAnimationFrame(updateTimer)
 
-    return () => clearInterval(interval)
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
   }, [task.startedAt, totalDuration, exploded, vibrate, onExpired])
 
+  // Format time with milliseconds
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000)
     const minutes = Math.floor(totalSeconds / 60)
     const seconds = totalSeconds % 60
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+    const milliseconds = Math.floor((ms % 1000) / 10) // Show centiseconds
+    return {
+      main: `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+      ms: `.${milliseconds.toString().padStart(2, '0')}`
+    }
   }
 
-  // Calculate urgency level for color changes
-  const urgencyLevel = timeLeft < 10000 ? 'critical' : timeLeft < 30000 ? 'warning' : 'normal'
+  // Calculate urgency level - more granular for smoother transitions
+  const getUrgencyLevel = () => {
+    const percentLeft = (timeLeft / totalDuration) * 100
+    if (percentLeft <= 5) return 'critical'
+    if (percentLeft <= 15) return 'danger'
+    if (percentLeft <= 30) return 'warning'
+    return 'normal'
+  }
+
+  const urgencyLevel = getUrgencyLevel()
+  const time = formatTime(timeLeft)
 
   if (exploded) {
     return (
@@ -80,37 +101,51 @@ export default function ActiveTaskScreen({ task, onComplete, onExpired }: Active
 
         <h1 className="active-title">{task.task.title}</h1>
 
-        <div className={`countdown-display ${urgencyLevel}`}>
-          <span className="countdown-value">{formatTime(timeLeft)}</span>
-        </div>
-
-        <div className="timer-container">
-          <svg className="timer-ring" viewBox="0 0 200 200">
-            {/* Background ring */}
+        {/* Pomodoro-style circular timer */}
+        <div className="pomodoro-container">
+          <svg className="pomodoro-ring" viewBox="0 0 200 200">
+            {/* Background circle */}
             <circle
-              className="timer-ring-bg"
+              className="pomodoro-bg"
               cx="100"
               cy="100"
               r="90"
               fill="none"
-              strokeWidth="12"
+              strokeWidth="8"
             />
-            {/* Progress ring */}
+            {/* Progress circle */}
             <circle
-              className={`timer-ring-progress ${urgencyLevel}`}
+              className={`pomodoro-progress ${urgencyLevel}`}
               cx="100"
               cy="100"
               r="90"
               fill="none"
-              strokeWidth="12"
+              strokeWidth="8"
               strokeDasharray={2 * Math.PI * 90}
-              strokeDashoffset={2 * Math.PI * 90 * (progress / 100)}
+              strokeDashoffset={2 * Math.PI * 90 * (1 - progress / 100)}
               transform="rotate(-90 100 100)"
             />
           </svg>
-          <div className="timer-inner">
-            <span className="bomb-emoji">💣</span>
+
+          <div className={`pomodoro-inner ${urgencyLevel}`}>
+            <div className={`countdown-display ${urgencyLevel}`}>
+              <span className="countdown-main">{time.main}</span>
+              <span className="countdown-ms">{time.ms}</span>
+            </div>
+            <span className="start-label">
+              {urgencyLevel === 'critical' ? 'HURRY!' :
+               urgencyLevel === 'danger' ? 'QUICK!' :
+               urgencyLevel === 'warning' ? 'FOCUS' : 'START'}
+            </span>
           </div>
+        </div>
+
+        {/* Urgency indicator bar */}
+        <div className={`urgency-bar ${urgencyLevel}`}>
+          <div
+            className="urgency-fill"
+            style={{ width: `${100 - progress}%` }}
+          />
         </div>
       </div>
 

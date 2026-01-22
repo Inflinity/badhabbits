@@ -1,3 +1,6 @@
+/* Import Inter font - must be first */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -5,17 +8,23 @@
 }
 
 :root {
+  /* Corporate Design Colors */
+  --accent: #FDD0D3;           /* Pink - primary accent */
+  --accent-dark: #f0b8bc;      /* Darker pink for hover */
+  --text-brown: #625654;       /* Dark brown - primary text */
+  --danger: #c44536;           /* Red for urgency */
+
   /* Neumorphism Light Theme */
   --bg: #ECF0F3;
   --bg-dark: #E3E7EA;
-  --text: #2D3436;
-  --text-muted: #636E72;
-  --accent: #0066FF;
-  --accent-light: #4D94FF;
-  --success: #00B894;
-  --warning: #FDCB6E;
+  --text: #625654;             /* Using brown as main text */
+  --text-muted: #8a807e;       /* Muted brown */
+  --success: #7d9f80;          /* Muted green matching palette */
+  --warning: #d4a574;          /* Warm warning color */
 
   /* Neumorphism shadows */
+  --shadow-dark: #D1D9E6;
+  --shadow-light: #FFFFFF;
   --shadow-out: 18px 18px 30px #D1D9E6, -18px -18px 30px #FFFFFF;
   --shadow-out-sm: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
   --shadow-in: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
@@ -29,7 +38,7 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -39,7 +48,7 @@ body {
 }
 
 button {
-  font-family: inherit;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   cursor: pointer;
   border: none;
   outline: none;

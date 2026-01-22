@@ -47,10 +47,10 @@ export interface AppState {
 }
 
 export const MOODS: Mood[] = [
-  { id: 'commute', name: 'Commuting', image: '/moods/commute.jpg' },
-  { id: 'couch', name: 'Couch Potato', image: '/moods/couch.jpg' },
-  { id: 'social', name: 'With Friends', image: '/moods/social.jpg' },
-  { id: 'bed', name: 'In Bed', image: '/moods/bed.jpg' },
+  { id: 'commute', name: 'Commuting', image: '/graphics/commute_512x512.png' },
+  { id: 'couch', name: 'Couch Potato', image: '/graphics/couch_512x512.png' },
+  { id: 'social', name: 'With Friends', image: '/graphics/party_512x512.png' },
+  { id: 'bed', name: 'In Bed', image: '/graphics/bed_512x512.png' },
 ]
 
 // Reward categories - in order of "badness"

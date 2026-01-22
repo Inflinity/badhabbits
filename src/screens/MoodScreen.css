@@ -18,7 +18,6 @@
 .user-id {
   font-size: 12px;
   color: var(--text-muted);
-  font-family: monospace;
 }
 
 .header-right {
@@ -34,7 +33,7 @@
   background: var(--bg);
   padding: 6px 12px;
   border-radius: 12px;
-  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-out-sm);
 }
 
 .settings-btn {
@@ -46,57 +45,63 @@
   background: var(--bg);
   border: none;
   border-radius: 10px;
-  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-out-sm);
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .settings-btn:active {
-  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-in);
 }
 
 .mood-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
   margin-bottom: 16px;
+  line-height: 1.4;
 }
 
 .mood-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .mood-card {
   position: relative;
   background: var(--bg);
-  box-shadow: 6px 6px 12px #D1D9E6, -6px -6px 12px #FFFFFF;
-  border-radius: 16px;
+  box-shadow: var(--shadow-out);
+  border-radius: 20px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   padding: 0;
-  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.mood-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 20px 20px 35px var(--shadow-dark), -20px -20px 35px var(--shadow-light);
 }
 
 .mood-card:active {
-  box-shadow: inset 6px 6px 12px #D1D9E6, inset -6px -6px 12px #FFFFFF;
-}
-
-.mood-card.selected {
-  box-shadow: inset 6px 6px 12px #D1D9E6, inset -6px -6px 12px #FFFFFF;
-  outline: 3px solid var(--accent);
+  transform: translateY(0);
+  box-shadow: var(--shadow-in);
 }
 
 .mood-image-container {
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg);
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
 }
 
 .mood-image {
@@ -114,6 +119,16 @@
   display: block;
 }
 
+.mood-label {
+  display: block;
+  padding: 12px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  background: var(--bg);
+}
+
 /* Buttons section */
 .mood-buttons {
   display: flex;
@@ -122,73 +137,49 @@
   margin-top: auto;
 }
 
-.btn-primary {
-  padding: 18px;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-muted);
-  background: var(--bg);
-  box-shadow: 6px 6px 12px #D1D9E6, -6px -6px 12px #FFFFFF;
-  border-radius: 16px;
-  transition: all 0.3s ease;
-}
-
-.btn-primary.active {
-  color: var(--accent);
-}
-
-.btn-primary:active {
-  box-shadow: inset 6px 6px 12px #D1D9E6, inset -6px -6px 12px #FFFFFF;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .btn-secondary {
   padding: 14px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--success);
+  color: var(--accent);
   background: var(--bg);
-  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-out-sm);
   border-radius: 14px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-secondary:active {
-  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-in);
 }
 
 .btn-schweinehund {
   padding: 14px;
   font-size: 15px;
   font-weight: 600;
-  color: #e67e22;
+  color: var(--text-brown);
   background: var(--bg);
-  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-out-sm);
   border-radius: 14px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-schweinehund:active {
-  box-shadow: inset 4px 4px 8px #D1D9E6, inset -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-in);
 }
 
 .btn-send {
   padding: 12px;
   font-size: 14px;
   font-weight: 500;
-  color: #9b59b6;
+  color: var(--text-muted);
   background: var(--bg);
-  box-shadow: 3px 3px 6px #D1D9E6, -3px -3px 6px #FFFFFF;
+  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-send:active {
-  box-shadow: inset 3px 3px 6px #D1D9E6, inset -3px -3px 6px #FFFFFF;
+  box-shadow: var(--shadow-in);
 }
 
 .btn-confess {
@@ -197,11 +188,11 @@
   font-weight: 500;
   color: var(--text-muted);
   background: var(--bg);
-  box-shadow: 3px 3px 6px #D1D9E6, -3px -3px 6px #FFFFFF;
+  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-confess:active {
-  box-shadow: inset 3px 3px 6px #D1D9E6, inset -3px -3px 6px #FFFFFF;
+  box-shadow: var(--shadow-in);
 }

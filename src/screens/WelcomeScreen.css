@@ -110,7 +110,7 @@
 
 .welcome-button.start {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-brown);
   box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
 }
 

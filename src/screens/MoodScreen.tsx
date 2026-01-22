@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { MOODS, AppState } from '../lib/state'
 import './MoodScreen.css'
 
@@ -13,16 +12,9 @@ interface MoodScreenProps {
 }
 
 export default function MoodScreen({ state, onMoodSelect, onRedeem, onSchweinehund, onConfess, onSendPoints, onSettings }: MoodScreenProps) {
-  const [selectedMood, setSelectedMood] = useState<string | null>(null)
-
+  // Direct click on mood image starts the task
   const handleMoodClick = (moodId: string) => {
-    setSelectedMood(moodId)
-  }
-
-  const handleGetTask = () => {
-    if (selectedMood) {
-      onMoodSelect(selectedMood)
-    }
+    onMoodSelect(moodId)
   }
 
   return (
@@ -41,13 +33,13 @@ export default function MoodScreen({ state, onMoodSelect, onRedeem, onSchweinehu
         </div>
       </div>
 
-      <h1 className="mood-title">Mood:</h1>
+      <h1 className="mood-title">Resist urge: Complete a task based on situation:</h1>
 
       <div className="mood-grid">
         {MOODS.map((mood) => (
           <button
             key={mood.id}
-            className={`mood-card ${selectedMood === mood.id ? 'selected' : ''}`}
+            className="mood-card"
             onClick={() => handleMoodClick(mood.id)}
           >
             <div className="mood-image-container">
@@ -68,19 +60,12 @@ export default function MoodScreen({ state, onMoodSelect, onRedeem, onSchweinehu
                 {mood.id === 'bed' && '🛏️'}
               </div>
             </div>
+            <span className="mood-label">{mood.name}</span>
           </button>
         ))}
       </div>
 
       <div className="mood-buttons">
-        <button
-          className={`btn-primary ${selectedMood ? 'active' : ''}`}
-          onClick={handleGetTask}
-          disabled={!selectedMood}
-        >
-          Give me a task!
-        </button>
-
         <button className="btn-secondary" onClick={onRedeem}>
           Spend points on myself!
         </button>

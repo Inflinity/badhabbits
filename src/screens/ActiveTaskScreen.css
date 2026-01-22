@@ -4,25 +4,30 @@
   flex-direction: column;
   padding: 48px 24px 32px;
   background: var(--bg);
-  transition: background 0.3s ease;
+  transition: background 0.5s ease;
 }
 
+/* Urgency background states */
 .active-screen.warning {
-  background: #fff5e6;
+  background: linear-gradient(180deg, var(--bg) 0%, #f5e6e0 100%);
+}
+
+.active-screen.danger {
+  background: linear-gradient(180deg, #f0dcd8 0%, #e8ccc4 100%);
 }
 
 .active-screen.critical {
-  background: #ffe6e6;
-  animation: pulse-bg 0.5s ease-in-out infinite alternate;
+  background: linear-gradient(180deg, #e8c8c0 0%, #d9b0a8 100%);
+  animation: pulse-bg-critical 0.8s ease-in-out infinite alternate;
 }
 
-@keyframes pulse-bg {
-  from { background: #ffe6e6; }
-  to { background: #ffcccc; }
+@keyframes pulse-bg-critical {
+  from { background: linear-gradient(180deg, #e8c8c0 0%, #d9b0a8 100%); }
+  to { background: linear-gradient(180deg, #dbb8b0 0%, #c99890 100%); }
 }
 
 .active-screen.exploded {
-  background: #1a1a1a;
+  background: var(--text-brown);
   justify-content: center;
   align-items: center;
 }
@@ -38,119 +43,219 @@
 .active-label {
   font-size: 14px;
   font-weight: 700;
-  color: var(--warning);
+  color: var(--accent);
   letter-spacing: 3px;
   margin-bottom: 16px;
+  transition: color 0.3s ease;
+}
+
+.warning .active-label,
+.danger .active-label,
+.critical .active-label {
+  color: var(--danger);
 }
 
 .active-title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
   line-height: 1.4;
   color: var(--text);
-  margin-bottom: 24px;
+  margin-bottom: 32px;
   max-width: 300px;
 }
 
-/* Big Countdown Display */
-.countdown-display {
-  margin-bottom: 24px;
-  padding: 16px 32px;
-  background: var(--bg);
-  border-radius: 20px;
-  box-shadow: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
-}
-
-.countdown-display.warning {
-  box-shadow: inset 8px 8px 16px #e6c99e, inset -8px -8px 16px #fff5e6;
-}
-
-.countdown-display.critical {
-  box-shadow: inset 8px 8px 16px #e6b3b3, inset -8px -8px 16px #ffe6e6;
-  animation: shake 0.1s ease-in-out infinite;
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  75% { transform: translateX(2px); }
-}
-
-.countdown-value {
-  font-size: 64px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
-}
-
-.countdown-display.warning .countdown-value {
-  color: #e67e22;
-}
-
-.countdown-display.critical .countdown-value {
-  color: #cc0000;
-}
-
-/* Neumorphism Timer Ring */
-.timer-container {
+/* Pomodoro Timer Container */
+.pomodoro-container {
   position: relative;
-  width: 180px;
-  height: 180px;
+  width: 240px;
+  height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 32px;
 }
 
-.timer-ring {
+.pomodoro-ring {
   position: absolute;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(6px 6px 12px #D1D9E6) drop-shadow(-6px -6px 12px #FFFFFF);
 }
 
-.timer-ring-bg {
-  stroke: #e0e0e0;
+.pomodoro-bg {
+  stroke: var(--shadow-dark);
+  opacity: 0.3;
 }
 
-.timer-ring-progress {
+.pomodoro-progress {
   stroke: var(--accent);
   stroke-linecap: round;
-  transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
+  transition: stroke 0.5s ease;
 }
 
-.timer-ring-progress.warning {
-  stroke: #e67e22;
+.pomodoro-progress.warning {
+  stroke: #e07a5f;
 }
 
-.timer-ring-progress.critical {
-  stroke: #cc0000;
+.pomodoro-progress.danger {
+  stroke: #c44536;
 }
 
-.timer-inner {
+.pomodoro-progress.critical {
+  stroke: #9e2a2b;
+  animation: pulse-ring 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-ring {
+  from { stroke-width: 8; }
+  to { stroke-width: 12; }
+}
+
+/* Inner circle with neumorphism */
+.pomodoro-inner {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: var(--shadow-in-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 130px;
-  height: 130px;
-  background: var(--bg);
-  border-radius: 50%;
-  box-shadow: inset 6px 6px 12px #D1D9E6, inset -6px -6px 12px #FFFFFF;
+  transition: all 0.5s ease;
 }
 
-.bomb-emoji {
+.pomodoro-inner.warning {
+  background: linear-gradient(145deg, #f0e0dc, #e8d4ce);
+  box-shadow: inset 8px 8px 16px #d4c4be, inset -8px -8px 16px #faf0ea;
+}
+
+.pomodoro-inner.danger {
+  background: linear-gradient(145deg, #e8d0c8, #dcc0b8);
+  box-shadow: inset 8px 8px 16px #c8b0a8, inset -8px -8px 16px #f8e0d8;
+}
+
+.pomodoro-inner.critical {
+  background: linear-gradient(145deg, #dcc0b8, #d0b0a8);
+  box-shadow: inset 8px 8px 16px #b89890, inset -8px -8px 16px #f0d0c8;
+  animation: shake 0.15s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+/* Countdown Display */
+.countdown-display {
+  display: flex;
+  align-items: baseline;
+  transition: all 0.3s ease;
+}
+
+.countdown-main {
   font-size: 48px;
-  animation: bomb-wiggle 1s ease-in-out infinite;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  transition: color 0.3s ease;
 }
 
-.critical .bomb-emoji {
-  animation: bomb-wiggle 0.2s ease-in-out infinite;
+.countdown-ms {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  transition: color 0.3s ease;
 }
 
-@keyframes bomb-wiggle {
-  0%, 100% { transform: rotate(-5deg); }
-  50% { transform: rotate(5deg); }
+.countdown-display.warning .countdown-main,
+.countdown-display.warning .countdown-ms {
+  color: #c44536;
+}
+
+.countdown-display.danger .countdown-main,
+.countdown-display.danger .countdown-ms {
+  color: #9e2a2b;
+}
+
+.countdown-display.critical .countdown-main {
+  color: #772e25;
+  animation: pulse-text 0.3s ease-in-out infinite alternate;
+}
+
+.countdown-display.critical .countdown-ms {
+  color: #9e2a2b;
+}
+
+@keyframes pulse-text {
+  from { transform: scale(1); }
+  to { transform: scale(1.05); }
+}
+
+.start-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  transition: all 0.3s ease;
+}
+
+.warning .start-label {
+  color: #c44536;
+}
+
+.danger .start-label {
+  color: #9e2a2b;
+  letter-spacing: 3px;
+}
+
+.critical .start-label {
+  color: #772e25;
+  letter-spacing: 2px;
+  animation: blink 0.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Urgency Bar */
+.urgency-bar {
+  width: 100%;
+  max-width: 280px;
+  height: 6px;
+  background: var(--shadow-dark);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: var(--shadow-in);
+}
+
+.urgency-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: background 0.5s ease;
+}
+
+.urgency-bar.warning .urgency-fill {
+  background: #e07a5f;
+}
+
+.urgency-bar.danger .urgency-fill {
+  background: #c44536;
+}
+
+.urgency-bar.critical .urgency-fill {
+  background: #9e2a2b;
+  animation: pulse-bar 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-bar {
+  from { opacity: 1; }
+  to { opacity: 0.7; }
 }
 
 /* Explosion */
@@ -185,15 +290,15 @@
 .explosion-text {
   font-size: 48px;
   font-weight: 900;
-  color: #ff4444;
-  text-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+  color: var(--accent);
+  text-shadow: 0 0 20px rgba(253, 208, 211, 0.5);
   margin: 16px 0 8px;
 }
 
 .explosion-penalty {
   font-size: 24px;
   font-weight: 700;
-  color: #ff6666;
+  color: var(--accent);
 }
 
 /* Buttons */
@@ -209,14 +314,14 @@
   padding: 20px;
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
-  background: var(--success);
+  color: var(--text-brown);
+  background: var(--accent);
   border-radius: 20px;
-  box-shadow: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+  box-shadow: var(--shadow-out);
   transition: all 0.2s ease;
 }
 
 .btn-complete:active {
-  box-shadow: 4px 4px 8px #D1D9E6, -4px -4px 8px #FFFFFF;
+  box-shadow: var(--shadow-in);
   transform: scale(0.98);
 }
