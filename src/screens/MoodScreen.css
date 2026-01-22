@@ -11,70 +11,101 @@
 .mood-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
 }
 
-.user-id {
-  font-size: 12px;
-  color: var(--text-muted);
+.header-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
 }
 
-.header-right {
+/* Action Bubbles */
+.action-bubbles {
   display: flex;
+  gap: 8px;
   align-items: center;
-  gap: 12px;
 }
 
-.points-display {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
+.action-bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   background: var(--bg);
-  padding: 6px 12px;
-  border-radius: 12px;
   box-shadow: var(--shadow-out-sm);
-}
-
-.settings-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: var(--bg);
-  border: none;
-  border-radius: 10px;
-  box-shadow: var(--shadow-out-sm);
   color: var(--text-muted);
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.settings-btn:active {
+.action-bubble:active {
   box-shadow: var(--shadow-in);
 }
 
-.mood-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 16px;
-  line-height: 1.4;
+.timer-bubble {
+  width: auto;
+  min-width: 36px;
+  padding: 0 10px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: var(--bg);
 }
 
+.bubble-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bubble-icon {
+  font-size: 14px;
+}
+
+.settings-bubble {
+  color: var(--text-muted);
+}
+
+/* Points Section */
+.points-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.points-value {
+  font-size: 48px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.points-label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Instruction */
+.mood-instruction {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+/* Mood Grid */
 .mood-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
 .mood-card {
-  position: relative;
   background: var(--bg);
-  box-shadow: var(--shadow-out);
-  border-radius: 20px;
+  box-shadow: var(--shadow-out-sm);
+  border-radius: 16px;
   overflow: hidden;
   transition: all 0.2s ease;
   padding: 0;
@@ -83,13 +114,7 @@
   cursor: pointer;
 }
 
-.mood-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 20px 20px 35px var(--shadow-dark), -20px -20px 35px var(--shadow-light);
-}
-
 .mood-card:active {
-  transform: translateY(0);
   box-shadow: var(--shadow-in);
 }
 
@@ -99,8 +124,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
-  border-radius: 20px 20px 0 0;
+  background: var(--bg-dark);
   overflow: hidden;
 }
 
@@ -110,89 +134,46 @@
   object-fit: cover;
 }
 
-.mood-emoji-fallback {
-  display: none;
-  font-size: 40px;
-}
-
-.mood-image-container.no-image .mood-emoji-fallback {
-  display: block;
-}
-
 .mood-label {
   display: block;
-  padding: 12px 8px;
+  padding: 10px 8px;
   font-size: 13px;
-  font-weight: 600;
   color: var(--text);
   text-align: center;
   background: var(--bg);
 }
 
-/* Buttons section */
+/* Action Buttons */
 .mood-buttons {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   margin-top: auto;
 }
 
-.btn-secondary {
+.btn-action {
   padding: 14px;
   font-size: 15px;
-  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  box-shadow: var(--shadow-out-sm);
+  border-radius: 14px;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.btn-action:active {
+  box-shadow: var(--shadow-in);
+}
+
+.btn-spend {
+  color: var(--danger);
+}
+
+.btn-invest {
   color: var(--accent);
-  background: var(--bg);
-  box-shadow: var(--shadow-out-sm);
-  border-radius: 14px;
-  transition: all 0.2s ease;
 }
 
-.btn-secondary:active {
-  box-shadow: var(--shadow-in);
-}
-
-.btn-schweinehund {
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-brown);
-  background: var(--bg);
-  box-shadow: var(--shadow-out-sm);
-  border-radius: 14px;
-  transition: all 0.2s ease;
-}
-
-.btn-schweinehund:active {
-  box-shadow: var(--shadow-in);
-}
-
-.btn-send {
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg);
-  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.btn-send:active {
-  box-shadow: var(--shadow-in);
-}
-
-.btn-confess {
-  padding: 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg);
-  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.btn-confess:active {
-  box-shadow: var(--shadow-in);
+.btn-track {
+  color: var(--accent-alt);
 }

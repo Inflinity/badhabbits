@@ -1,5 +1,5 @@
 /* Import Inter font - must be first */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap');
 
 * {
   margin: 0;
@@ -8,27 +8,30 @@
 }
 
 :root {
-  /* Corporate Design Colors */
-  --accent: #FDD0D3;           /* Pink - primary accent */
-  --accent-dark: #f0b8bc;      /* Darker pink for hover */
-  --text-brown: #625654;       /* Dark brown - primary text */
-  --danger: #c44536;           /* Red for urgency */
+  /* New Color Palette */
+  --dark-brown: #1F1410;
+  --mid-brown: #5C4D42;
+  --olive: #6B7F56;
+  --blue-gray: #7FA3B0;
+  --light-gray: #C9D1C8;
+  --cream: #EDE8E2;
 
-  /* Neumorphism Light Theme */
-  --bg: #ECF0F3;
-  --bg-dark: #E3E7EA;
-  --text: #625654;             /* Using brown as main text */
-  --text-muted: #8a807e;       /* Muted brown */
-  --success: #7d9f80;          /* Muted green matching palette */
-  --warning: #d4a574;          /* Warm warning color */
+  /* Semantic mappings */
+  --bg: #EDE8E2;
+  --bg-dark: #C9D1C8;
+  --text: #1F1410;
+  --text-muted: #5C4D42;
+  --accent: #6B7F56;
+  --accent-alt: #7FA3B0;
+  --danger: #8B4513;
 
-  /* Neumorphism shadows */
-  --shadow-dark: #D1D9E6;
+  /* Neumorphism shadows for cream background */
+  --shadow-dark: #D4CFC9;
   --shadow-light: #FFFFFF;
-  --shadow-out: 18px 18px 30px #D1D9E6, -18px -18px 30px #FFFFFF;
-  --shadow-out-sm: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
-  --shadow-in: inset 8px 8px 16px #D1D9E6, inset -8px -8px 16px #FFFFFF;
-  --shadow-in-lg: inset 12px 12px 24px #D1D9E6, inset -12px -12px 24px #FFFFFF;
+  --shadow-out: 12px 12px 24px #D4CFC9, -12px -12px 24px #FFFFFF;
+  --shadow-out-sm: 6px 6px 12px #D4CFC9, -6px -6px 12px #FFFFFF;
+  --shadow-in: inset 6px 6px 12px #D4CFC9, inset -6px -6px 12px #FFFFFF;
+  --shadow-in-lg: inset 8px 8px 16px #D4CFC9, inset -8px -8px 16px #FFFFFF;
 }
 
 html, body, #root {
@@ -39,6 +42,8 @@ html, body, #root {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  font-size: 16px;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -49,6 +54,8 @@ body {
 
 button {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  font-size: 16px;
   cursor: pointer;
   border: none;
   outline: none;
@@ -63,19 +70,19 @@ body {
 .neu-flat {
   background: var(--bg);
   box-shadow: var(--shadow-out);
-  border-radius: 24px;
+  border-radius: 20px;
 }
 
 .neu-pressed {
   background: var(--bg);
   box-shadow: var(--shadow-in);
-  border-radius: 24px;
+  border-radius: 20px;
 }
 
 .neu-button {
   background: var(--bg);
   box-shadow: var(--shadow-out-sm);
-  border-radius: 16px;
+  border-radius: 14px;
   transition: all 0.2s ease;
 }
 
