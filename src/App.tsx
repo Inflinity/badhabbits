@@ -5,7 +5,7 @@ import SettingsScreen from './screens/SettingsScreen'
 import ResultOverlay from './components/ResultOverlay'
 import { loadState, saveState, clearState, AppState, getInitialState, getRandomTask } from './lib/state'
 
-type Screen = 'main' | 'active' | 'spend' | 'invest' | 'track' | 'messages' | 'settings' | 'profile'
+type Screen = 'main' | 'active' | 'spend' | 'invest' | 'track' | 'messages' | 'settings' | 'profile' | 'todolist'
 type ResultType = 'success' | 'fail' | null
 
 function App() {
@@ -111,6 +111,7 @@ function App() {
           onResumeTask={handleResumeTask}
           onMessages={() => setScreen('messages')}
           onProfile={() => setScreen('profile')}
+          onTodoList={() => setScreen('todolist')}
         />
       )}
       {screen === 'active' && state.currentTask && (
@@ -159,6 +160,21 @@ function App() {
           <p style={{ marginTop: 20 }}>User ID: {state.oderId}</p>
           <p style={{ fontSize: 12, color: '#5C4D42', marginTop: 20 }}>customize your avatar and settings here</p>
           <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 10 }}>⚠️ profile incomplete - add your info!</p>
+        </div>
+      )}
+      {screen === 'todolist' && (
+        <div className="placeholder-screen" style={{ padding: 20, background: 'var(--bg)', height: '100%' }}>
+          <button onClick={() => setScreen('main')} style={{ marginBottom: 20 }}>back</button>
+          <h2>daily & weekly tasks</h2>
+          <img src="/graphics/todo_512x512.png" alt="Todo List" style={{ width: 120, marginTop: 20 }} />
+          <p style={{ marginTop: 20, fontSize: 14 }}>add your daily and weekly habits here</p>
+          <p style={{ fontSize: 12, color: 'var(--accent)', marginTop: 10 }}>complete all daily tasks = +1 bonus point!</p>
+          <div style={{ marginTop: 30, textAlign: 'left' }}>
+            <p style={{ fontSize: 12, color: '#5C4D42', marginBottom: 10 }}>daily tasks:</p>
+            <p style={{ fontSize: 11, color: '#999' }}>no tasks yet - add some!</p>
+            <p style={{ fontSize: 12, color: '#5C4D42', marginBottom: 10, marginTop: 20 }}>weekly tasks:</p>
+            <p style={{ fontSize: 11, color: '#999' }}>no tasks yet - add some!</p>
+          </div>
         </div>
       )}
       {screen === 'settings' && (

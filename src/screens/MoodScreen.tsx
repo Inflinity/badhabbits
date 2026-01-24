@@ -13,6 +13,7 @@ interface MoodScreenProps {
   onResumeTask: () => void
   onMessages: () => void
   onProfile: () => void
+  onTodoList: () => void
 }
 
 export default function MoodScreen({
@@ -25,7 +26,8 @@ export default function MoodScreen({
   onSettings,
   onResumeTask,
   onMessages,
-  onProfile
+  onProfile,
+  onTodoList
 }: MoodScreenProps) {
   const [timerDisplay, setTimerDisplay] = useState<string | null>(null)
 
@@ -97,6 +99,10 @@ export default function MoodScreen({
             <span className="bubble-time">{timerDisplay}</span>
           </button>
         )}
+
+        <button className="action-bubble todo-bubble" onClick={onTodoList}>
+          <img src="/graphics/todo_512x512.png" alt="Todo List" />
+        </button>
 
         <button className="action-bubble tip-bubble">
           <span className="bubble-icon">?</span>
