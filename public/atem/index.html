@@ -197,8 +197,8 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
 
   <form id="setup">
     <div class="field">
-      <label for="volume">Lautstärke <output id="volumeOut">50 %</output></label>
-      <input type="range" id="volume" min="0.15" max="1" step="0.05" value="0.5">
+      <label for="volume">Lautstärke <output id="volumeOut">35 %</output></label>
+      <input type="range" id="volume" min="0.15" max="1" step="0.05" value="0.35">
     </div>
     <div class="field">
       <label for="target">Ziel <output id="targetOut">6</output> Atemzüge pro Minute</label>
@@ -230,11 +230,11 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
       </div>
     </div>
     <div class="field">
-      <span>Klang</span>
+      <span>Klänge (einzeln an/aus)</span>
       <div class="seg">
-        <input type="radio" name="sound" id="sSea" value="sea" checked><label for="sSea">Meer</label>
-        <input type="radio" name="sound" id="sTone" value="tone"><label for="sTone">Ton</label>
-        <input type="radio" name="sound" id="sBoth" value="both"><label for="sBoth">Beides</label>
+        <input type="checkbox" id="lTone" checked><label for="lTone">Ton</label>
+        <input type="checkbox" id="lSea"><label for="lSea">Meer</label>
+        <input type="checkbox" id="lHeart"><label for="lHeart">Herzschlag</label>
       </div>
     </div>
     <div class="toggles">
@@ -242,7 +242,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
       <label><input type="checkbox" id="chimes" checked> Glöckchen an Wendepunkten</label>
       <label><input type="checkbox" id="autodim" checked> Bildschirm abdunkeln</label>
     </div>
-    <p class="hint"><b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Das Meer kannst du dazunehmen. <b>Matchen</b>: Der Klang rastet auf deinen Atem ein und atmet mit dir. <b>Führen</b>: Erst matchen, dann wird der Klang sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <p class="hint"><b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Matchen</b>: Der Klang rastet auf deinen Atem ein und atmet mit dir. <b>Führen</b>: Erst matchen, dann wird der Klang sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -261,14 +261,15 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v4 · 21.10. 23:00";
-const S = { target: 6, ratio: 1.5, mode: "realtime", minutes: 10, sound: "sea", volume: 0.5, voice: true, chimes: true, autodim: true };
-try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse3") || "{}")); } catch (e) {}
+const VERSION = "v5 · 21.10. 23:45";
+const S = { target: 6, ratio: 1.5, mode: "realtime", minutes: 10, volume: 0.35, tone: true, sea: false, heart: false, voice: true, chimes: true, autodim: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse4") || "{}")); } catch (e) {}
 if (!["realtime", "match", "lead"].includes(S.mode)) S.mode = "realtime";
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
   $("#volume").value = S.volume; $("#volumeOut").textContent = Math.round(S.volume * 100) + " %";
-  for (const name of ["ratio", "mode", "minutes", "sound"]) {
+  $("#lTone").checked = S.tone; $("#lSea").checked = S.sea; $("#lHeart").checked = S.heart;
+  for (const name of ["ratio", "mode", "minutes"]) {
     const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
     if (el) el.checked = true;
   }
@@ -280,9 +281,9 @@ function readForm() {
   S.ratio = parseFloat(document.querySelector("input[name=ratio]:checked").value);
   S.mode = document.querySelector("input[name=mode]:checked").value;
   S.minutes = parseFloat(document.querySelector("input[name=minutes]:checked").value);
-  S.sound = document.querySelector("input[name=sound]:checked").value;
+  S.tone = $("#lTone").checked; S.sea = $("#lSea").checked; S.heart = $("#lHeart").checked;
   S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
-  try { localStorage.setItem("atemlotse3", JSON.stringify(S)); } catch (e) {}
+  try { localStorage.setItem("atemlotse4", JSON.stringify(S)); } catch (e) {}
 }
 applySettingsToForm();
 $("#target").addEventListener("input", () => { $("#targetOut").textContent = $("#target").value; });
@@ -300,7 +301,7 @@ const sig = {
   C: [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]], u: [0, 0, 1],
   s: 0, amp: 0, x: 0, polarity: 1, seen: false,
   // gravity smoothed but not high-passed: the chest's actual position, for Echtzeit
-  g1: [0, 0, 0], g2: [0, 0, 0], hbSlow: [0, 0, 0], hb: [0, 0, 0],
+  g1: [0, 0, 0], g2: [0, 0, 0],
   acc: [0, 0, 0], accN: 0, rot: [0, 0, 0], rotN: 0,
 };
 const det = { dir: 1, ext: 0, extT: 0, lastTurn: 0, troughs: [], peaks: [] };
@@ -320,7 +321,7 @@ function onMotion(e) {
   const g = [a.x, a.y, a.z];
   if (!sig.init) {
     sig.slow = g.slice(); sig.lp = [0, 0, 0]; sig.lp2 = [0, 0, 0];
-    sig.g1 = g.slice(); sig.g2 = g.slice(); sig.hbSlow = g.slice(); sig.acc = [0, 0, 0]; sig.accN = 0; sig.rot = [0, 0, 0]; sig.rotN = 0; sig.lastT = t; sig.t0 = t; sig.nextSample = t;
+    sig.g1 = g.slice(); sig.g2 = g.slice(); sig.acc = [0, 0, 0]; sig.accN = 0; sig.rot = [0, 0, 0]; sig.rotN = 0; sig.lastT = t; sig.t0 = t; sig.nextSample = t;
     sig.magSlow = Math.hypot(...g); sig.init = true; return;
   }
   const dt = clamp(t - sig.lastT, 0.001, 0.1); sig.lastT = t;
@@ -350,7 +351,6 @@ function sample(t, moving) {
   const gAvg = sig.accN ? sig.acc.map((c) => c / sig.accN) : sig.g2.slice();
   const rAvg = sig.rotN ? sig.rot.map((c) => c / sig.rotN) : [0, 0, 0];
   sig.acc = [0, 0, 0]; sig.accN = 0; sig.rot = [0, 0, 0]; sig.rotN = 0;
-  for (let i = 0; i < 3; i++) { sig.hbSlow[i] += (gAvg[i] - sig.hbSlow[i]) * (0.05 / 0.3); sig.hb[i] = gAvg[i] - sig.hbSlow[i]; }
   const v = sig.lp2;
   if (!moving) {
     const tau = Math.min(20, 3 + (t - sig.t0) * 0.5);
@@ -369,6 +369,7 @@ function sample(t, moving) {
   sig.x = clamp(s / Math.max(sig.amp * 1.41, 1e-4), -1.6, 1.6);
   detect(t, s, moving);
   rtSample(t, moving);
+  heartSample(t, rAvg, moving);
   logSample(t, gAvg, rAvg);
 }
 
@@ -376,18 +377,17 @@ function sample(t, moving) {
    Hold (lungs empty) gives the resting position and the heartbeat jitter,
    one deep breath gives the direction and size of the movement. After that
    the tone simply follows where the chest is, with no rhythm model at all. */
-const RT = { base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null, hbBuf: [] };
+const RT = { base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null };
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 function rtReset() {
-  Object.assign(RT, { base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null, hbBuf: [] });
+  Object.assign(RT, { base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null });
 }
 function rtSample(t, moving) {
   const ph = sess.phase, el = t - sess.phaseStart;
   if (ph === "hold" && el > 2.5 && !moving) {
     for (let i = 0; i < 3; i++) RT.baseSum[i] += sig.g2[i];
     RT.baseN++;
-    RT.hbBuf.push(sig.hb.slice());
   } else if (ph === "deep" && RT.base) {
     const d = sub(sig.g2, RT.base), n = Math.hypot(...d);
     if (n > RT.inMax) { RT.inMax = n; RT.inVec = d; }
@@ -404,7 +404,7 @@ function rtSample(t, moving) {
 }
 function rtEndHold() {
   RT.base = RT.baseN > 10 ? RT.baseSum.map((c) => c / RT.baseN) : sig.g2.slice();
-  RT.hr = estimateHR(RT.hbBuf);
+  RT.hr = HB.bpm;
   logEvent("hold", { baseN: RT.baseN, base: RT.base.map((c) => +c.toFixed(4)), hr: RT.hr && +RT.hr.toFixed(1) });
 }
 function rtEndDeep() {
@@ -416,29 +416,67 @@ function rtEndDeep() {
   resetDetector();
   logEvent("deep", { inMax: +RT.inMax.toFixed(4), dir: RT.dir.map((c) => +c.toFixed(3)), polarity: sig.polarity });
 }
-function estimateHR(buf) {
-  if (buf.length < 80) return null;
-  let best = 0, axis = 0;
+
+/* ---------------- Heartbeat from the gyroscope ----------------
+   Each beat gives the chest a tiny twist the gyroscope picks up (Chrome rounds
+   the accelerometer too coarsely for it). The rate comes from a 16 s spectrum
+   of the band-passed rotation (fundamental plus 2nd harmonic, kept close to
+   the previous estimate); single beats come from peaks of its energy. */
+const HB = { slow: [0, 0, 0], lp: [0, 0, 0], buf: [], e: [0, 0, 0], eHist: [], bpm: null, conf: 0, nextEst: 0, lastBeat: 0, beat: false, sum: 0, n: 0 };
+function heartReset() { Object.assign(HB, { slow: [0, 0, 0], lp: [0, 0, 0], buf: [], e: [0, 0, 0], eHist: [], bpm: null, conf: 0, nextEst: 0, lastBeat: 0, beat: false, sum: 0, n: 0 }); }
+function heartSample(t, r, moving) {
+  HB.beat = false;
+  if (moving) { HB.buf = []; HB.eHist = []; HB.slow = r.slice(); HB.lp = [0, 0, 0]; return; }
+  let e = 0;
   for (let k = 0; k < 3; k++) {
-    const m = buf.reduce((a, v) => a + v[k], 0) / buf.length;
-    const varK = buf.reduce((a, v) => a + (v[k] - m) * (v[k] - m), 0);
-    if (varK > best) { best = varK; axis = k; }
+    HB.slow[k] += (r[k] - HB.slow[k]) * 0.2;           // high-pass ~0.6 Hz
+    HB.lp[k] += (r[k] - HB.slow[k] - HB.lp[k]) * 0.83; // low-pass ~3 Hz
+    e += HB.lp[k] * HB.lp[k];
   }
-  const m = buf.reduce((a, v) => a + v[axis], 0) / buf.length;
-  const a = buf.map((v) => v[axis] - m);
-  const e0 = a.reduce((x, v) => x + v * v, 0) || 1;
-  const ac = [];
-  for (let lag = 0; lag <= 32; lag++) {
-    let sum = 0;
-    for (let i = 0; i + lag < a.length; i++) sum += a[i] * a[i + lag];
-    ac[lag] = sum / e0;
+  HB.buf.push(HB.lp.slice());
+  if (HB.buf.length > 320) HB.buf.shift();
+  // beat = local peak of the (3-tap smoothed) energy, well above its recent median
+  HB.e.shift(); HB.e.push(e);
+  const es = (HB.e[0] + HB.e[1] + HB.e[2]) / 3;
+  HB.eHist.push(es); if (HB.eHist.length > 100) HB.eHist.shift();
+  const h = HB.eHist, n = h.length;
+  if (n > 40 && h[n - 2] > h[n - 3] && h[n - 2] >= h[n - 1]) {
+    const med = h.slice().sort((a, b) => a - b)[n >> 1];
+    const gap = HB.bpm ? 0.65 * 60 / HB.bpm : 0.45;
+    if (h[n - 2] > 2 * med && t - 0.05 - HB.lastBeat > gap) {
+      HB.lastBeat = t - 0.05; HB.beat = true;
+      if (sess.phase !== "place") heartSound();
+    }
   }
-  let L = -1, peak = 0.3;
-  for (let lag = 8; lag <= 30; lag++) if (ac[lag] > peak && ac[lag] >= ac[lag - 1] && ac[lag] >= ac[lag + 1]) { peak = ac[lag]; L = lag; }
-  if (L < 0) return null;
-  const den = ac[L - 1] - 2 * ac[L] + ac[L + 1];
-  const off = den ? 0.5 * (ac[L - 1] - ac[L + 1]) / den : 0;
-  return 60 / ((L + off) * 0.05);
+  if (t >= HB.nextEst && HB.buf.length >= 160) { HB.nextEst = t + 2; heartEstimate(); }
+}
+function heartEstimate() {
+  const N = HB.buf.length, fs = 20;
+  const w = HB.buf.map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+  const power = (bpm) => {
+    const om = (2 * Math.PI * bpm) / 60 / fs;
+    let p = 0;
+    for (let k = 0; k < 3; k++) {
+      let re = 0, im = 0;
+      for (let i = 0; i < N; i++) { const v = HB.buf[i][k] * w[i]; re += v * Math.cos(om * i); im -= v * Math.sin(om * i); }
+      p += re * re + im * im;
+    }
+    return p;
+  };
+  const cand = [], H = [];
+  for (let bpm = 45; bpm <= 130; bpm += 0.5) { cand.push(bpm); H.push(power(bpm) + 0.6 * power(2 * bpm)); }
+  const med = H.slice().sort((a, b) => a - b)[H.length >> 1] || 1;
+  let best = -1, bi = 0;
+  for (let i = 0; i < H.length; i++) {
+    const prior = HB.bpm ? Math.exp(-0.5 * ((cand[i] - HB.bpm) / 15) ** 2) : 1;
+    const sc = (H[i] / med) * prior;
+    if (sc > best) { best = sc; bi = i; }
+  }
+  const raw = H[bi] / med;
+  if (raw >= 3) {
+    HB.bpm = HB.bpm ? HB.bpm + (cand[bi] - HB.bpm) * 0.6 : cand[bi];
+    HB.conf = raw; HB.sum += HB.bpm; HB.n++;
+  }
 }
 
 /* ---------------- Session log (downloadable) ---------------- */
@@ -455,7 +493,7 @@ function logSample(t, gAvg, rAvg) {
     gAvg[0].toFixed(4), gAvg[1].toFixed(4), gAvg[2].toFixed(4),
     rAvg[0].toFixed(3), rAvg[1].toFixed(3), rAvg[2].toFixed(3),
     sig.s.toFixed(5), sig.x.toFixed(3), RT.q.toFixed(3), guiding ? G.y.toFixed(3) : "",
-    sess.phase, sig.motion.toFixed(3),
+    sess.phase, sig.motion.toFixed(3), HB.bpm ? HB.bpm.toFixed(1) : "", HB.beat ? 1 : 0,
   ].join(","));
 }
 function buildLog() {
@@ -469,7 +507,8 @@ function buildLog() {
     "#   s = band-passed breath signal, x = normalised breath, q = Echtzeit chest position 0..1, guide = guide wave, motion",
     "# events (t, type, data):",
     ...LOG.events.map((e) => "# " + e.join(" ")),
-    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion",
+    "#   hr = heart rate estimate from the gyroscope, beat = 1 where a heartbeat was detected",
+    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat",
   ];
   return head.join("\n") + "\n" + LOG.rows.join("\n") + "\n";
 }
@@ -616,12 +655,12 @@ function initAudio() {
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
   }
   const verb = ctx.createConvolver(); verb.buffer = ir;
-  const wet = ctx.createGain(); wet.gain.value = 0.3; verb.connect(wet).connect(A.master);
+  const wet = ctx.createGain(); wet.gain.value = 0.4; verb.connect(wet).connect(A.master);
   A.padFilter = ctx.createBiquadFilter(); A.padFilter.type = "lowpass"; A.padFilter.Q.value = 0.7; A.padFilter.frequency.value = 400;
   A.padGain = ctx.createGain(); A.padGain.gain.value = 0;
   A.padFilter.connect(A.padGain); A.padGain.connect(A.master); A.padGain.connect(verb);
   A.pad = [];
-  for (const [type, mult, cents, vol] of [["sawtooth", 1, -9, 0.2], ["sawtooth", 1, 9, 0.2], ["triangle", 0.5, 0, 0.55], ["sine", 2, 3, 0.08]]) {
+  for (const [type, mult, cents, vol] of [["triangle", 1, -7, 0.35], ["triangle", 1, 7, 0.35], ["sine", 0.5, 0, 0.6], ["sine", 1.5, 2, 0.06]]) {
     const o = ctx.createOscillator(); o.type = type; o.frequency.value = 130.81 * mult; o.detune.value = cents;
     const og = ctx.createGain(); og.gain.value = vol; o.connect(og).connect(A.padFilter); o.start();
     A.pad.push({ o, mult });
@@ -650,7 +689,7 @@ function audioUpdate(level, shimmer) {
   if (!A.ctx) return;
   const t = A.ctx.currentTime, k = 0.35;
   const v = clamp((level + 1) / 2, 0, 1);
-  const sea = S.sound !== "tone", tone = S.sound !== "sea";
+  const sea = S.sea, tone = S.tone;
   A.nFilter.frequency.setTargetAtTime(160 + Math.pow(v, 1.5) * 650, t, k);
   A.nGain.gain.setTargetAtTime(sea ? 0.03 + v * 0.13 : 0, t, k);
   A.dGain.gain.setTargetAtTime(tone ? 0.05 : 0, t, 0.5);
@@ -666,16 +705,29 @@ function audioRealtime(q, follow) {
   if (!A.ctx) return;
   const t = A.ctx.currentTime, k = 0.07;
   const v = clamp(q, 0, 1.1);
-  const f = 130.81 * Math.pow(2, (v * 7) / 12); // C3 up to G3 at a deep breath
+  const f = 130.81 * Math.pow(2, (v * 5) / 12); // C3 up to F3 at a deep breath
   for (const p of A.pad) p.o.frequency.setTargetAtTime(f * p.mult, t, k);
-  A.padFilter.frequency.setTargetAtTime(320 + v * 1300, t, k);
-  A.padGain.gain.setTargetAtTime(0.075 + v * 0.03, t, follow ? 0.15 : 1.2);
-  const sea = S.sound !== "tone" && follow;
+  A.padFilter.frequency.setTargetAtTime(240 + v * 700, t, k);
+  A.padGain.gain.setTargetAtTime(S.tone ? 0.04 + v * 0.015 : 0, t, follow ? 0.15 : 1.2);
+  const sea = S.sea && follow;
   A.nFilter.frequency.setTargetAtTime(160 + Math.pow(v, 1.5) * 650, t, 0.1);
   A.nGain.gain.setTargetAtTime(sea ? 0.02 + v * 0.1 : 0, t, 0.1);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
   A.vGain.gain.setTargetAtTime(0, t, 0.3);
   A.hGain.gain.setTargetAtTime(0, t, 0.5);
+}
+function heartSound() {
+  if (!A.ctx || !S.heart) return;
+  // soft "lub-dub": two low, short thumps
+  const ctx = A.ctx, t = ctx.currentTime;
+  for (const [dt, f, vol] of [[0, 62, 0.22], [0.17, 52, 0.14]]) {
+    const o = ctx.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(f * 1.4, t + dt); o.frequency.exponentialRampToValueAtTime(f, t + dt + 0.06);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t + dt); g.gain.linearRampToValueAtTime(vol, t + dt + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dt + 0.22);
+    o.connect(g).connect(A.master); o.start(t + dt); o.stop(t + dt + 0.3);
+  }
 }
 function chime(freq) {
   if (!A.ctx || !S.chimes) return;
@@ -873,11 +925,11 @@ function updateReadouts() {
   const real = S.mode === "realtime" && ["hold", "deep", "realtime"].includes(sess.phase);
   const guiding = sess.phase === "lead" || sess.phase === "calib" || sess.phase === "match";
   $("#guideLabel").textContent = real ? "Puls" : "Lotse";
-  $("#guideNote").textContent = real ? "Schläge/min, grob" : "Atemzüge/min";
+  $("#guideNote").textContent = real ? "Schläge/min" : "Atemzüge/min";
   $("#syncLabel").textContent = real ? "Brustkorb" : "Synchron";
   $("#syncNote").textContent = real ? "0 % = Ruhelage" : "mit dem Klang";
   if (real) {
-    $("#guideRate").textContent = RT.hr ? "~" + Math.round(RT.hr) : "–";
+    $("#guideRate").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
     $("#sync").textContent = sess.phase === "realtime" ? Math.round(clamp(RT.q, 0, 1.15) * 100) + "%" : "–";
   } else {
     $("#guideRate").textContent = guiding ? (60 / G.P).toFixed(1) : (sess.phase === "idle" ? S.target.toFixed(1) : "–");
@@ -989,6 +1041,7 @@ async function start(ev) {
   }
   resetSignal();
   rtReset();
+  heartReset();
   LOG.rows = []; LOG.events = []; LOG.startedAt = new Date().toISOString();
   window.addEventListener("devicemotion", onMotion);
   keepAwake();
@@ -1026,6 +1079,7 @@ function finish(natural) {
   if (up) rows.push(["Atem am Ende", (60 / up).toFixed(1) + " /min"]);
   if (S.mode === "lead") rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
   if (RT.hr) rows.push(["Puls beim Luftanhalten", "~" + Math.round(RT.hr) + " /min"]);
+  if (HB.n) rows.push(["Puls im Schnitt", "~" + Math.round(HB.sum / HB.n) + " /min"]);
   if (sess.matchN) rows.push(["Ø Synchron", Math.round((sess.matchSum / sess.matchN) * 100) + " %"]);
   rows.push(["Log", LOG.rows.length + " Messpunkte"]);
   $("#sumList").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
