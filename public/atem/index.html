@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a1214">
+<title>Atemlotse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm night screen. Orb on top, live trace below, controls at the thumb. */
+:root {
+  --bg: #0a1214;
+  --surface: #111d20;
+  --line: #1f3236;
+  --fg: #dce8e5;
+  --muted: #7d9894;
+  --breath: #7fd1c1;   /* your breath: sea glass */
+  --guide: #e9c27f;    /* the pilot light that leads */
+  --warn: #e59a7a;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 var(--body);
+  -webkit-tap-highlight-color: transparent;
+}
+main {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-block: max(20px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 {
+  font: 600 1.6rem/1.1 var(--display);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+h1 span { color: var(--guide); }
+.status {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: right;
+  min-width: 0;
+}
+.status b { color: var(--fg); font-weight: 500; }
+.status.warn b { color: var(--warn); }
+
+#viz { width: 100%; aspect-ratio: 1 / 0.9; max-width: 100%; display: block; }
+
+.prompt {
+  font: 400 1.25rem/1.3 var(--display);
+  text-align: center;
+  text-wrap: balance;
+  min-height: 3.3em;
+  margin: -8px 0 0;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.stat {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat small {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.stat strong {
+  font: 600 1.4rem/1.1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.stat em { font-style: normal; font-size: 0.75rem; color: var(--muted); }
+.stat.you strong { color: var(--breath); }
+.stat.goal strong { color: var(--guide); }
+
+form { display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label, .field > span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.field output { color: var(--guide); font-variant-numeric: tabular-nums; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  flex: 1 1 0;
+  min-width: 64px;
+  text-align: center;
+  padding: 9px 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.seg input:checked + label { border-color: var(--guide); color: var(--guide); }
+.seg input:focus-visible + label { outline: 2px solid var(--breath); outline-offset: 2px; }
+input[type=range] { width: 100%; accent-color: var(--guide); }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.92rem; }
+.toggles label { display: flex; align-items: center; gap: 8px; }
+.toggles input { accent-color: var(--guide); width: 18px; height: 18px; }
+.hint { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+.actions { display: flex; gap: 10px; }
+button {
+  font: 600 1rem var(--body);
+  border: 0;
+  border-radius: 14px;
+  padding: 15px 18px;
+  cursor: pointer;
+  color: var(--bg);
+  background: var(--guide);
+  flex: 1;
+}
+button.ghost { background: var(--surface); color: var(--fg); border: 1px solid var(--line); }
+button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
+
+.summary {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.summary h2 { font: 600 1.15rem var(--display); margin: 0; }
+.summary dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; }
+.summary dt { color: var(--muted); }
+.summary dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+#dim {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  color: #2a3a3c;
+  font-size: 0.85rem;
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Atem<span>lotse</span></h1>
+    <div class="status" id="status">Sensor: <b>bereit</b></div>
+  </header>
+
+  <canvas id="viz" aria-label="Atemkreis und Verlauf"></canvas>
+  <p class="prompt" id="prompt">Leg dich hin, Handy flach auf die Brust, Kopfhörer rein.</p>
+
+  <section class="stats" id="stats">
+    <div class="stat you"><small>Du</small><strong id="youRate">–</strong><em>Atemzüge/min</em></div>
+    <div class="stat goal"><small>Lotse</small><strong id="guideRate">–</strong><em>Atemzüge/min</em></div>
+    <div class="stat"><small>Synchron</small><strong id="sync">–</strong><em id="syncNote">mit dem Klang</em></div>
+  </section>
+
+  <form id="setup">
+    <div class="field">
+      <label for="target">Ziel <output id="targetOut">6</output> Atemzüge pro Minute</label>
+      <input type="range" id="target" min="4" max="10" step="0.5" value="6">
+    </div>
+    <div class="field">
+      <span>Einatmen : Ausatmen</span>
+      <div class="seg">
+        <input type="radio" name="ratio" id="r1" value="1"><label for="r1">1 : 1</label>
+        <input type="radio" name="ratio" id="r15" value="1.5" checked><label for="r15">2 : 3</label>
+        <input type="radio" name="ratio" id="r2" value="2"><label for="r2">1 : 2</label>
+      </div>
+    </div>
+    <div class="field">
+      <span>Modus</span>
+      <div class="seg">
+        <input type="radio" name="mode" id="mLead" value="lead" checked><label for="mLead">Führen</label>
+        <input type="radio" name="mode" id="mMirror" value="mirror"><label for="mMirror">Spiegeln</label>
+      </div>
+    </div>
+    <div class="field">
+      <span>Dauer</span>
+      <div class="seg">
+        <input type="radio" name="minutes" id="d5" value="5"><label for="d5">5 min</label>
+        <input type="radio" name="minutes" id="d10" value="10" checked><label for="d10">10 min</label>
+        <input type="radio" name="minutes" id="d20" value="20"><label for="d20">20 min</label>
+        <input type="radio" name="minutes" id="dInf" value="0"><label for="dInf">offen</label>
+      </div>
+    </div>
+    <div class="field">
+      <span>Klang</span>
+      <div class="seg">
+        <input type="radio" name="sound" id="sSea" value="sea"><label for="sSea">Meer</label>
+        <input type="radio" name="sound" id="sTone" value="tone"><label for="sTone">Ton</label>
+        <input type="radio" name="sound" id="sBoth" value="both" checked><label for="sBoth">Beides</label>
+      </div>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="voice" checked> Sprachansagen</label>
+      <label><input type="checkbox" id="chimes" checked> Glöckchen an Wendepunkten</label>
+      <label><input type="checkbox" id="autodim" checked> Bildschirm abdunkeln</label>
+    </div>
+    <p class="hint"><b>Führen</b>: Erst folgt der Klang deinem Atem, dann verlangsamt er sich sanft bis zu deinem Ziel. <b>Spiegeln</b>: Der Klang folgt nur dir. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
+  </form>
+
+  <div class="actions" id="running" hidden>
+    <button type="button" class="ghost" id="dimBtn">Abdunkeln</button>
+    <button type="button" id="stopBtn">Beenden</button>
+  </div>
+
+  <section class="summary" id="summary" hidden>
+    <h2>Deine Runde</h2>
+    <dl id="sumList"></dl>
+  </section>
+</main>
+<div id="dim" hidden>Tippen zum Aufwecken</div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const now = () => performance.now() / 1000;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/* ---------------- Settings ---------------- */
+const S = { target: 6, ratio: 1.5, mode: "lead", minutes: 10, sound: "both", voice: true, chimes: true, autodim: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse") || "{}")); } catch (e) {}
+function applySettingsToForm() {
+  $("#target").value = S.target; $("#targetOut").textContent = S.target;
+  for (const name of ["ratio", "mode", "minutes", "sound"]) {
+    const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
+    if (el) el.checked = true;
+  }
+  $("#voice").checked = S.voice; $("#chimes").checked = S.chimes; $("#autodim").checked = S.autodim;
+}
+function readForm() {
+  S.target = parseFloat($("#target").value);
+  S.ratio = parseFloat(document.querySelector("input[name=ratio]:checked").value);
+  S.mode = document.querySelector("input[name=mode]:checked").value;
+  S.minutes = parseFloat(document.querySelector("input[name=minutes]:checked").value);
+  S.sound = document.querySelector("input[name=sound]:checked").value;
+  S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
+  try { localStorage.setItem("atemlotse", JSON.stringify(S)); } catch (e) {}
+}
+applySettingsToForm();
+$("#target").addEventListener("input", () => { $("#targetOut").textContent = $("#target").value; });
+
+/* ---------------- Breath signal from the accelerometer ----------------
+   Chest movement tilts the phone, which shifts gravity across its axes.
+   Each axis is band-passed (~0.03–0.4 Hz), the dominant direction is found
+   with a running PCA, and the projection onto it is the breath signal. */
+const MOTION_LIMIT = 0.35; // m/s² of jitter that counts as moving around
+const sig = {
+  init: false, lastT: 0, t0: 0, nextSample: 0,
+  slow: [0, 0, 0], lp: [0, 0, 0], magSlow: 9.81, motion: 0,
+  C: [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]], u: [0, 0, 1],
+  s: 0, amp: 0, x: 0, polarity: 1, seen: false,
+};
+const det = { dir: 1, ext: 0, extT: 0, lastTurn: 0, troughs: [], peaks: [] };
+
+function resetSignal() {
+  sig.init = false; sig.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; sig.u = [0, 0, 1];
+  sig.amp = 0; sig.x = 0; sig.s = 0; sig.polarity = 1; sig.motion = 0;
+  resetDetector();
+}
+function resetDetector() { det.dir = 1; det.ext = sig.s; det.extT = now(); det.lastTurn = 0; det.troughs = []; det.peaks = []; }
+
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null) return;
+  sig.seen = true;
+  const t = now();
+  const g = [a.x, a.y, a.z];
+  if (!sig.init) {
+    sig.slow = g.slice(); sig.lp = [0, 0, 0]; sig.lastT = t; sig.t0 = t; sig.nextSample = t;
+    sig.magSlow = Math.hypot(...g); sig.init = true; return;
+  }
+  const dt = clamp(t - sig.lastT, 0.001, 0.1); sig.lastT = t;
+  const mag = Math.hypot(...g);
+  sig.magSlow += (mag - sig.magSlow) * Math.min(1, dt / 0.5);
+  sig.motion += (Math.abs(mag - sig.magSlow) - sig.motion) * Math.min(1, dt / 0.6);
+  const moving = sig.motion > MOTION_LIMIT;
+  for (let i = 0; i < 3; i++) {
+    // while moving, re-anchor quickly so the filter settles once the phone lies still
+    sig.slow[i] += (g[i] - sig.slow[i]) * Math.min(1, dt / (moving ? 0.3 : 5));
+    const hp = g[i] - sig.slow[i];
+    sig.lp[i] += (hp - sig.lp[i]) * Math.min(1, dt / 0.4);
+  }
+  if (t >= sig.nextSample) { sig.nextSample = Math.max(sig.nextSample + 0.05, t - 0.05); sample(t, moving); }
+}
+
+function sample(t, moving) {
+  const v = sig.lp;
+  if (!moving) {
+    const tau = Math.min(20, 3 + (t - sig.t0) * 0.5);
+    const al = 0.05 / tau;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) sig.C[i][j] += (v[i] * v[j] - sig.C[i][j]) * al;
+  }
+  const w = [0, 1, 2].map((i) => sig.C[i][0] * sig.u[0] + sig.C[i][1] * sig.u[1] + sig.C[i][2] * sig.u[2]);
+  const n = Math.hypot(...w);
+  if (n > 1e-14) sig.u = w.map((c) => c / n);
+  const s = (v[0] * sig.u[0] + v[1] * sig.u[1] + v[2] * sig.u[2]) * sig.polarity;
+  sig.s = s;
+  if (!moving) sig.amp += (Math.abs(s) - sig.amp) * (sig.amp === 0 ? 1 : 0.05 / 6);
+  sig.x = clamp(s / Math.max(sig.amp * 1.57, 1e-4), -1.6, 1.6);
+  detect(t, s, moving);
+}
+
+function detect(t, s, moving) {
+  if (moving) { det.ext = s; det.extT = t; return; }
+  const h = Math.max(sig.amp * 0.6, 0.0015);
+  if (det.dir > 0) {
+    if (s > det.ext) { det.ext = s; det.extT = t; }
+    else if (s < det.ext - h && t - det.lastTurn > 0.7) {
+      det.peaks.push(det.extT); det.lastTurn = det.extT; det.dir = -1; det.ext = s; det.extT = t;
+    }
+  } else {
+    if (s < det.ext) { det.ext = s; det.extT = t; }
+    else if (s > det.ext + h && t - det.lastTurn > 0.7) {
+      det.troughs.push(det.extT); det.lastTurn = det.extT; det.dir = 1; det.ext = s; det.extT = t;
+    }
+  }
+  if (det.troughs.length > 12) det.troughs.shift();
+  if (det.peaks.length > 12) det.peaks.shift();
+}
+
+function userPeriod() {
+  const tr = det.troughs;
+  if (tr.length < 2 || now() - tr[tr.length - 1] > 25) return null;
+  const d = [];
+  for (let i = Math.max(1, tr.length - 4); i < tr.length; i++) {
+    const p = tr[i] - tr[i - 1];
+    if (p > 1.5 && p < 25) d.push(p);
+  }
+  if (!d.length) return null;
+  d.sort((a, b) => a - b);
+  return d[Math.floor(d.length / 2)];
+}
+
+function signalQuality() {
+  if (sess.phase === "idle") return "idle";
+  if (!sig.seen) return "none";
+  if (sig.motion > MOTION_LIMIT) return "moving";
+  if (sig.amp < 0.003) return "weak";
+  return "ok";
+}
+
+/* ---------------- Guide (the pacer) ---------------- */
+const G = { phase: 0, P: 10, rIn: 0.4, y: -1 };
+function shape(ph, rIn) {
+  return ph < rIn ? -Math.cos(Math.PI * ph / rIn) : Math.cos(Math.PI * (ph - rIn) / (1 - rIn));
+}
+
+/* ---------------- Sound ---------------- */
+const A = { ctx: null };
+function initAudio() {
+  if (A.ctx) { A.ctx.resume(); return; }
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  A.ctx = ctx;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -18; comp.ratio.value = 3;
+  comp.connect(ctx.destination);
+  A.master = ctx.createGain(); A.master.gain.value = 0; A.master.connect(comp);
+
+  // Sea: decorrelated stereo pink noise through a breathing low-pass
+  const len = ctx.sampleRate * 6;
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.969 * b2 + w * 0.153852; b3 = 0.8665 * b3 + w * 0.3104856;
+      b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+    }
+  }
+  const noise = ctx.createBufferSource(); noise.buffer = buf; noise.loop = true;
+  A.nFilter = ctx.createBiquadFilter(); A.nFilter.type = "lowpass"; A.nFilter.Q.value = 0.6; A.nFilter.frequency.value = 300;
+  A.nGain = ctx.createGain(); A.nGain.gain.value = 0;
+  noise.connect(A.nFilter).connect(A.nGain).connect(A.master); noise.start();
+
+  // Tone: a quiet A drone plus a voice that opens and lifts a whole tone with each inhale
+  A.dGain = ctx.createGain(); A.dGain.gain.value = 0;
+  const dFilter = ctx.createBiquadFilter(); dFilter.type = "lowpass"; dFilter.frequency.value = 700;
+  dFilter.connect(A.dGain).connect(A.master);
+  for (const [f, g] of [[110, 0.5], [110.4, 0.4], [164.8, 0.3], [220, 0.22]]) {
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const og = ctx.createGain(); og.gain.value = g; o.connect(og).connect(dFilter); o.start();
+  }
+  A.voice = ctx.createOscillator(); A.voice.type = "triangle"; A.voice.frequency.value = 220;
+  A.voice2 = ctx.createOscillator(); A.voice2.type = "sine"; A.voice2.frequency.value = 330;
+  A.vFilter = ctx.createBiquadFilter(); A.vFilter.type = "lowpass"; A.vFilter.frequency.value = 400; A.vFilter.Q.value = 1.2;
+  A.vGain = ctx.createGain(); A.vGain.gain.value = 0;
+  const v2g = ctx.createGain(); v2g.gain.value = 0.35;
+  A.voice.connect(A.vFilter); A.voice2.connect(v2g).connect(A.vFilter);
+  A.vFilter.connect(A.vGain).connect(A.master);
+  A.voice.start(); A.voice2.start();
+
+  // Shimmer: fades in while your breath matches the guide
+  A.hGain = ctx.createGain(); A.hGain.gain.value = 0; A.hGain.connect(A.master);
+  for (const [f, p] of [[440, -0.4], [659.25, 0.4], [880.6, 0]]) {
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const pan = ctx.createStereoPanner(); pan.pan.value = p;
+    const og = ctx.createGain(); og.gain.value = 0.3;
+    o.connect(og).connect(pan).connect(A.hGain); o.start();
+  }
+}
+function audioFade(to, time) {
+  if (!A.ctx) return;
+  const t = A.ctx.currentTime;
+  A.master.gain.cancelScheduledValues(t);
+  A.master.gain.setValueAtTime(A.master.gain.value, t);
+  A.master.gain.linearRampToValueAtTime(to, t + time);
+}
+function audioUpdate(level, shimmer) {
+  if (!A.ctx) return;
+  const t = A.ctx.currentTime, k = 0.12;
+  const v = clamp((level + 1) / 2, 0, 1);
+  const sea = S.sound !== "tone", tone = S.sound !== "sea";
+  A.nFilter.frequency.setTargetAtTime(220 + v * v * 1500, t, k);
+  A.nGain.gain.setTargetAtTime(sea ? 0.05 + v * 0.3 : 0, t, k);
+  A.dGain.gain.setTargetAtTime(tone ? 0.05 : 0, t, 0.5);
+  A.vFilter.frequency.setTargetAtTime(280 + v * 1300, t, k);
+  A.vGain.gain.setTargetAtTime(tone ? 0.015 + v * 0.07 : 0, t, k);
+  const f = 196 * Math.pow(2, (v * 2) / 12);
+  A.voice.frequency.setTargetAtTime(f, t, k);
+  A.voice2.frequency.setTargetAtTime(f * 1.5, t, k);
+  A.hGain.gain.setTargetAtTime(shimmer * 0.035, t, 0.8);
+}
+function chime(freq) {
+  if (!A.ctx || !S.chimes) return;
+  const ctx = A.ctx, t = ctx.currentTime;
+  for (const [mult, vol] of [[1, 0.06], [2.76, 0.015], [5.4, 0.006]]) {
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = freq * mult;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2 / mult + 0.4);
+    o.connect(g).connect(A.master); o.start(t); o.stop(t + 4);
+  }
+}
+function say(text) {
+  if (!S.voice || !("speechSynthesis" in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "de-DE"; u.rate = 0.88; u.pitch = 0.95; u.volume = 0.9;
+    const de = speechSynthesis.getVoices().find((v) => v.lang && v.lang.startsWith("de"));
+    if (de) u.voice = de;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+/* ---------------- Session ---------------- */
+const sess = {
+  phase: "idle", phaseStart: 0, start: 0, lastTick: 0, timer: null,
+  hasSensor: false, calib: { xy: 0, xx: 0, yy: 0 },
+  m: { xy: 0, xx: 1e-6, yy: 1e-6 }, match: 0, flipBad: 0,
+  leadCycles: 0, naturalRate: null, matchSum: 0, matchN: 0, history: [],
+};
+const PLACE_SECONDS = 12, CALIB_SECONDS = 20, LISTEN_SECONDS = 30;
+
+function setPrompt(t) { $("#prompt").textContent = t; }
+function setPhase(p) {
+  sess.phase = p; sess.phaseStart = now();
+  if (p === "place") {
+    setPrompt("Handy flach auf die Brust legen und ruhig liegen.");
+    say("Leg das Handy flach auf deine Brust und lieg ganz ruhig.");
+    setTimeout(() => {
+      if (sess.phase === "place" && sess.hasSensor)
+        say("Gleich atmest du zweimal mit dem Klang. Schwillt er an, atme ein. Ebbt er ab, atme aus.");
+    }, 4500);
+  } else if (p === "calib") {
+    G.phase = 0; G.P = 10; G.rIn = 0.4;
+    sess.calib = { xy: 0, xx: 0, yy: 0 };
+    setPrompt("Zweimal mit dem Klang: anschwellen = ein, abebben = aus.");
+    chime(440);
+  } else if (p === "listen") {
+    setPrompt("Atme jetzt ganz natürlich. Der Klang folgt dir.");
+    say("Jetzt atme einfach natürlich. Der Klang folgt dir.");
+  } else if (p === "mirror") {
+    setPrompt("Der Klang folgt deinem Atem.");
+    say("Jetzt atme einfach natürlich. Der Klang folgt dir.");
+  } else if (p === "lead") {
+    const up = userPeriod();
+    G.rIn = 1 / (1 + S.ratio);
+    G.P = clamp(up || 5, 3, 15);
+    sess.naturalRate = up ? 60 / up : null;
+    // start the guide where the user currently is in their breath
+    const t = now();
+    const lastTr = det.troughs[det.troughs.length - 1], lastPk = det.peaks[det.peaks.length - 1];
+    if (sess.hasSensor && det.dir > 0 && lastTr) G.phase = G.rIn * clamp((t - lastTr) / (G.P * G.rIn), 0, 0.95);
+    else if (sess.hasSensor && det.dir < 0 && lastPk) G.phase = G.rIn + (1 - G.rIn) * clamp((t - lastPk) / (G.P * (1 - G.rIn)), 0, 0.95);
+    else G.phase = 0;
+    sess.leadCycles = 0; sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 };
+    setPrompt("Folge dem Klang. Er wird langsam ruhiger.");
+    say(sess.hasSensor ? "Jetzt führt dich der Klang. Folge ihm sanft, ohne Anstrengung." : "Folge dem Klang. Schwillt er an, atme ein. Ebbt er ab, atme aus.");
+  }
+}
+
+function guideStep(dt, adapt) {
+  const prev = G.phase;
+  G.phase += dt / G.P;
+  if (prev < G.rIn && G.phase >= G.rIn) chime(659.25);
+  if (G.phase >= 1) {
+    G.phase -= 1;
+    chime(440);
+    if (adapt) {
+      sess.leadCycles++;
+      const targetP = 60 / S.target;
+      const following = !sess.hasSensor || sess.leadCycles <= 2 || sess.match > 0.4;
+      if (following) G.P = G.P < targetP ? Math.min(targetP, G.P * 1.05) : Math.max(targetP, G.P / 1.05);
+    }
+  }
+  G.y = shape(G.phase, G.rIn);
+}
+
+function tick() {
+  const t = now();
+  const dt = clamp(t - sess.lastTick, 0, 0.2); sess.lastTick = t;
+  const el = t - sess.phaseStart;
+  const ph = sess.phase;
+  let level = 0, yForMatch = null;
+
+  if (ph === "place") {
+    level = -0.6;
+    if (el > PLACE_SECONDS) setPhase(sess.hasSensor && sig.seen ? "calib" : (S.mode === "mirror" && sig.seen ? "mirror" : "lead"));
+  } else if (ph === "calib") {
+    guideStep(dt, false);
+    level = G.y; yForMatch = G.y;
+    const yd = delayedGuide();
+    if (yd != null && signalQuality() !== "moving") {
+      sess.calib.xy += sig.s * yd; sess.calib.xx += sig.s * sig.s; sess.calib.yy += yd * yd;
+    }
+    if (el >= CALIB_SECONDS) {
+      const c = sess.calib, r = c.xy / Math.sqrt(c.xx * c.yy + 1e-12);
+      if (r < -0.15) { sig.polarity = -sig.polarity; sig.s = -sig.s; sig.x = -sig.x; }
+      resetDetector();
+      setPhase(S.mode === "mirror" ? "mirror" : "listen");
+    }
+  } else if (ph === "listen" || ph === "mirror") {
+    level = sig.x;
+    if (ph === "listen" && el > LISTEN_SECONDS && (userPeriod() || el > LISTEN_SECONDS * 2)) setPhase("lead");
+  } else if (ph === "lead") {
+    guideStep(dt, true);
+    level = G.y; yForMatch = G.y;
+  }
+
+  // agreement between your breath and the guide (guide delayed for reaction time)
+  if (yForMatch != null && sess.hasSensor && signalQuality() === "ok") {
+    const yd = delayedGuide();
+    if (yd != null) {
+      const al = Math.min(1, dt / 8);
+      sess.m.xy += (sig.x * yd - sess.m.xy) * al;
+      sess.m.xx += (sig.x * sig.x - sess.m.xx) * al;
+      sess.m.yy += (yd * yd - sess.m.yy) * al;
+      sess.match = clamp(sess.m.xy / Math.sqrt(sess.m.xx * sess.m.yy + 1e-9), -1, 1);
+      if (ph === "lead" && t - sess.phaseStart > 20) {
+        sess.matchSum += Math.max(0, sess.match); sess.matchN++;
+        // persistently opposite? then the sign of the signal is flipped: fix it
+        sess.flipBad = sess.match < -0.4 ? sess.flipBad + dt : 0;
+        if (sess.flipBad > 12) { sig.polarity = -sig.polarity; sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 }; sess.flipBad = 0; resetDetector(); }
+      }
+    }
+  }
+  const shimmer = ph === "lead" && sess.hasSensor ? clamp((sess.match - 0.55) / 0.35, 0, 1) : 0;
+  audioUpdate(level, shimmer);
+
+  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? sig.x : null, y: ph === "calib" || ph === "lead" ? G.y : null });
+  while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
+
+  if (S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
+  updateReadouts();
+}
+
+function delayedGuide() {
+  const h = sess.history, target = now() - 0.9;
+  for (let i = h.length - 1; i >= 0; i--) if (h[i].t <= target) return h[i].y;
+  return null;
+}
+
+/* ---------------- Readouts & drawing ---------------- */
+function updateReadouts() {
+  const up = userPeriod();
+  $("#youRate").textContent = up ? (60 / up).toFixed(1) : "–";
+  const guiding = sess.phase === "lead" || sess.phase === "calib";
+  $("#guideRate").textContent = guiding ? (60 / G.P).toFixed(1) : (sess.phase === "idle" ? S.target.toFixed(1) : "–");
+  $("#sync").textContent = sess.phase === "lead" && sess.hasSensor ? Math.round(Math.max(0, sess.match) * 100) + "%" : "–";
+  const q = signalQuality();
+  const st = $("#status");
+  const label = { idle: "bereit", none: "kein Sensor", moving: "Bewegung", weak: "schwach", ok: "gut" }[q];
+  st.className = "status" + (q === "ok" || q === "idle" ? "" : " warn");
+  st.innerHTML = "Atemsignal: <b>" + label + "</b>";
+  if (sess.phase !== "idle") {
+    const left = S.minutes > 0 ? Math.max(0, S.minutes * 60 - (now() - sess.start)) : now() - sess.start;
+    st.innerHTML += "<br>" + (S.minutes > 0 ? "noch " : "") + Math.floor(left / 60) + ":" + String(Math.floor(left % 60)).padStart(2, "0");
+  }
+}
+
+const cv = $("#viz"), cx = cv.getContext("2d");
+const css = getComputedStyle(document.documentElement);
+const COL = { breath: css.getPropertyValue("--breath").trim(), guide: css.getPropertyValue("--guide").trim(), line: css.getPropertyValue("--line").trim(), muted: css.getPropertyValue("--muted").trim() };
+let idleT = 0;
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx.clearRect(0, 0, W, H);
+  const orbH = H * 0.72, cxp = W / 2, cyp = orbH / 2, R = Math.min(W, orbH) / 2 - 6;
+  const h = sess.history, last = h[h.length - 1];
+  const idle = sess.phase === "idle";
+  idleT += 0.016;
+  const gy = idle ? Math.sin(idleT * 0.7) : (last && last.y != null ? last.y : null);
+  const ux = idle ? null : (last && last.x != null ? last.x : null);
+
+  // guide: soft amber halo
+  if (gy != null) {
+    const r = R * (0.42 + 0.3 * (gy + 1) / 2);
+    const grad = cx.createRadialGradient(cxp, cyp, r * 0.2, cxp, cyp, r * 1.25);
+    grad.addColorStop(0, hexA(COL.guide, 0.38)); grad.addColorStop(0.7, hexA(COL.guide, 0.12)); grad.addColorStop(1, hexA(COL.guide, 0));
+    cx.fillStyle = grad; cx.beginPath(); cx.arc(cxp, cyp, r * 1.25, 0, Math.PI * 2); cx.fill();
+    cx.strokeStyle = hexA(COL.guide, 0.7); cx.lineWidth = 1.5;
+    cx.beginPath(); cx.arc(cxp, cyp, r, 0, Math.PI * 2); cx.stroke();
+  }
+  // you: sea-glass ring
+  if (ux != null) {
+    const r = R * (0.42 + 0.3 * clamp((ux + 1) / 2, -0.1, 1.15));
+    cx.strokeStyle = COL.breath; cx.lineWidth = 3;
+    cx.beginPath(); cx.arc(cxp, cyp, Math.max(4, r), 0, Math.PI * 2); cx.stroke();
+    if (gy == null) {
+      cx.fillStyle = hexA(COL.breath, 0.12);
+      cx.beginPath(); cx.arc(cxp, cyp, Math.max(4, r), 0, Math.PI * 2); cx.fill();
+    }
+  }
+  // phase word in the middle
+  let word = "";
+  if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
+  else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
+  if (word) {
+    cx.fillStyle = hexA("#dce8e5", 0.75);
+    cx.font = "400 22px " + css.getPropertyValue("--display");
+    cx.textAlign = "center"; cx.textBaseline = "middle";
+    cx.fillText(word, cxp, cyp);
+  }
+
+  // trace of the last 40 s
+  const top = orbH + 10, th = H - top - 4;
+  cx.strokeStyle = COL.line; cx.lineWidth = 1;
+  cx.beginPath(); cx.moveTo(0, top + th / 2); cx.lineTo(W, top + th / 2); cx.stroke();
+  if (h.length > 1) {
+    const t1 = last.t, t0 = t1 - 40;
+    const X = (t) => ((t - t0) / 40) * W, Y = (v) => top + th / 2 - clamp(v, -1.4, 1.4) * th * 0.33;
+    for (const [key, col, lw] of [["y", hexA(COL.guide, 0.8), 1.5], ["x", COL.breath, 2]]) {
+      cx.strokeStyle = col; cx.lineWidth = lw; cx.beginPath();
+      let pen = false;
+      for (const p of h) {
+        if (p[key] == null) { pen = false; continue; }
+        if (!pen) { cx.moveTo(X(p.t), Y(p[key])); pen = true; } else cx.lineTo(X(p.t), Y(p[key]));
+      }
+      cx.stroke();
+    }
+  } else {
+    cx.fillStyle = COL.muted; cx.font = "13px " + css.getPropertyValue("--body"); cx.textAlign = "center";
+    cx.fillText("Bernstein = Lotse   ·   Türkis = dein Atem", W / 2, top + th / 2 - 10);
+  }
+  requestAnimationFrame(draw);
+}
+function hexA(hex, a) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+requestAnimationFrame(draw);
+
+/* ---------------- Start / stop ---------------- */
+let wakeLock = null;
+async function keepAwake() {
+  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && sess.phase !== "idle") keepAwake();
+});
+
+async function start(ev) {
+  ev.preventDefault();
+  readForm();
+  initAudio();
+  audioFade(0.9, 3);
+  if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+    try { await DeviceMotionEvent.requestPermission(); } catch (e) {}
+  }
+  resetSignal();
+  window.addEventListener("devicemotion", onMotion);
+  keepAwake();
+  sess.hasSensor = "DeviceMotionEvent" in window;
+  sess.start = now(); sess.lastTick = now(); sess.history = [];
+  sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
+  $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
+  setPhase("place");
+  sess.timer = setInterval(tick, 50);
+  // check a moment later whether the sensor actually delivers data
+  setTimeout(() => {
+    if (sess.phase !== "idle" && !sig.seen) {
+      sess.hasSensor = false;
+      setPrompt("Kein Bewegungssensor erreichbar. Der Klang führt dich trotzdem.");
+    }
+  }, 2500);
+  if (S.autodim) setTimeout(() => { if (sess.phase !== "idle") $("#dim").hidden = false; }, 9000);
+}
+
+function finish(natural) {
+  if (sess.phase === "idle") return;
+  const dur = now() - sess.start;
+  const up = userPeriod();
+  sess.phase = "idle";
+  clearInterval(sess.timer);
+  window.removeEventListener("devicemotion", onMotion);
+  if (natural) { chime(440); setTimeout(() => chime(659.25), 900); say("Schön. Du kannst langsam zurückkommen."); }
+  audioFade(0, natural ? 6 : 1.2);
+  try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
+  $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false;
+  setPrompt(natural ? "Fertig. Lass dir Zeit beim Aufstehen." : "Leg dich hin, Handy flach auf die Brust, Kopfhörer rein.");
+  const rows = [["Dauer", Math.floor(dur / 60) + ":" + String(Math.floor(dur % 60)).padStart(2, "0") + " min"]];
+  if (sess.naturalRate) rows.push(["Atem am Anfang", sess.naturalRate.toFixed(1) + " /min"]);
+  if (up) rows.push(["Atem am Ende", (60 / up).toFixed(1) + " /min"]);
+  if (S.mode === "lead") rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
+  if (sess.matchN) rows.push(["Ø Synchron", Math.round((sess.matchSum / sess.matchN) * 100) + " %"]);
+  $("#sumList").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
+  $("#summary").hidden = dur < 20;
+}
+
+$("#setup").addEventListener("submit", start);
+$("#stopBtn").addEventListener("click", () => finish(false));
+$("#dimBtn").addEventListener("click", () => { $("#dim").hidden = false; });
+$("#dim").addEventListener("click", () => { $("#dim").hidden = true; });
+if ("speechSynthesis" in window) speechSynthesis.getVoices();
+updateReadouts();
+</script>
+</body>
+</html>

@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        navigateFallbackDenylist: [/^\/atem/]
+      },
       includeAssets: ['favicon.ico', 'graphics/logo_512x512.png'],
       manifest: {
         name: 'Bad Habbit',
