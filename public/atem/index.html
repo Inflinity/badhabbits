@@ -51,6 +51,7 @@ h1 {
   margin: 0;
 }
 h1 span { color: var(--guide); }
+.back { color: var(--muted); text-decoration: none; padding-right: 10px; font-weight: 400; }
 .status {
   font-size: 0.8rem;
   color: var(--muted);
@@ -171,7 +172,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
 <body>
 <main>
   <header>
-    <h1>Atem<span>lotse</span></h1>
+    <h1><a class="back" href="/" aria-label="Zurück zu Bad Habbit">‹</a>Atem<span>lotse</span></h1>
     <div class="status" id="status">Sensor: <b>bereit</b></div>
   </header>
 

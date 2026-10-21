@@ -104,6 +104,13 @@ export default function MoodScreen({
           <img src="/graphics/todo_512x512.png" alt="Todo List" />
         </button>
 
+        <a className="action-bubble breathe-bubble" href="/atem/" aria-label="Atemlotse">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M2 9c2.5-2 5-2 7.5 0s5 2 7.5 0 3.5-1.5 5-1"></path>
+            <path d="M2 15c2.5-2 5-2 7.5 0s5 2 7.5 0 3.5-1.5 5-1"></path>
+          </svg>
+        </a>
+
         <button className="action-bubble tip-bubble">
           <span className="bubble-icon">?</span>
         </button>
