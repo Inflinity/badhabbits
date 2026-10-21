@@ -123,6 +123,16 @@ form { display: flex; flex-direction: column; gap: 14px; }
 .seg input:checked + label { border-color: var(--guide); color: var(--guide); }
 .seg input:focus-visible + label { outline: 2px solid var(--breath); outline-offset: 2px; }
 input[type=range] { width: 100%; accent-color: var(--guide); }
+select {
+  flex: 2;
+  min-width: 0;
+  font: 500 0.95rem var(--body);
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+}
 .toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.92rem; }
 .toggles label { display: flex; align-items: center; gap: 8px; }
 .toggles input { accent-color: var(--guide); width: 18px; height: 18px; }
@@ -215,8 +225,8 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     <div class="field">
       <span>Modus</span>
       <div class="seg">
-        <input type="radio" name="mode" id="mReal" value="realtime" checked><label for="mReal">Echtzeit</label>
-        <input type="radio" name="mode" id="mMatch" value="match"><label for="mMatch">Matchen</label>
+        <input type="radio" name="mode" id="mTiefe" value="tiefe" checked><label for="mTiefe">Tiefe</label>
+        <input type="radio" name="mode" id="mReal" value="realtime"><label for="mReal">Echtzeit</label>
         <input type="radio" name="mode" id="mLead" value="lead"><label for="mLead">Führen</label>
       </div>
     </div>
@@ -234,15 +244,23 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
       <div class="seg">
         <input type="checkbox" id="lTone" checked><label for="lTone">Ton</label>
         <input type="checkbox" id="lSea"><label for="lSea">Meer</label>
-        <input type="checkbox" id="lHeart"><label for="lHeart">Herzschlag</label>
+        <input type="checkbox" id="lBowl"><label for="lBowl">Klangschale</label>
+        <input type="checkbox" id="lHeart"><label for="lHeart">Herz</label>
       </div>
     </div>
     <div class="toggles">
       <label><input type="checkbox" id="voice" checked> Sprachansagen</label>
-      <label><input type="checkbox" id="chimes" checked> Glöckchen an Wendepunkten</label>
+      <label><input type="checkbox" id="chimes" checked> Anschlag an Wendepunkten</label>
       <label><input type="checkbox" id="autodim" checked> Bildschirm abdunkeln</label>
     </div>
-    <p class="hint"><b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Matchen</b>: Der Klang rastet auf deinen Atem ein und atmet mit dir. <b>Führen</b>: Erst matchen, dann wird der Klang sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <div class="field">
+      <label for="voiceSel">Stimme</label>
+      <div class="actions">
+        <select id="voiceSel"></select>
+        <button type="button" class="ghost" id="voiceTest">Probe</button>
+      </div>
+    </div>
+    <p class="hint"><b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -261,14 +279,14 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v5 · 21.10. 23:45";
-const S = { target: 6, ratio: 1.5, mode: "realtime", minutes: 10, volume: 0.35, tone: true, sea: false, heart: false, voice: true, chimes: true, autodim: true };
-try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse4") || "{}")); } catch (e) {}
-if (!["realtime", "match", "lead"].includes(S.mode)) S.mode = "realtime";
+const VERSION = "v6 · 22.10. 00:30";
+const S = { target: 6, ratio: 1.5, mode: "tiefe", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse5") || "{}")); } catch (e) {}
+if (!["tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "tiefe";
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
   $("#volume").value = S.volume; $("#volumeOut").textContent = Math.round(S.volume * 100) + " %";
-  $("#lTone").checked = S.tone; $("#lSea").checked = S.sea; $("#lHeart").checked = S.heart;
+  $("#lTone").checked = S.tone; $("#lSea").checked = S.sea; $("#lBowl").checked = S.bowl; $("#lHeart").checked = S.heart;
   for (const name of ["ratio", "mode", "minutes"]) {
     const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
     if (el) el.checked = true;
@@ -281,9 +299,10 @@ function readForm() {
   S.ratio = parseFloat(document.querySelector("input[name=ratio]:checked").value);
   S.mode = document.querySelector("input[name=mode]:checked").value;
   S.minutes = parseFloat(document.querySelector("input[name=minutes]:checked").value);
-  S.tone = $("#lTone").checked; S.sea = $("#lSea").checked; S.heart = $("#lHeart").checked;
+  S.tone = $("#lTone").checked; S.sea = $("#lSea").checked; S.bowl = $("#lBowl").checked; S.heart = $("#lHeart").checked;
+  S.voiceName = $("#voiceSel").value;
   S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
-  try { localStorage.setItem("atemlotse4", JSON.stringify(S)); } catch (e) {}
+  try { localStorage.setItem("atemlotse5", JSON.stringify(S)); } catch (e) {}
 }
 applySettingsToForm();
 $("#target").addEventListener("input", () => { $("#targetOut").textContent = $("#target").value; });
@@ -391,15 +410,17 @@ function rtSample(t, moving) {
   } else if (ph === "deep" && RT.base) {
     const d = sub(sig.g2, RT.base), n = Math.hypot(...d);
     if (n > RT.inMax) { RT.inMax = n; RT.inVec = d; }
-  } else if (ph === "realtime" && RT.dir) {
+  } else if ((ph === "realtime" || ph === "dive") && RT.dir) {
     const p = dot(sub(sig.g2, RT.base), RT.dir) / RT.range;
     if (!moving) {
       // follow slow posture drift (about a minute) without flattening single breaths
-      const al = 0.05 / 60;
-      if (p < RT.lo) RT.lo = p; else RT.lo += (p - RT.lo) * al;
-      if (p > RT.hi) RT.hi = p; else RT.hi += (p - RT.hi) * al;
+      // the floor follows posture drift within a minute; the top only very slowly,
+      // and never closer than 0.6 of the calibrated breath, so deeper breaths keep room
+      if (p < RT.lo) RT.lo = p; else RT.lo += (p - RT.lo) * (0.05 / 60);
+      if (p > RT.hi) RT.hi = RT.hi + (p - RT.hi) * 0.02; else RT.hi += (p - RT.hi) * (0.05 / 300);
+      RT.hi = Math.max(RT.hi, RT.lo + 0.6);
     }
-    RT.q = clamp((p - RT.lo) / Math.max(RT.hi - RT.lo, 0.4), -0.1, 1.15);
+    RT.q = clamp((p - RT.lo) / (RT.hi - RT.lo), -0.1, 1.6);
   }
 }
 function rtEndHold() {
@@ -487,7 +508,7 @@ function logEvent(type, data) {
 }
 function logSample(t, gAvg, rAvg) {
   if (sess.phase === "idle" || !LOG.startedAt) return;
-  const guiding = ["calib", "match", "lead"].includes(sess.phase);
+  const guiding = ["calib", "match", "lead", "dive"].includes(sess.phase);
   LOG.rows.push([
     (t - sess.start).toFixed(3),
     gAvg[0].toFixed(4), gAvg[1].toFixed(4), gAvg[2].toFixed(4),
@@ -669,6 +690,19 @@ function initAudio() {
   const lfoAmt = ctx.createGain(); lfoAmt.gain.value = 70;
   lfo.connect(lfoAmt).connect(A.padFilter.frequency); lfo.start();
 
+  // Singing bowl: inharmonic partials, each a slightly detuned pair so it slowly beats
+  A.bowlGain = ctx.createGain(); A.bowlGain.gain.value = 0;
+  A.bowlGain.connect(A.master); A.bowlGain.connect(verb);
+  A.bowlParts = [];
+  for (const [ratio, vol] of [[1, 0.5], [2.71, 0.22], [5.15, 0.1], [8.43, 0.04]]) {
+    const pg = ctx.createGain(); pg.gain.value = vol; pg.connect(A.bowlGain);
+    for (const off of [0, 0.55 + ratio * 0.15]) {
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = BOWL_HZ * ratio + off;
+      o.connect(pg); o.start();
+    }
+    A.bowlParts.push({ g: pg, vol, ratio });
+  }
+
   // Shimmer: fades in while your breath matches the guide
   A.hGain = ctx.createGain(); A.hGain.gain.value = 0; A.hGain.connect(A.master);
   for (const [f, p] of [[440, -0.4], [659.25, 0.4], [880.6, 0]]) {
@@ -690,8 +724,9 @@ function audioUpdate(level, shimmer) {
   const t = A.ctx.currentTime, k = 0.35;
   const v = clamp((level + 1) / 2, 0, 1);
   const sea = S.sea, tone = S.tone;
-  A.nFilter.frequency.setTargetAtTime(160 + Math.pow(v, 1.5) * 650, t, k);
-  A.nGain.gain.setTargetAtTime(sea ? 0.03 + v * 0.13 : 0, t, k);
+  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, v * 3.2), t, k);
+  A.nGain.gain.setTargetAtTime(sea ? 0.025 + v * 0.09 : 0, t, k);
+  bowlLevel(v, k);
   A.dGain.gain.setTargetAtTime(tone ? 0.05 : 0, t, 0.5);
   A.vFilter.frequency.setTargetAtTime(280 + v * 1300, t, k);
   A.vGain.gain.setTargetAtTime(tone ? 0.015 + v * 0.07 : 0, t, k);
@@ -701,20 +736,33 @@ function audioUpdate(level, shimmer) {
   A.hGain.gain.setTargetAtTime(shimmer * 0.035, t, 0.8);
   A.padGain.gain.setTargetAtTime(0, t, 0.5);
 }
-function audioRealtime(q, follow) {
+// linear up to 0.8, then flattening toward 1.4: deeper than calibrated still sounds deeper
+const soft = (q) => (q < 0.8 ? Math.max(0, q) : 0.8 + 0.6 * (1 - Math.exp(-(q - 0.8) / 0.6)));
+function audioRealtime(q, follow, guideY) {
   if (!A.ctx) return;
   const t = A.ctx.currentTime, k = 0.07;
-  const v = clamp(q, 0, 1.1);
-  const f = 130.81 * Math.pow(2, (v * 5) / 12); // C3 up to F3 at a deep breath
+  const u = soft(q);
+  const f = 130.81 * Math.pow(2, (u * 5) / 12); // C3 up to F3 at the calibrated breath
   for (const p of A.pad) p.o.frequency.setTargetAtTime(f * p.mult, t, k);
-  A.padFilter.frequency.setTargetAtTime(240 + v * 700, t, k);
-  A.padGain.gain.setTargetAtTime(S.tone ? 0.04 + v * 0.015 : 0, t, follow ? 0.15 : 1.2);
+  A.padFilter.frequency.setTargetAtTime(240 + u * 650, t, k);
+  A.padGain.gain.setTargetAtTime(S.tone ? 0.04 + u * 0.012 : 0, t, follow ? 0.15 : 1.2);
   const sea = S.sea && follow;
-  A.nFilter.frequency.setTargetAtTime(160 + Math.pow(v, 1.5) * 650, t, 0.1);
-  A.nGain.gain.setTargetAtTime(sea ? 0.02 + v * 0.1 : 0, t, 0.1);
+  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, u * 3.2), t, 0.1);
+  A.nGain.gain.setTargetAtTime(sea ? 0.02 + u * 0.07 : 0, t, 0.1);
+  // the bowl leads when there is a guide, otherwise it breathes with you
+  bowlLevel(guideY != null ? (guideY + 1) / 2 : follow ? u / 1.4 : 0, guideY != null ? 0.35 : 0.1);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
   A.vGain.gain.setTargetAtTime(0, t, 0.3);
   A.hGain.gain.setTargetAtTime(0, t, 0.5);
+}
+const BOWL_HZ = 196; // G3
+function bowlLevel(v, k) {
+  if (!A.bowlGain) return;
+  const t = A.ctx.currentTime;
+  v = clamp(v, 0, 1);
+  A.bowlGain.gain.setTargetAtTime(S.bowl ? 0.01 + v * 0.035 : 0, t, k);
+  // brighter at the top of the breath: upper partials open up
+  for (const p of A.bowlParts) if (p.ratio > 1) p.g.gain.setTargetAtTime(p.vol * (0.25 + 0.75 * v), t, k);
 }
 function heartSound() {
   if (!A.ctx || !S.heart) return;
@@ -730,14 +778,17 @@ function heartSound() {
   }
 }
 function chime(freq) {
+  // a softly struck singing bowl
   if (!A.ctx || !S.chimes) return;
   const ctx = A.ctx, t = ctx.currentTime;
-  for (const [mult, vol] of [[1, 0.06], [2.76, 0.015], [5.4, 0.006]]) {
-    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = freq * mult;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2 / mult + 0.4);
-    o.connect(g).connect(A.master); o.start(t); o.stop(t + 4);
+  for (const [mult, vol, decay] of [[1, 0.045, 7], [2.71, 0.014, 3.5], [5.15, 0.005, 1.6]]) {
+    for (const off of [0, 0.7]) {
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = freq * mult + off;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol / 2, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      o.connect(g).connect(A.master); o.start(t); o.stop(t + decay + 0.1);
+    }
   }
 }
 function say(text) {
@@ -745,8 +796,9 @@ function say(text) {
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "de-DE"; u.rate = 0.88; u.pitch = 0.95; u.volume = 0.9;
-    const de = speechSynthesis.getVoices().find((v) => v.lang && v.lang.startsWith("de"));
+    u.lang = "de-DE"; u.rate = 0.85; u.pitch = 0.95; u.volume = 0.85;
+    const voices = speechSynthesis.getVoices();
+    const de = voices.find((v) => v.name === S.voiceName) || voices.find((v) => v.lang && v.lang.startsWith("de"));
     if (de) u.voice = de;
     speechSynthesis.speak(u);
   } catch (e) {}
@@ -759,7 +811,7 @@ const sess = {
   m: { xy: 0, xx: 1e-6, yy: 1e-6 }, match: 0, flipBad: 0,
   leadCycles: 0, naturalRate: null, matchSum: 0, matchN: 0, history: [],
 };
-const PLACE_SECONDS = 12, CALIB_SECONDS = 20, MATCH_SECONDS = 60, HOLD_SECONDS = 10, DEEP_SECONDS = 5;
+const PLACE_SECONDS = 12, CALIB_SECONDS = 20, MATCH_SECONDS = 60, HOLD_SECONDS = 10, DEEP_SECONDS = 7, SETTLE_SECONDS = 45;
 
 function setPrompt(t) { $("#prompt").textContent = t; }
 function alignGuide() {
@@ -778,8 +830,8 @@ function setPhase(p) {
     setPrompt("Ausatmen und Luft anhalten …");
     say("Atme aus und halte die Luft an.");
   } else if (p === "deep") {
-    setPrompt("Und jetzt tief einatmen.");
-    say("Und jetzt tief einatmen.");
+    setPrompt("Und jetzt so tief einatmen, wie du kannst.");
+    say("Und jetzt so tief einatmen, wie du kannst.");
   } else if (p === "realtime") {
     setPrompt("Hebt sich dein Brustkorb, wird der Ton heller. Senkt er sich, wird er tiefer.");
     say("Und ausatmen. Ab jetzt folgt der Ton deinem Brustkorb.");
@@ -788,7 +840,7 @@ function setPhase(p) {
     say("Leg das Handy flach auf deine Brust und lieg ganz ruhig.");
     setTimeout(() => {
       if (sess.phase === "place" && sess.hasSensor)
-        say(S.mode === "realtime"
+        say(S.mode !== "lead"
           ? "Gleich atmest du aus und hältst kurz die Luft an. So lerne ich deine Ruhelage."
           : "Gleich atmest du zweimal mit dem Klang. Schwillt er an, atme ein. Ebbt er ab, atme aus.");
     }, 4500);
@@ -796,13 +848,21 @@ function setPhase(p) {
     G.phase = 0; G.P = 10; G.rIn = 0.4;
     sess.calib = { xy: 0, xx: 0, yy: 0 };
     setPrompt("Zweimal mit dem Klang: anschwellen = ein, abebben = aus.");
-    chime(440);
+    chime(BOWL_HZ);
   } else if (p === "match") {
     const up = userPeriod();
     G.P = clamp(up || 5, 2.5, 15); G.rIn = 0.42; G.corr = 0;
     alignGuide();
     setPrompt("Atme ganz natürlich. Der Klang passt sich dir an.");
     say("Jetzt atme einfach natürlich. Der Klang passt sich deinem Atem an.");
+  } else if (p === "dive") {
+    const up = userPeriod();
+    G.P = clamp(up || 6, 3, 15); G.rIn = 0.42; G.corr = 0;
+    alignGuide();
+    sess.naturalRate = 60 / G.P; sess.leadCycles = 0; sess.arrived = false;
+    sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 }; sess.hrStart = HB.bpm;
+    setPrompt("Folge der Klangschale. Sie wird langsam ruhiger.");
+    say("Jetzt führt dich die Klangschale. Atme mit ihr, ganz ohne Anstrengung.");
   } else if (p === "lead" && prevPhase === "match") {
     sess.naturalRate = 60 / G.P;
     sess.leadCycles = 0;
@@ -826,16 +886,21 @@ function guideStep(dt, adapt) {
   G.corr -= d;
   G.phase += dt / G.P + d;
   if (G.phase < 0) G.phase += 1;
-  if (prev < G.rIn && G.phase >= G.rIn) chime(659.25);
+  if (prev < G.rIn && G.phase >= G.rIn) chime(BOWL_HZ * 1.5);
   if (G.phase >= 1) {
     G.phase -= 1;
-    chime(440);
+    chime(BOWL_HZ);
     if (adapt) {
       G.rIn += (1 / (1 + S.ratio) - G.rIn) * 0.25;
       sess.leadCycles++;
       const targetP = 60 / S.target;
       const following = !sess.hasSensor || sess.leadCycles <= 2 || sess.match > 0.4;
-      if (following) G.P = G.P < targetP ? Math.min(targetP, G.P * 1.05) : Math.max(targetP, G.P / 1.05);
+      const step = sess.phase === "dive" ? 1.03 : 1.05; // meditation slows down more gently
+      if (following) G.P = G.P < targetP ? Math.min(targetP, G.P * step) : Math.max(targetP, G.P / step);
+      if (sess.phase === "dive" && !sess.arrived && Math.abs(G.P - targetP) < 0.01) {
+        sess.arrived = true;
+        say("Du bist angekommen. Bleib einfach hier, im Rhythmus der Klangschale.");
+      }
     }
   }
   G.y = shape(G.phase, G.rIn);
@@ -850,7 +915,7 @@ function tick() {
 
   if (ph === "place") {
     level = -0.6;
-    if (el > PLACE_SECONDS) setPhase(!(sess.hasSensor && sig.seen) ? "lead" : S.mode === "realtime" ? "hold" : "calib");
+    if (el > PLACE_SECONDS) setPhase(!(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
   } else if (ph === "hold") {
     if (el >= HOLD_SECONDS) { rtEndHold(); setPhase("deep"); }
   } else if (ph === "deep") {
@@ -858,6 +923,10 @@ function tick() {
   } else if (ph === "realtime") {
     level = RT.q * 2 - 1;
     if (!sess.naturalRate && el > 40 && userPeriod()) sess.naturalRate = 60 / userPeriod();
+    if (S.mode === "tiefe" && el > SETTLE_SECONDS && userPeriod()) setPhase("dive");
+  } else if (ph === "dive") {
+    guideStep(dt, true);
+    level = RT.q * 2 - 1; yForMatch = G.y;
   } else if (ph === "calib") {
     guideStep(dt, false);
     level = G.y; yForMatch = G.y;
@@ -891,7 +960,7 @@ function tick() {
       sess.m.xx += (sig.x * sig.x - sess.m.xx) * al;
       sess.m.yy += (yd * yd - sess.m.yy) * al;
       sess.match = clamp(sess.m.xy / Math.sqrt(sess.m.xx * sess.m.yy + 1e-9), -1, 1);
-      if ((ph === "lead" || ph === "match") && t - sess.phaseStart > 20) {
+      if ((ph === "lead" || ph === "match" || ph === "dive") && t - sess.phaseStart > 20) {
         sess.matchSum += Math.max(0, sess.match); sess.matchN++;
         // persistently opposite? then the sign of the signal is flipped: fix it
         sess.flipBad = sess.match < -0.4 ? sess.flipBad + dt : 0;
@@ -900,11 +969,13 @@ function tick() {
     }
   }
   const shimmer = ph === "lead" && sess.hasSensor ? clamp((sess.match - 0.55) / 0.35, 0, 1) : 0;
-  if (ph === "hold" || ph === "deep" || ph === "realtime") audioRealtime(ph === "realtime" ? RT.q : 0, ph === "realtime");
+  if (ph === "hold" || ph === "deep") audioRealtime(0, false, null);
+  else if (ph === "realtime" || ph === "dive") audioRealtime(RT.q, true, ph === "dive" ? G.y : null);
   else audioUpdate(level, shimmer);
 
-  const xNow = ph === "realtime" ? level : (ph === "hold" || ph === "deep" ? null : sig.x);
-  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: ph === "calib" || ph === "lead" || ph === "match" ? G.y : null });
+  const xNow = ph === "realtime" || ph === "dive" ? level : (ph === "hold" || ph === "deep" ? null : sig.x);
+  const guided = ph === "calib" || ph === "lead" || ph === "match" || ph === "dive";
+  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: guided ? G.y : null });
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
   if (S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
@@ -913,7 +984,7 @@ function tick() {
 
 function delayedGuide() {
   // your trace lags by the filter; when following the guide you also lag by reaction time
-  const h = sess.history, target = now() - (sess.phase === "lead" ? LAG + 0.4 : LAG);
+  const h = sess.history, target = now() - (sess.phase === "lead" || sess.phase === "dive" ? LAG + 0.4 : LAG);
   for (let i = h.length - 1; i >= 0; i--) if (h[i].t <= target) return h[i].y;
   return null;
 }
@@ -923,14 +994,18 @@ function updateReadouts() {
   const up = userPeriod();
   $("#youRate").textContent = up ? (60 / up).toFixed(1) : "–";
   const real = S.mode === "realtime" && ["hold", "deep", "realtime"].includes(sess.phase);
-  const guiding = sess.phase === "lead" || sess.phase === "calib" || sess.phase === "match";
+  const tiefe = S.mode === "tiefe" && sess.phase !== "idle";
+  const guiding = ["lead", "calib", "match", "dive"].includes(sess.phase);
   $("#guideLabel").textContent = real ? "Puls" : "Lotse";
   $("#guideNote").textContent = real ? "Schläge/min" : "Atemzüge/min";
-  $("#syncLabel").textContent = real ? "Brustkorb" : "Synchron";
-  $("#syncNote").textContent = real ? "0 % = Ruhelage" : "mit dem Klang";
-  if (real) {
+  $("#syncLabel").textContent = real ? "Brustkorb" : tiefe ? "Puls" : "Synchron";
+  $("#syncNote").textContent = real ? "0 % = Ruhelage" : tiefe ? "Schläge/min" : "mit dem Klang";
+  if (tiefe) {
+    $("#guideRate").textContent = sess.phase === "dive" ? (60 / G.P).toFixed(1) : "–";
+    $("#sync").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
+  } else if (real) {
     $("#guideRate").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
-    $("#sync").textContent = sess.phase === "realtime" ? Math.round(clamp(RT.q, 0, 1.15) * 100) + "%" : "–";
+    $("#sync").textContent = sess.phase === "realtime" ? Math.round(clamp(RT.q, 0, 1.6) * 100) + "%" : "–";
   } else {
     $("#guideRate").textContent = guiding ? (60 / G.P).toFixed(1) : (sess.phase === "idle" ? S.target.toFixed(1) : "–");
     $("#sync").textContent = (sess.phase === "lead" || sess.phase === "match") && sess.hasSensor ? Math.round(Math.max(0, sess.match) * 100) + "%" : "–";
@@ -1047,6 +1122,7 @@ async function start(ev) {
   keepAwake();
   sess.hasSensor = "DeviceMotionEvent" in window;
   sess.start = now(); sess.lastTick = now(); sess.history = [];
+  sess.hrStart = null; sess.arrived = false;
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
   setPhase("place");
@@ -1069,7 +1145,7 @@ function finish(natural) {
   sess.phase = "idle";
   clearInterval(sess.timer);
   window.removeEventListener("devicemotion", onMotion);
-  if (natural) { chime(440); setTimeout(() => chime(659.25), 900); say("Schön. Du kannst langsam zurückkommen."); }
+  if (natural) { chime(BOWL_HZ); setTimeout(() => chime(BOWL_HZ * 1.5), 900); say("Schön. Du kannst langsam zurückkommen."); }
   audioFade(0, natural ? 6 : 1.2);
   try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
   $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false;
@@ -1077,7 +1153,8 @@ function finish(natural) {
   const rows = [["Dauer", Math.floor(dur / 60) + ":" + String(Math.floor(dur % 60)).padStart(2, "0") + " min"]];
   if (sess.naturalRate) rows.push(["Atem am Anfang", sess.naturalRate.toFixed(1) + " /min"]);
   if (up) rows.push(["Atem am Ende", (60 / up).toFixed(1) + " /min"]);
-  if (S.mode === "lead") rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
+  if (sess.hrStart && HB.bpm) rows.push(["Puls beim Eintauchen → Ende", "~" + Math.round(sess.hrStart) + " → ~" + Math.round(HB.bpm) + " /min"]);
+  if (S.mode !== "realtime" && G.P) rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
   if (RT.hr) rows.push(["Puls beim Luftanhalten", "~" + Math.round(RT.hr) + " /min"]);
   if (HB.n) rows.push(["Puls im Schnitt", "~" + Math.round(HB.sum / HB.n) + " /min"]);
   if (sess.matchN) rows.push(["Ø Synchron", Math.round((sess.matchSum / sess.matchN) * 100) + " %"]);
@@ -1093,7 +1170,21 @@ $("#saveLog").addEventListener("click", saveLog);
 $("#shareLog").addEventListener("click", shareLog);
 $("#dimBtn").addEventListener("click", () => { $("#dim").hidden = false; });
 $("#dim").addEventListener("click", () => { $("#dim").hidden = true; });
-if ("speechSynthesis" in window) speechSynthesis.getVoices();
+function fillVoices() {
+  if (!("speechSynthesis" in window)) return;
+  const sel = $("#voiceSel");
+  const voices = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith("de"));
+  sel.innerHTML = "";
+  if (!voices.length) { sel.add(new Option("Standardstimme", "")); return; }
+  for (const v of voices) sel.add(new Option(v.name + (v.localService ? "" : " (online)"), v.name));
+  if (voices.some((v) => v.name === S.voiceName)) sel.value = S.voiceName;
+}
+if ("speechSynthesis" in window) { fillVoices(); speechSynthesis.addEventListener("voiceschanged", fillVoices); }
+$("#voiceTest").addEventListener("click", () => {
+  const was = S.voice; S.voiceName = $("#voiceSel").value; S.voice = true;
+  say("Atme ruhig ein. Und lass den Atem langsam wieder los.");
+  S.voice = was;
+});
 updateReadouts();
 </script>
 </body>
