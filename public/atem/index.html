@@ -120,6 +120,7 @@ form { display: flex; flex-direction: column; gap: 14px; }
   font-size: 0.9rem;
   cursor: pointer;
 }
+.seg label { display: flex; align-items: center; justify-content: center; }
 .seg input:checked + label { border-color: var(--guide); color: var(--guide); }
 .seg input:focus-visible + label { outline: 2px solid var(--breath); outline-offset: 2px; }
 input[type=range] { width: 100%; accent-color: var(--guide); }
@@ -258,10 +259,30 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     <div class="field">
       <span>Modus</span>
       <div class="seg">
-        <input type="radio" name="mode" id="mBox" value="box" checked><label for="mBox">Viereck</label>
+        <input type="radio" name="mode" id="mJb" value="jb" checked><label for="mJb">Just Breathe</label>
+        <input type="radio" name="mode" id="mBox" value="box"><label for="mBox">Viereck</label>
         <input type="radio" name="mode" id="mTiefe" value="tiefe"><label for="mTiefe">Tiefe</label>
         <input type="radio" name="mode" id="mReal" value="realtime"><label for="mReal">Echtzeit</label>
         <input type="radio" name="mode" id="mLead" value="lead"><label for="mLead">Führen</label>
+      </div>
+    </div>
+    <div class="field" id="jbField">
+      <span>Ziel-Rhythmus in Sekunden</span>
+      <div class="box">
+        <label>Ein<input type="number" id="jIn" min="1" max="12" step="1" inputmode="numeric"></label>
+        <label>Halten<input type="number" id="jTop" min="0" max="12" step="1" inputmode="numeric"></label>
+        <label>Aus<input type="number" id="jOut" min="1" max="12" step="1" inputmode="numeric"></label>
+        <label>Halten<input type="number" id="jBot" min="0" max="12" step="1" inputmode="numeric"></label>
+      </div>
+      <span>Einschlafen: Klänge ausblenden nach</span>
+      <div class="seg">
+        <input type="radio" name="sleepFade" id="f10" value="10"><label for="f10">10 min</label>
+        <input type="radio" name="sleepFade" id="f20" value="20" checked><label for="f20">20 min</label>
+        <input type="radio" name="sleepFade" id="f30" value="30"><label for="f30">30 min</label>
+        <input type="radio" name="sleepFade" id="f0" value="0"><label for="f0">nie</label>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="snore"> Schnarchen aufzeichnen (Mikrofon, erst nach dem Ausblenden)</label>
       </div>
     </div>
     <div class="field" id="boxField">
@@ -279,7 +300,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <button type="button" data-box="4,7,8,0">4·7·8</button>
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="durField">
       <span>Dauer</span>
       <div class="seg">
         <input type="radio" name="minutes" id="d5" value="5"><label for="d5">5 min</label>
@@ -309,7 +330,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <button type="button" class="ghost" id="voiceTest">Probe</button>
       </div>
     </div>
-    <p class="hint"><b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <p class="hint"><b>Just Breathe</b>: Lass dich fallen. Erst folgt dir die Klangschale, dann bringt sie dich Runde für Runde sanft zu deinem Ziel-Rhythmus und blendet zum Einschlafen aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -328,13 +349,13 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v7 · 22.10. 01:15";
-const S = { box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "box", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
-try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse6") || "{}")); } catch (e) {}
-if (!["box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "box";
-const BOX_IDS = ["bIn", "bTop", "bOut", "bBot"];
-function readBox() {
-  return BOX_IDS.map((id, i) => {
+const VERSION = "v8 · 22.10. 02:00";
+const S = { jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "jb", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse7") || "{}")); } catch (e) {}
+if (!["jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "jb";
+const BOX_IDS = ["bIn", "bTop", "bOut", "bBot"], JB_IDS = ["jIn", "jTop", "jOut", "jBot"];
+function readBox(ids = BOX_IDS) {
+  return ids.map((id, i) => {
     const v = Math.round(parseFloat($("#" + id).value));
     return clamp(isNaN(v) ? 4 : v, i % 2 ? 0 : 1, 12);
   });
@@ -342,11 +363,16 @@ function readBox() {
 function updateFields() {
   const mode = document.querySelector("input[name=mode]:checked").value;
   $("#boxField").hidden = mode !== "box";
+  $("#jbField").hidden = mode !== "jb";
+  $("#durField").hidden = mode === "jb";
   $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead");
 }
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
   BOX_IDS.forEach((id, i) => { $("#" + id).value = S.box[i]; });
+  JB_IDS.forEach((id, i) => { $("#" + id).value = S.jb[i]; });
+  const sf = document.querySelector(`input[name=sleepFade][value="${S.sleepFade}"]`); if (sf) sf.checked = true;
+  $("#snore").checked = S.snore;
   $("#volume").value = S.volume; $("#volumeOut").textContent = Math.round(S.volume * 100) + " %";
   $("#lTone").checked = S.tone; $("#lSea").checked = S.sea; $("#lBowl").checked = S.bowl; $("#lHeart").checked = S.heart;
   for (const name of ["ratio", "mode", "minutes"]) {
@@ -358,6 +384,9 @@ function applySettingsToForm() {
 function readForm() {
   S.target = parseFloat($("#target").value);
   S.box = readBox();
+  S.jb = readBox(JB_IDS);
+  S.sleepFade = parseFloat(document.querySelector("input[name=sleepFade]:checked").value);
+  S.snore = $("#snore").checked;
   S.volume = parseFloat($("#volume").value);
   S.ratio = parseFloat(document.querySelector("input[name=ratio]:checked").value);
   S.mode = document.querySelector("input[name=mode]:checked").value;
@@ -365,7 +394,7 @@ function readForm() {
   S.tone = $("#lTone").checked; S.sea = $("#lSea").checked; S.bowl = $("#lBowl").checked; S.heart = $("#lHeart").checked;
   S.voiceName = $("#voiceSel").value;
   S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
-  try { localStorage.setItem("atemlotse6", JSON.stringify(S)); } catch (e) {}
+  try { localStorage.setItem("atemlotse7", JSON.stringify(S)); } catch (e) {}
 }
 applySettingsToForm();
 updateFields();
@@ -396,7 +425,19 @@ const det = { dir: 1, ext: 0, extT: 0, lastTurn: 0, troughs: [], peaks: [] };
 function resetSignal() {
   sig.init = false; sig.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; sig.u = [0, 0, 1];
   sig.amp = 0; sig.ms = 0; sig.x = 0; sig.s = 0; sig.polarity = 1; sig.motion = 0;
+  sig.gRef = null; sig.disturbed = false; sig.settleUntil = 0; sig.relearnUntil = 0;
   resetDetector();
+}
+// After the phone was moved: forget the old axis and range and learn them again quietly.
+// The PCA restarts from the previous axis, so "inhale" keeps pointing the same way.
+function relearn(t) {
+  sig.disturbed = false;
+  sig.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; sig.t0 = t; sig.ms = 0;
+  sig.gRef = sig.g2.slice(); sig.relearnUntil = t + 15;
+  resetDetector();
+  RT.init = false; if (RT.dir) RT.passive = true;
+  HB.buf = [];
+  logEvent("relearn", {});
 }
 function resetDetector() { det.dir = 1; det.ext = sig.s; det.extT = now(); det.lastTurn = 0; det.troughs = []; det.peaks = []; }
 
@@ -416,6 +457,15 @@ function onMotion(e) {
   sig.magSlow += (mag - sig.magSlow) * Math.min(1, dt / 0.5);
   sig.motion += (Math.abs(mag - sig.magSlow) - sig.motion) * Math.min(1, dt / 0.6);
   const moving = sig.motion > MOTION_LIMIT;
+  // a slipped or re-placed phone: a jolt, or a tilt away from where it has been lying
+  if (sig.gRef) {
+    const ang = Math.acos(clamp(dot(sig.g2, sig.gRef) / (Math.hypot(...sig.g2) * Math.hypot(...sig.gRef) + 1e-9), -1, 1)) * 57.3;
+    if (sig.motion > 0.15 || ang > 6) {
+      if (!sig.disturbed) logEvent("moved", { angle: +ang.toFixed(1), motion: +sig.motion.toFixed(2) });
+      sig.disturbed = true; sig.settleUntil = t + 4;
+    }
+    sig.gRef = sig.gRef.map((c, i) => c + (sig.g2[i] - c) * Math.min(1, dt / (sig.disturbed ? 2 : 20)));
+  } else sig.gRef = sig.g2.slice();
   const r = e.rotationRate;
   if (r && r.alpha != null) { sig.rot[0] += r.alpha; sig.rot[1] += r.beta; sig.rot[2] += r.gamma; sig.rotN++; }
   for (let i = 0; i < 3; i++) {
@@ -423,7 +473,7 @@ function onMotion(e) {
     sig.g1[i] += (g[i] - sig.g1[i]) * Math.min(1, dt / 0.25);
     sig.g2[i] += (sig.g1[i] - sig.g2[i]) * Math.min(1, dt / 0.25);
     // while moving, re-anchor quickly so the filter settles once the phone lies still
-    sig.slow[i] += (g[i] - sig.slow[i]) * Math.min(1, dt / (moving ? 0.3 : 5));
+    sig.slow[i] += (g[i] - sig.slow[i]) * Math.min(1, dt / (moving || sig.disturbed ? 0.3 : 5));
     const hp = g[i] - sig.slow[i];
     // two gentle stages: keeps breathing, drops heartbeat and hand tremor
     sig.lp[i] += (hp - sig.lp[i]) * Math.min(1, dt / 0.35);
@@ -434,6 +484,8 @@ function onMotion(e) {
 }
 
 function sample(t, moving) {
+  if (sig.disturbed && t >= sig.settleUntil) relearn(t);
+  moving = moving || sig.disturbed;
   // 20 Hz box averages of the raw readings (for the heartbeat band and the log)
   const gAvg = sig.accN ? sig.acc.map((c) => c / sig.accN) : sig.g2.slice();
   const rAvg = sig.rotN ? sig.rot.map((c) => c / sig.rotN) : [0, 0, 0];
@@ -464,11 +516,11 @@ function sample(t, moving) {
    Hold (lungs empty) gives the resting position and the heartbeat jitter,
    one deep breath gives the direction and size of the movement. After that
    the tone simply follows where the chest is, with no rhythm model at all. */
-const RT = { init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null };
+const RT = { passive: false, init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null };
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 function rtReset() {
-  Object.assign(RT, { init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null });
+  Object.assign(RT, { passive: false, init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null });
 }
 function rtSample(t, moving) {
   const ph = sess.phase, el = t - sess.phaseStart;
@@ -478,8 +530,13 @@ function rtSample(t, moving) {
   } else if (ph === "deep" && RT.base) {
     const d = sub(sig.g2, RT.base), n = Math.hypot(...d);
     if (n > RT.inMax) { RT.inMax = n; RT.inVec = d; }
-  } else if (ph === "box") {
+  } else if (["box", "arrive", "jb", "sleep"].includes(ph) || ((ph === "realtime" || ph === "dive") && RT.passive)) {
     // learned silently: main breathing axis from the PCA, range from what you actually do
+    if (!sess.polPrior) {
+      // before any guide can tell: inhaling tilts the phone along its long axis
+      // (seen in every calibrated session so far); the guide corrects this if not
+      sess.polPrior = true; sig.polarity = sig.u[1] >= 0 ? 1 : -1;
+    }
     const p = dot(sig.g2, sig.u) * sig.polarity;
     if (!RT.init) { RT.lo = p; RT.hi = p + 1e-3; RT.init = true; }
     if (!moving) {
@@ -577,6 +634,54 @@ function heartEstimate() {
   }
 }
 
+/* ---------------- Snoring (microphone, only once the sounds have faded) ----------------
+   Only loudness and a low-frequency share are kept, never the audio itself.
+   A snore = clearly above the room's noise floor, mostly below 500 Hz, 0.3–4 s long. */
+const MIC = { stream: null, an: null, timer: null, db: null, floor: null, inEv: false, evStart: 0, peak: 0, events: 0 };
+async function micAllow() {
+  try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach((tr) => tr.stop()); return true; }
+  catch (e) { return false; }
+}
+async function micStart() {
+  if (MIC.stream || !A.ctx) return;
+  try {
+    MIC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) { logEvent("mic", { error: e.name }); return; }
+  const src = A.ctx.createMediaStreamSource(MIC.stream);
+  MIC.an = A.ctx.createAnalyser(); MIC.an.fftSize = 2048; src.connect(MIC.an);
+  MIC.floor = null; MIC.events = 0; MIC.inEv = false;
+  MIC.timer = setInterval(micTick, 250);
+  logEvent("mic", { on: true });
+}
+function micTick() {
+  const an = MIC.an, td = new Float32Array(an.fftSize), fd = new Float32Array(an.frequencyBinCount);
+  an.getFloatTimeDomainData(td); an.getFloatFrequencyData(fd);
+  let ss = 0; for (const v of td) ss += v * v;
+  const db = 10 * Math.log10(ss / td.length + 1e-12);
+  const hz = A.ctx.sampleRate / an.fftSize;
+  let low = 0, all = 0;
+  for (let i = 1; i < fd.length; i++) {
+    const f = i * hz; if (f < 50 || f > 4000) continue;
+    const pw = Math.pow(10, fd[i] / 10); all += pw; if (f <= 500) low += pw;
+  }
+  // noise floor: follows quiet moments quickly, loud ones only very slowly
+  MIC.floor = MIC.floor == null ? db : MIC.floor + (db - MIC.floor) * (db < MIC.floor ? 0.2 : 0.002);
+  MIC.db = db;
+  const loud = db > MIC.floor + 10 && low / (all || 1) > 0.6, t = now();
+  if (loud && !MIC.inEv) { MIC.inEv = true; MIC.evStart = t; MIC.peak = db; }
+  else if (loud) MIC.peak = Math.max(MIC.peak, db);
+  else if (MIC.inEv) {
+    MIC.inEv = false;
+    const d = t - MIC.evStart;
+    if (d >= 0.3 && d <= 4) { MIC.events++; logEvent("snore", { dur: +d.toFixed(2), db: +(MIC.peak - MIC.floor).toFixed(1) }); }
+  }
+}
+function micStop() {
+  clearInterval(MIC.timer); MIC.timer = null;
+  if (MIC.stream) MIC.stream.getTracks().forEach((tr) => tr.stop());
+  MIC.stream = null; MIC.an = null; MIC.db = null;
+}
+
 /* ---------------- Session log (downloadable) ---------------- */
 const LOG = { rows: [], events: [], startedAt: null };
 function logEvent(type, data) {
@@ -585,13 +690,13 @@ function logEvent(type, data) {
 }
 function logSample(t, gAvg, rAvg) {
   if (sess.phase === "idle" || !LOG.startedAt) return;
-  const guiding = ["calib", "match", "lead", "dive", "box"].includes(sess.phase);
+  const guiding = ["calib", "match", "lead", "dive", "box", "jb"].includes(sess.phase);
   LOG.rows.push([
     (t - sess.start).toFixed(3),
     gAvg[0].toFixed(4), gAvg[1].toFixed(4), gAvg[2].toFixed(4),
     rAvg[0].toFixed(3), rAvg[1].toFixed(3), rAvg[2].toFixed(3),
     sig.s.toFixed(5), sig.x.toFixed(3), RT.q.toFixed(3), guiding ? G.y.toFixed(3) : "",
-    sess.phase, sig.motion.toFixed(3), HB.bpm ? HB.bpm.toFixed(1) : "", HB.beat ? 1 : 0,
+    sess.phase, sig.motion.toFixed(3), HB.bpm ? HB.bpm.toFixed(1) : "", HB.beat ? 1 : 0, MIC.db != null ? MIC.db.toFixed(1) : "",
   ].join(","));
 }
 function buildLog() {
@@ -606,7 +711,8 @@ function buildLog() {
     "# events (t, type, data):",
     ...LOG.events.map((e) => "# " + e.join(" ")),
     "#   hr = heart rate estimate from the gyroscope, beat = 1 where a heartbeat was detected",
-    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat",
+    "#   mic = microphone level dB (only while snore recording runs)",
+    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic",
   ];
   return head.join("\n") + "\n" + LOG.rows.join("\n") + "\n";
 }
@@ -652,6 +758,16 @@ function detect(t, s, moving) {
   if (det.peaks.length > 12) det.peaks.shift();
 }
 
+function userInhale() {
+  const d = [];
+  for (const pk of det.peaks) {
+    const tr = det.troughs.filter((v) => v < pk).pop();
+    if (tr != null && pk - tr > 0.8 && pk - tr < 10) d.push(pk - tr);
+  }
+  if (!d.length) return null;
+  d.sort((a, b) => a - b);
+  return d[d.length >> 1];
+}
 function userPeriod() {
   const tr = det.troughs;
   if (tr.length < 2 || now() - tr[tr.length - 1] > 25) return null;
@@ -669,6 +785,7 @@ function signalQuality() {
   if (sess.phase === "idle") return "idle";
   if (!sig.seen) return "none";
   if (sig.motion > MOTION_LIMIT) return "moving";
+  if (sig.disturbed || now() < sig.relearnUntil) return "relearn";
   if (sig.amp < 0.003) return "weak";
   return "ok";
 }
@@ -903,7 +1020,28 @@ function setPhase(p) {
   const prevPhase = sess.phase;
   sess.phase = p; sess.phaseStart = now();
   logEvent("phase", { to: p });
-  if (p === "box") {
+  if (p === "arrive") {
+    sig.relearnUntil = Math.max(sig.relearnUntil, now() + 20);
+    setPrompt("Lass dich fallen. Du musst nichts tun.");
+  } else if (p === "jb") {
+    const up = clamp(userPeriod() || 5, 2.5, 12);
+    const inD = clamp(userInhale() || up * 0.42, 1, up - 1);
+    sess.jbStart = [inD, 0, up - inD, 0]; sess.jbProg = 0; sess.boxDur = sess.jbStart.slice(); sess.boxCycles = 0;
+    sess.naturalRate = 60 / up;
+    // join the breath where it is right now
+    const t = now(), lastTr = det.troughs[det.troughs.length - 1], lastPk = det.peaks[det.peaks.length - 1];
+    if (det.dir > 0 && lastTr) { B.i = 0; B.el = clamp(t - lastTr, 0, inD * 0.9); }
+    else if (lastPk) { B.i = 2; B.el = clamp(t - lastPk, 0, (up - inD) * 0.9); }
+    else { B.i = 0; B.el = 0; }
+    setPrompt("Die Klangschale atmet mit dir. Lass dich tragen.");
+    say("Die Klangschale atmet jetzt mit dir. Lass dich von ihr tragen.");
+  } else if (p === "sleep") {
+    audioFade(0, 180);
+    setPrompt("Schlaf gut. Die Aufzeichnung läuft weiter.");
+    if (S.snore) micStart();
+  } else if (p === "box") {
+    sess.boxDur = S.box.slice();
+    sig.relearnUntil = Math.max(sig.relearnUntil, now() + 25);
     B.i = 0; B.el = 0; sess.boxCycles = 0;
     setPrompt("Ein · halten · aus · halten. Atme so, wie es sich gut anfühlt.");
     boxCorner();
@@ -920,8 +1058,10 @@ function setPhase(p) {
     setPrompt("Handy flach auf die Brust legen und ruhig liegen.");
     say("Leg das Handy flach auf deine Brust und lieg ganz ruhig.");
     setTimeout(() => {
-      if (sess.phase === "place" && (sess.hasSensor || S.mode === "box"))
-        say(S.mode === "box"
+      if (sess.phase === "place" && (sess.hasSensor || S.mode === "box" || S.mode === "jb"))
+        say(S.mode === "jb"
+          ? "Lass dich einfach fallen. Du musst nichts tun. Die Klangschale findet dich."
+          : S.mode === "box"
           ? "Gleich hörst du die Klangschale. Sie steigt beim Einatmen, bleibt stehen beim Halten und sinkt beim Ausatmen. Es gibt kein Richtig oder Falsch."
           : S.mode !== "lead"
           ? "Gleich atmest du aus und hältst kurz die Luft an. So lerne ich deine Ruhelage."
@@ -968,14 +1108,27 @@ const BOX_WORDS = ["ein", "halten", "aus", "halten"];
 const BOX_SAY = ["Ein", "Halten", "Aus", "Halten"];
 const BOX_PITCH = [1, 1.5, 1.26, 0.75];
 function boxCorner() {
-  chime(BOWL_HZ * BOX_PITCH[B.i]);
-  if (B.i === 0) sess.boxCycles++;
+  const jb = sess.phase === "jb";
+  if (!jb || B.i === 0) chime(BOWL_HZ * BOX_PITCH[B.i]);
+  if (B.i === 0) {
+    sess.boxCycles++;
+    if (jb) jbProgress();
+  }
   // count along only for the first two rounds, and only when there is time to say it
-  if (sess.boxCycles <= 2 && S.box[B.i] >= 2) say(BOX_SAY[B.i]);
+  if (!jb && sess.boxCycles <= 2 && sess.boxDur[B.i] >= 2) say(BOX_SAY[B.i]);
   logEvent("box", { i: B.i });
 }
+// Just Breathe: start from your own in/out, then move a twelfth of the way per round
+// toward the target, and only while you are roughly with it. Nothing ever speeds up on you.
+function jbProgress() {
+  const following = !sess.hasSensor || sess.boxCycles <= 3 || sess.match > 0.3;
+  if (following) sess.jbProg = Math.min(1, sess.jbProg + 1 / 12);
+  const k = sess.jbProg * sess.jbProg * (3 - 2 * sess.jbProg);
+  sess.boxDur = sess.jbStart.map((a, i) => a + (S.jb[i] - a) * k);
+  logEvent("jb", { prog: +sess.jbProg.toFixed(2), dur: sess.boxDur.map((v) => +v.toFixed(2)) });
+}
 function boxStep(dt) {
-  const d = S.box;
+  const d = sess.boxDur;
   B.el += dt;
   for (let guard = 0; guard < 4 && B.el >= d[B.i]; guard++) {
     B.el -= d[B.i];
@@ -1021,7 +1174,7 @@ function tick() {
 
   if (ph === "place") {
     level = -0.6;
-    if (el > PLACE_SECONDS) setPhase(S.mode === "box" ? "box" : !(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
+    if (el > PLACE_SECONDS) setPhase(S.mode === "box" ? "box" : S.mode === "jb" ? (sess.hasSensor && sig.seen ? "arrive" : "jb") : !(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
   } else if (ph === "hold") {
     if (el >= HOLD_SECONDS) { rtEndHold(); setPhase("deep"); }
   } else if (ph === "deep") {
@@ -1030,6 +1183,14 @@ function tick() {
     level = RT.q * 2 - 1;
     if (!sess.naturalRate && el > 40 && userPeriod()) sess.naturalRate = 60 / userPeriod();
     if (S.mode === "tiefe" && el > SETTLE_SECONDS && userPeriod()) setPhase("dive");
+  } else if (ph === "arrive") {
+    level = RT.q * 2 - 1;
+    if (el > 40 && (userPeriod() || el > 75)) setPhase("jb");
+  } else if (ph === "jb" || ph === "sleep") {
+    boxStep(dt);
+    level = RT.q * 2 - 1; yForMatch = ph === "jb" ? G.y : null;
+    if (!sess.hrStart && t - sess.start > 60 && HB.bpm) sess.hrStart = HB.bpm;
+    if (ph === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
   } else if (ph === "box") {
     boxStep(dt);
     level = RT.q * 2 - 1; yForMatch = G.y;
@@ -1070,32 +1231,36 @@ function tick() {
       sess.m.xx += (sig.x * sig.x - sess.m.xx) * al;
       sess.m.yy += (yd * yd - sess.m.yy) * al;
       sess.match = clamp(sess.m.xy / Math.sqrt(sess.m.xx * sess.m.yy + 1e-9), -1, 1);
-      if ((ph === "lead" || ph === "match" || ph === "dive" || ph === "box") && t - sess.phaseStart > 20) {
+      if (["lead", "match", "dive", "box", "jb"].includes(ph) && t - sess.phaseStart > 20) {
         sess.matchSum += Math.max(0, sess.match); sess.matchN++;
         // persistently opposite? then the sign of the signal is flipped: fix it
         sess.flipBad = sess.match < -0.4 ? sess.flipBad + dt : 0;
-        if (sess.flipBad > (ph === "box" ? 6 : 12)) { sig.polarity = -sig.polarity; RT.init = false; sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 }; sess.flipBad = 0; resetDetector(); }
+        if (sess.flipBad > (ph === "box" || ph === "jb" ? 6 : 12)) { sig.polarity = -sig.polarity; RT.init = false; sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 }; sess.flipBad = 0; resetDetector(); }
       }
     }
   }
   const shimmer = ph === "lead" && sess.hasSensor ? clamp((sess.match - 0.55) / 0.35, 0, 1) : 0;
   if (ph === "hold" || ph === "deep") audioRealtime(0, false, null);
-  else if (ph === "realtime" || ph === "dive") audioRealtime(RT.q, true, ph === "dive" ? G.y : null);
-  else if (ph === "box") { const ready = sess.hasSensor && sig.seen && el > 25; audioRealtime(ready ? RT.q : 0, ready, G.y); }
-  else audioUpdate(level, shimmer);
+  else if (["realtime", "dive", "box", "arrive", "jb", "sleep"].includes(ph)) {
+    // while the phone settles or relearns, the chest sounds drift to a calm middle instead of jumping
+    const ready = sess.hasSensor && sig.seen && !sig.disturbed && t >= sig.relearnUntil;
+    sess.qOut += ((ready ? RT.q : 0.3) - sess.qOut) * Math.min(1, dt / (ready ? 0.1 : 4));
+    audioRealtime(sess.qOut, ready, ["dive", "box", "jb"].includes(ph) ? G.y : null);
+  } else audioUpdate(level, shimmer);
 
-  const xNow = ph === "realtime" || ph === "dive" ? level : ph === "box" ? (el > 25 ? level : null) : (ph === "hold" || ph === "deep" ? null : sig.x);
-  const guided = ph === "calib" || ph === "lead" || ph === "match" || ph === "dive" || ph === "box";
+  const chestPhase = ["realtime", "dive", "box", "arrive", "jb", "sleep"].includes(ph);
+  const xNow = chestPhase ? (sig.disturbed || t < sig.relearnUntil ? null : level) : (ph === "hold" || ph === "deep" ? null : sig.x);
+  const guided = ["calib", "lead", "match", "dive", "box", "jb"].includes(ph);
   sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: guided ? G.y : null });
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
-  if (S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
+  if (S.mode !== "jb" && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
   updateReadouts();
 }
 
 function delayedGuide() {
   // your trace lags by the filter; when following the guide you also lag by reaction time
-  const h = sess.history, target = now() - (["lead", "dive", "box"].includes(sess.phase) ? LAG + 0.4 : LAG);
+  const h = sess.history, target = now() - (["lead", "dive", "box", "jb"].includes(sess.phase) ? LAG + 0.4 : LAG);
   for (let i = h.length - 1; i >= 0; i--) if (h[i].t <= target) return h[i].y;
   return null;
 }
@@ -1105,15 +1270,16 @@ function updateReadouts() {
   const up = userPeriod();
   $("#youRate").textContent = up ? (60 / up).toFixed(1) : "–";
   const real = S.mode === "realtime" && ["hold", "deep", "realtime"].includes(sess.phase);
-  const tiefe = (S.mode === "tiefe" || S.mode === "box") && sess.phase !== "idle";
-  const boxm = S.mode === "box";
+  const tiefe = ["tiefe", "box", "jb"].includes(S.mode) && sess.phase !== "idle";
+  const boxm = S.mode === "box" || S.mode === "jb";
   const guiding = ["lead", "calib", "match", "dive"].includes(sess.phase);
-  $("#guideLabel").textContent = real ? "Puls" : boxm ? "Viereck" : "Lotse";
+  $("#guideLabel").textContent = real ? "Puls" : S.mode === "jb" ? "Rhythmus" : boxm ? "Viereck" : "Lotse";
   $("#guideNote").textContent = real ? "Schläge/min" : boxm ? "Sekunden" : "Atemzüge/min";
   $("#syncLabel").textContent = real ? "Brustkorb" : tiefe ? "Puls" : "Synchron";
   $("#syncNote").textContent = real ? "0 % = Ruhelage" : tiefe ? "Schläge/min" : "mit dem Klang";
   if (boxm) {
-    $("#guideRate").textContent = (sess.phase === "idle" ? readBox() : S.box).join("·");
+    const pat = sess.phase === "idle" || !sess.boxDur ? readBox(S.mode === "jb" ? JB_IDS : BOX_IDS) : sess.phase === "arrive" || sess.phase === "place" ? null : sess.boxDur;
+    $("#guideRate").textContent = pat ? pat.map((v) => Math.round(v)).join("·") : "–";
     if (tiefe) $("#sync").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
     else { $("#syncLabel").textContent = "Puls"; $("#syncNote").textContent = "Schläge/min"; $("#sync").textContent = "–"; }
   } else if (tiefe) {
@@ -1128,7 +1294,7 @@ function updateReadouts() {
   }
   const q = signalQuality();
   const st = $("#status");
-  const label = { idle: "bereit", none: "kein Sensor", moving: "Bewegung", weak: "schwach", ok: "gut" }[q];
+  const label = { idle: "bereit", relearn: "lernt neu", none: "kein Sensor", moving: "Bewegung", weak: "schwach", ok: "gut" }[q];
   st.className = "status" + (q === "ok" || q === "idle" ? "" : " warn");
   st.innerHTML = "Atemsignal: <b>" + label + "</b>";
   if (sess.phase !== "idle") {
@@ -1176,7 +1342,8 @@ function draw() {
   }
   // phase word in the middle
   let word = "";
-  if (!idle && sess.phase === "box") word = BOX_WORDS[B.i];
+  if (!idle && (sess.phase === "box" || sess.phase === "jb")) word = BOX_WORDS[B.i];
+  else if (!idle && sess.phase === "sleep") word = "";
   else if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
   else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
   if (word) {
@@ -1227,6 +1394,10 @@ async function start(ev) {
   ev.preventDefault();
   readForm();
   initAudio();
+  if (S.mode === "jb" && S.snore && S.sleepFade > 0 && navigator.mediaDevices) {
+    // ask now, while you are awake; the microphone itself only starts once the sounds have faded
+    S.snore = await micAllow();
+  }
   audioFade(S.volume, 3);
   if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
     try { await DeviceMotionEvent.requestPermission(); } catch (e) {}
@@ -1239,7 +1410,7 @@ async function start(ev) {
   keepAwake();
   sess.hasSensor = "DeviceMotionEvent" in window;
   sess.start = now(); sess.lastTick = now(); sess.history = [];
-  sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0;
+  sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0; sess.qOut = 0.3; sess.boxDur = S.box.slice(); sess.jbStart = null; sess.polPrior = false;
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
   setPhase("place");
@@ -1259,8 +1430,10 @@ function finish(natural) {
   const dur = now() - sess.start;
   const up = userPeriod();
   logEvent("finish", { natural, dur: +dur.toFixed(1), rate: up && +(60 / up).toFixed(2) });
+  const wasSleep = sess.phase === "sleep";
   sess.phase = "idle";
   clearInterval(sess.timer);
+  micStop();
   window.removeEventListener("devicemotion", onMotion);
   if (natural) { chime(BOWL_HZ); setTimeout(() => chime(BOWL_HZ * 1.5), 900); say("Schön. Du kannst langsam zurückkommen."); }
   audioFade(0, natural ? 6 : 1.2);
@@ -1272,6 +1445,11 @@ function finish(natural) {
   if (up) rows.push(["Atem am Ende", (60 / up).toFixed(1) + " /min"]);
   if (sess.hrStart && HB.bpm) rows.push(["Puls Anfang → Ende", "~" + Math.round(sess.hrStart) + " → ~" + Math.round(HB.bpm) + " /min"]);
   if (S.mode === "box") rows.push(["Viereck", S.box.join(" · ") + " s, " + (sess.boxCycles || 0) + " Runden"]);
+  if (S.mode === "jb" && sess.jbStart) rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => Math.round(v)).join(" · ") + " s (" + Math.round((sess.jbProg || 0) * 100) + " % am Ziel)"]);
+  if (wasSleep) rows.push(["Klänge ausgeblendet nach", S.sleepFade + " min"]);
+  if (S.mode === "jb" && S.snore) rows.push(["Schnarch-Geräusche", MIC.events + " Mal"]);
+  const moves = LOG.events.filter((e) => e[1] === "moved").length;
+  if (moves) rows.push(["Handy verrutscht / neu gelegt", moves + " Mal"]);
   if ((S.mode === "tiefe" || S.mode === "lead") && G.P) rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
   if (RT.hr) rows.push(["Puls beim Luftanhalten", "~" + Math.round(RT.hr) + " /min"]);
   if (HB.n) rows.push(["Puls im Schnitt", "~" + Math.round(HB.sum / HB.n) + " /min"]);
