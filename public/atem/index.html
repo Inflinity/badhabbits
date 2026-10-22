@@ -267,8 +267,8 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
       </div>
     </div>
     <div class="field" id="jbField">
-      <span>Ziel-Rhythmus in Sekunden</span>
-      <div class="box">
+      <span hidden>Ziel-Rhythmus in Sekunden</span>
+      <div class="box" hidden>
         <label>Ein<input type="number" id="jIn" min="1" max="12" step="1" inputmode="numeric"></label>
         <label>Halten<input type="number" id="jTop" min="0" max="12" step="1" inputmode="numeric"></label>
         <label>Aus<input type="number" id="jOut" min="1" max="12" step="1" inputmode="numeric"></label>
@@ -330,7 +330,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <button type="button" class="ghost" id="voiceTest">Probe</button>
       </div>
     </div>
-    <p class="hint"><b>Just Breathe</b>: Handy auf die Brust, atme in deinem Tempo. Das Meer folgt dir in Echtzeit: Es rauscht, solange Luft fließt, und schweigt in jeder Pause. Sobald die App sicher weiß, wo bei dir „ein“ ist, steigt es beim Einatmen und sinkt beim Ausatmen. Zum Einschlafen blendet es aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <p class="hint"><b>Just Breathe</b>: Handy auf die Brust, atme in deinem Tempo. Das Meer folgt dir in Echtzeit: Es rauscht, solange Luft fließt, und schweigt in jeder Pause. Sobald die App sicher weiß, wo bei dir „ein“ ist, steigt es beim Einatmen und sinkt beim Ausatmen. Wird dein Atem gleichmäßig, heißt es „Jetzt folge du dem Meer“: Aus den Böen wird ein ruhiges Auf und Ab in deinem Tempo, und wenn du mitgehst, wird es langsam ruhiger, bis zu deinem Ziel. Zum Einschlafen blendet es aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -349,7 +349,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v13 · 23.10. 00:45";
+const VERSION = "v14 · 23.10. 01:30";
 const S = { jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "jb", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse7") || "{}")); } catch (e) {}
 if (!["jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "jb";
@@ -365,7 +365,7 @@ function updateFields() {
   $("#boxField").hidden = mode !== "box";
   $("#jbField").hidden = mode !== "jb";
   $("#durField").hidden = mode === "jb";
-  $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead");
+  $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead" || mode === "jb");
 }
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
@@ -880,9 +880,10 @@ function logSample(t, gAvg, rAvg) {
     (t - sess.start).toFixed(3),
     gAvg[0].toFixed(4), gAvg[1].toFixed(4), gAvg[2].toFixed(4),
     rAvg[0].toFixed(3), rAvg[1].toFixed(3), rAvg[2].toFixed(3),
-    sig.s.toFixed(5), sig.x.toFixed(3), RT.q.toFixed(3), guiding ? G.y.toFixed(3) : "",
+    sig.s.toFixed(5), sig.x.toFixed(3), RT.q.toFixed(3), sess.phase === "seaLead" ? SP.y.toFixed(3) : guiding ? G.y.toFixed(3) : "",
     sess.phase, sig.motion.toFixed(3), HB.bpm ? HB.bpm.toFixed(1) : "", HB.beat ? 1 : 0, MIC.db != null ? MIC.db.toFixed(1) : "",
     sess.flowEng ? sess.flowEng.flow.toFixed(3) : "", sess.flowEng ? sess.flowEng.u.toFixed(3) : "", sess.flowEng ? sess.flowEng.wgt.toFixed(2) : "",
+    sess.phase === "seaLead" ? SP.flow.toFixed(3) : "", sess.phase === "seaLead" ? SP.sync.toFixed(2) : "",
   ].join(","));
 }
 function buildLog() {
@@ -899,7 +900,8 @@ function buildLog() {
     "#   hr = heart rate estimate from the gyroscope, beat = 1 where a heartbeat was detected",
     "#   mic = microphone level dB (only while snore recording runs)",
     "#   flow = real-time airflow (signed, 1 = a usual strong breath), pos = chest position 0..1, gyro = share of the gyroscope in flow",
-    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic,flow,pos,gyro",
+    "#   seaFlow = the leading sea's airflow, sync = how closely your flow follows it",
+    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic,flow,pos,gyro,seaFlow,sync",
   ];
   return head.join("\n") + "\n" + LOG.rows.join("\n") + "\n";
 }
@@ -1141,7 +1143,7 @@ const BOWL_HZ = 196; // G3
 // the sustained bowl only as it starts to lead.
 function mix(layer) {
   if (S.mode !== "jb") return 1;
-  if (sess.phase === "sea" || (sess.phase === "sleep" && sess.flowEng)) return 0;
+  if (sess.phase === "sea" || sess.phase === "seaLead" || (sess.phase === "sleep" && sess.flowEng)) return 0;
   if (layer === "bowl") return sess.phase === "blend" ? 0.3 * sess.alpha : ["jb", "sleep"].includes(sess.phase) ? 0.3 : 0;
   return sess.layersOn ? 0.05 : 0;
 }
@@ -1156,10 +1158,14 @@ function audioSea(dt) {
   const ok = e && sig.seen && !sig.disturbed;
   const fl = ok ? clamp((Math.abs(e.flow) - 0.12) / 0.88, 0, 1) : 0;
   sess.flowOut += (fl - sess.flowOut) * Math.min(1, dt / 0.06);
-  const mix = sess.dir ? sess.dir.mix : 0, pu = 0.45 + ((ok ? e.u : 0.45) - 0.45) * mix;
+  const mix = sess.dir ? sess.dir.mix : 0, puYou = 0.45 + ((ok ? e.u : 0.45) - 0.45) * mix;
+  // once the sea leads, your gusts cross over into its even swell
+  const a = SP.aOut;
+  const level = (1 - a) * sess.flowOut + a * (0.08 + 0.92 * Math.abs(SP.flow));
+  const pu = (1 - a) * puYou + a * (SP.y + 1) / 2;
   A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 0.05);
   // the sea is the whole of Just Breathe, so it plays regardless of the sound chips
-  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(sess.flowOut, 1.2), t, 0.04);
+  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2), t, 0.04);
   A.padGain.gain.setTargetAtTime(0, t, 0.5);
   if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(0, t, 0.5);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
@@ -1323,6 +1329,85 @@ function jbIntroCues(t, el) {
     setPhase("sea");
   }
 }
+/* Breaths on the real-time flow: a change of direction counts once the air has gone the new way
+   for 0.5 s, so a stumble does not split a breath (checked on a recorded session: 9.0–9.3/min
+   steady, where counting every turn gave 0.8 s "breaths"). */
+const BT = { st: 0, cand: null, on: [], ins: [], lastOff: null };
+function btReset() { Object.assign(BT, { st: 0, cand: null, on: [], ins: [], lastOff: null }); }
+function btStep(t, v) {
+  const want = v > 0.2 ? 1 : v < -0.2 ? -1 : 0;
+  if (want && want !== BT.st) {
+    if (!BT.cand || BT.cand[0] !== want) BT.cand = [want, t];
+    else if (t - BT.cand[1] >= 0.5) {
+      if (want === 1) { BT.on.push(BT.cand[1]); if (BT.on.length > 12) BT.on.shift(); }
+      else if (BT.on.length) { BT.ins.push(BT.cand[1] - BT.on[BT.on.length - 1]); if (BT.ins.length > 12) BT.ins.shift(); BT.lastOff = BT.cand[1]; }
+      BT.st = want; BT.cand = null;
+    }
+  } else if (want === BT.st) BT.cand = null;
+}
+const median = (a) => { const b = [...a].sort((x, y) => x - y); return b[b.length >> 1]; };
+function btPeriods(n) {
+  const p = [];
+  for (let i = Math.max(1, BT.on.length - n); i < BT.on.length; i++) p.push(BT.on[i] - BT.on[i - 1]);
+  return p;
+}
+// steady: of the last six breaths, five within 30 % of their median length
+function btSteady() {
+  const p = btPeriods(6);
+  if (p.length < 6) return false;
+  const m = median(p);
+  return p.filter((x) => Math.abs(x - m) < 0.3 * m).length >= 5;
+}
+
+/* The sea that leads: an even swell (sounding while its air flows, quiet at each turn), started at
+   your own length and split of a breath, where you are in it. Over five breaths your gusts give way
+   to it. Once you breathe with it, it lengthens each breath by 3 % toward the target, and only
+   while you stay with it. It never gets faster. */
+const SP = { ph: 0, P: 6, rIn: 0.45, y: -1, flow: 0, ring: [], cab: 0, caa: 1e-9, cbb: 1e-9, sync: 0, a: 0, aOut: 0, slowing: false, arrived: false, bad: 0 };
+function spStep(dt) {
+  SP.ph += dt / SP.P;
+  if (SP.ph >= 1) { SP.ph -= 1; spCycle(); }
+  const f = SP.ph;
+  if (f < SP.rIn) { const x = f / SP.rIn; SP.y = -Math.cos(Math.PI * x); SP.flow = Math.sin(Math.PI * x); }
+  else { const x = (f - SP.rIn) / (1 - SP.rIn); SP.y = Math.cos(Math.PI * x); SP.flow = -Math.sin(Math.PI * x); }
+  SP.aOut += (SP.a - SP.aOut) * Math.min(1, dt / 3);
+  if (SP.a === 0 && SP.aOut < 0.02) SP.aOut = 0;
+  // are you with it? your flow against the sea's, allowing half a second to follow
+  SP.ring.push(SP.flow); if (SP.ring.length > 10) SP.ring.shift();
+  const e = sess.flowEng;
+  if (!e || sig.disturbed) return;
+  const g = SP.ring[0], u = clamp(e.flow, -1.5, 1.5), al = dt / 12;
+  SP.cab += (u * g - SP.cab) * al; SP.caa += (u * u - SP.caa) * al; SP.cbb += (g * g - SP.cbb) * al;
+  SP.sync = SP.cab / Math.sqrt(SP.caa * SP.cbb);
+}
+function spCycle() {
+  if (sess.phase !== "seaLead") return;
+  // five breaths in a row not with it: no pushing, the sea goes back to following you
+  SP.bad = SP.sync < 0.3 ? SP.bad + 1 : SP.sync > 0.5 ? 0 : SP.bad;
+  if (SP.a >= 1 && SP.bad >= 5) {
+    SP.a = 0; sess.seaBackAt = now();
+    logEvent("seaBack", { P: +SP.P.toFixed(2), sync: +SP.sync.toFixed(2) });
+    setPhase("sea");
+    setPrompt("Das Meer folgt wieder dir. Lass dir Zeit.");
+    return;
+  }
+  SP.a = Math.min(1, SP.a + 1 / 5);
+  if (SP.a >= 1 && !SP.slowing && SP.sync > 0.6) {
+    SP.slowing = true;
+    setPrompt("Du bist im Takt. Das Meer wird jetzt langsam ruhiger.");
+    say("Schön. Das Meer wird jetzt langsam ruhiger.");
+  }
+  if (SP.slowing && SP.sync <= 0.5 && !SP.arrived) setPrompt("Folge dem Meer, so gut es geht. Es wartet auf dich.");
+  if (SP.slowing && SP.sync > 0.5) {
+    if (!SP.arrived) setPrompt("Du bist im Takt. Das Meer wird langsam ruhiger.");
+    const T = 60 / S.target;
+    if (SP.P < T) SP.P = Math.min(T, SP.P * 1.03);
+    SP.rIn += (1 / (1 + S.ratio) - SP.rIn) * 0.15;
+    if (!SP.arrived && SP.P >= T - 0.01) { SP.arrived = true; setPrompt("Angekommen. Bleib einfach im Rhythmus des Meeres."); }
+  }
+  logEvent("seaCycle", { P: +SP.P.toFixed(2), rIn: +SP.rIn.toFixed(2), sync: +SP.sync.toFixed(2), a: +SP.a.toFixed(2), slowing: SP.slowing });
+}
+
 // Every 5 s: keep the axis aligned with the breathing (same sign), and vote on which way is in.
 // The pitch only joins once the votes clearly agree; until then the sea follows the flow alone,
 // which is right whichever way round. A later clear majority the other way turns it around.
@@ -1350,7 +1435,22 @@ function setPhase(p) {
   const prevPhase = sess.phase;
   sess.phase = p; sess.phaseStart = now();
   logEvent("phase", { to: p });
-  if (p === "sea") {
+  if (p === "seaLead") {
+    const P = clamp(median(btPeriods(6)), 2.5, 15);
+    const rIn = clamp(BT.ins.length ? median(BT.ins.slice(-6)) / P : 0.45, 0.3, 0.6);
+    Object.assign(SP, { P, rIn, a: 0, aOut: SP.aOut, slowing: false, arrived: false, ring: [], cab: 0, caa: 1e-9, cbb: 1e-9, sync: 0, bad: 0 });
+    // join you where you are in your breath
+    const t = now(), on = BT.on[BT.on.length - 1];
+    if (BT.st === 1 && on) SP.ph = clamp((t - on) / P, 0, rIn * 0.95);
+    else if (BT.lastOff) SP.ph = rIn + clamp((t - BT.lastOff) / P, 0, (1 - rIn) * 0.95);
+    else SP.ph = 0;
+    sess.naturalRate = 60 / P; sess.hrStart = HB.bpm;
+    logEvent("seaLead", { P: +P.toFixed(2), rIn: +rIn.toFixed(2) });
+    setPrompt("Jetzt folge du dem Meer.");
+    say("Jetzt folge du dem Meer.");
+  } else if (p === "sea" && prevPhase === "seaLead") {
+    // quietly back to following; the even swell fades out over a few seconds
+  } else if (p === "sea") {
     setPrompt("Das Meer folgt deinem Atem. Es rauscht, solange Luft fließt.");
     say("Jetzt kommt das Meer. Es folgt dir.");
   } else if (p === "learn") {
@@ -1598,8 +1698,12 @@ function tick() {
     level = RT.q * 2 - 1; yForMatch = ph === "jb" ? G.y : null;
     if (!sess.hrStart && t - sess.start > 60 && HB.bpm) sess.hrStart = HB.bpm;
     if (ph === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
-  } else if (ph === "sea") {
+  } else if (ph === "sea" || ph === "seaLead") {
     seaDirection(t, dt);
+    if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
+    const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
+    if (ph === "sea" && rested && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
+    if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
     if (S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
   } else if (ph === "box") {
     boxStep(dt);
@@ -1650,7 +1754,7 @@ function tick() {
     }
   }
   const shimmer = ph === "lead" && sess.hasSensor ? clamp((sess.match - 0.55) / 0.35, 0, 1) : 0;
-  if (S.mode === "jb" && (ph === "sea" || ph === "sleep")) audioSea(dt);
+  if (S.mode === "jb" && (ph === "sea" || ph === "seaLead" || ph === "sleep")) audioSea(dt);
   else if (S.mode === "jb" && ph !== "place") audioJB(ph, dt);
   else if (ph === "hold" || ph === "deep") audioRealtime(0, false, null);
   else if (["realtime", "dive", "box", "arrive", "jb", "sleep"].includes(ph)) {
@@ -1662,11 +1766,11 @@ function tick() {
 
   const jbPhase = S.mode === "jb" && ph !== "place";
   if (jbPhase && (ph === "jb" || ph === "sleep")) level = TD.hgt * 2 - 1;
-  if (sess.flowEng && (ph === "sea" || ph === "sleep")) level = sess.flowEng.u * 2 - 1;
+  if (sess.flowEng && (ph === "sea" || ph === "seaLead" || ph === "sleep")) level = sess.flowEng.u * 2 - 1;
   const chestPhase = jbPhase || ["realtime", "dive", "box"].includes(ph);
   const xNow = chestPhase ? (sig.disturbed || t < sig.relearnUntil ? null : level) : (ph === "hold" || ph === "deep" ? null : sig.x);
   const guided = ["calib", "lead", "match", "dive", "box", "jb", "blend"].includes(ph);
-  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: guided ? G.y : null });
+  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: ph === "seaLead" ? SP.y : guided ? G.y : null });
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
   if (S.mode !== "jb" && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
@@ -1694,10 +1798,13 @@ function updateReadouts() {
   $("#syncLabel").textContent = real ? "Brustkorb" : tiefe ? "Puls" : "Synchron";
   $("#syncNote").textContent = real ? "0 % = Ruhelage" : tiefe ? "Schläge/min" : "mit dem Klang";
   if (S.mode === "jb" && (sess.flowEng || sess.phase === "place") && sess.phase !== "idle") {
-    $("#guideLabel").textContent = "Puls"; $("#guideNote").textContent = "Schläge/min";
-    $("#guideRate").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
-    $("#syncLabel").textContent = "Luft"; $("#syncNote").textContent = "fließt gerade";
-    $("#sync").textContent = sess.flowEng ? Math.round(clamp(Math.abs(sess.flowEng.flow), 0, 1) * 100) + "%" : "–";
+    const bp = btPeriods(4);
+    if (bp.length >= 2) $("#youRate").textContent = (60 / median(bp)).toFixed(1);
+    const leading = sess.phase === "seaLead";
+    $("#guideLabel").textContent = leading ? "Meer" : "Puls"; $("#guideNote").textContent = leading ? "Atemzüge/min" : "Schläge/min";
+    $("#guideRate").textContent = leading ? (60 / SP.P).toFixed(1) : HB.bpm ? "~" + Math.round(HB.bpm) : "–";
+    $("#syncLabel").textContent = leading ? "Synchron" : "Luft"; $("#syncNote").textContent = leading ? "mit dem Meer" : "fließt gerade";
+    $("#sync").textContent = leading ? Math.round(Math.max(0, SP.sync) * 100) + "%" : sess.flowEng ? Math.round(clamp(Math.abs(sess.flowEng.flow), 0, 1) * 100) + "%" : "–";
   } else if (boxm) {
     const pat = sess.phase === "idle" || !sess.boxDur ? readBox(S.mode === "jb" ? JB_IDS : BOX_IDS) : sess.phase === "arrive" || sess.phase === "place" ? null : sess.boxDur;
     $("#guideRate").textContent = tapping ? String(LEARN.taps.length) : pat && ["blend", "jb", "sleep", "idle"].includes(sess.phase) ? pat.map((v) => Math.round(v)).join("·") : "–";
@@ -1766,6 +1873,7 @@ function draw() {
   if (!idle && (sess.phase === "box" || sess.phase === "jb" || sess.phase === "blend")) word = BOX_WORDS[B.i];
   else if (!idle && ["learn", "echo", "check", "flat", "flow"].includes(sess.phase) && TD.st) word = TD.st === 1 || TD.st === 2 ? "ein" : "aus";
   else if (!idle && sess.phase === "sleep") word = "";
+  else if (!idle && sess.phase === "seaLead") word = SP.ph < SP.rIn ? "ein" : "aus";
   else if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
   else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
   if (word) {
@@ -1834,6 +1942,7 @@ async function start(ev) {
   sess.start = now(); sess.lastTick = now(); sess.history = [];
   sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0; sess.qOut = 0.3; sess.boxDur = S.box.slice(); sess.jbStart = null; sess.polPrior = false;
   sess.turns = []; sess.alpha = 0; sess.layersOn = false; sess.flowOut = 0; sess.fit = null;
+  btReset(); SP.a = 0; SP.aOut = 0; sess.seaBackAt = null;
   LEARN.on = false; LEARN.buf = []; LEARN.taps = []; turnReset();
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
@@ -1872,6 +1981,10 @@ function finish(natural) {
   if (S.mode === "jb" && sess.jbStart) {
     rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => v.toFixed(1).replace(".0", "")).join(" · ") + " s"]);
     rows.push(["Viereck", "Höhe " + Math.round(sess.progH * 100) + " %, Breite " + Math.round(sess.progW * 100) + " %"]);
+  }
+  if (S.mode === "jb" && SP.a > 0) {
+    rows.push(["Meer zuletzt", (60 / SP.P).toFixed(1).replace(".", ",") + " Atemzüge/min" + (SP.arrived ? " (Ziel erreicht)" : "")]);
+    rows.push(["Synchron mit dem Meer", Math.round(Math.max(0, SP.sync) * 100) + " %"]);
   }
   if (S.mode === "jb" && sess.fit) rows.push(["Gelernt aus Tipps", sess.fit.taps + " Tipps, " + sess.fit.hits + " getroffen (Ø " + sess.fit.err.toFixed(1).replace(".", ",") + " s)"]);
   if (wasSleep) rows.push(["Klänge ausgeblendet nach", S.sleepFade + " min"]);
