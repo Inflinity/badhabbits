@@ -158,6 +158,9 @@ input[type=range] { width: 100%; accent-color: var(--guide); }
   border-radius: 10px;
 }
 #samBuilder { display: flex; flex-direction: column; gap: 8px; }
+#diary summary { cursor: pointer; color: var(--guide); font-size: 0.92rem; padding-block: 6px; }
+#diaryList { white-space: pre-wrap; margin: 0; }
+#nightChart { width: 100%; max-width: 100%; height: 190px; display: block; }
 #samBuilder summary { cursor: pointer; color: var(--guide); font-size: 0.92rem; padding-block: 6px; }
 #samBuilder[open] { display: flex; }
 #samSrc { font: 400 0.8rem/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
@@ -249,10 +252,11 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
   <section class="summary" id="summary" hidden>
     <h2>Deine Runde</h2>
     <dl id="sumList"></dl>
+    <canvas id="nightChart" height="190" hidden aria-label="Die Nacht als Zeitleiste"></canvas>
     <div class="field" id="noteField" hidden>
-      <label for="dreamNote">Traumnotiz</label>
+      <label for="dreamNote">Traumtagebuch</label>
       <textarea id="dreamNote" rows="3" placeholder="Was hast du geträumt? Warst du dir bewusst, dass du träumst?"></textarea>
-      <button type="button" class="ghost" id="saveNote">Notiz in den Log</button>
+      <button type="button" class="ghost" id="saveNote">Ins Tagebuch</button>
     </div>
     <div class="actions">
       <button type="button" class="ghost" id="saveLog">Log speichern</button>
@@ -316,6 +320,18 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <input type="radio" name="carrier" id="c136" value="136.1" checked><label for="c136">tief 136 Hz</label>
         <input type="radio" name="carrier" id="c200" value="200"><label for="c200">mittel 200 Hz</label>
         <input type="radio" name="carrier" id="c432" value="432"><label for="c432">hell 432 Hz</label>
+      </div>
+      <span>Die Nacht</span>
+      <div class="toggles">
+        <label><input type="checkbox" id="snoreP"> Schnarchen erkennen (Mikrofon, erst wenn die Klänge aus sind oder nach 20 min)</label>
+        <label><input type="checkbox" id="markOnset"> Ganz leises Zeichen, wenn ich vermutlich eingeschlafen bin</label>
+      </div>
+      <span>Bei Schnarchen in Rückenlage sanft erinnern</span>
+      <div class="seg">
+        <input type="radio" name="snoreCue" id="sc0" value="aus" checked><label for="sc0">nein</label>
+        <input type="radio" name="snoreCue" id="sc1" value="Ton"><label for="sc1">Ton</label>
+        <input type="radio" name="snoreCue" id="sc2" value="Vibration"><label for="sc2">Vibration</label>
+        <input type="radio" name="snoreCue" id="sc3" value="beides"><label for="sc3">beides</label>
       </div>
       <div id="lucidField">
         <span>Signale im Schlaf ab</span>
@@ -392,6 +408,11 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     </div>
     <p class="hint"><b>Just Breathe</b>: Handy auf die Brust, atme in deinem Tempo. Das Meer folgt dir in Echtzeit: Es rauscht, solange Luft fließt, und schweigt in jeder Pause. Sobald die App sicher weiß, wo bei dir „ein“ ist, steigt es beim Einatmen und sinkt beim Ausatmen. Wird dein Atem gleichmäßig, heißt es „Jetzt folge du dem Meer“: Aus den Böen wird ein ruhiges Auf und Ab in deinem Tempo, und wenn du mitgehst, wird es langsam ruhiger, bis zu deinem Ziel. Zum Einschlafen blendet es aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
+    <details id="diary">
+      <summary>Traumtagebuch und Nächte</summary>
+      <pre class="hint" id="diaryList"></pre>
+      <div class="actions"><button type="button" class="ghost" id="diaryExport">Als Text speichern</button></div>
+    </details>
   </form>
 
   <div class="actions" id="running" hidden>
@@ -410,8 +431,8 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v17 · 23.10. 22:30 · Samsara";
-const S = { journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
+const VERSION = "v18 · 24.10. 00:30 · Nacht";
+const S = { markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
 // the Portal journeys ride on Just Breathe: same start, same sea, then their own way
@@ -456,7 +477,8 @@ function applySettingsToForm() {
     const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
     if (el) el.checked = true;
   }
-  for (const name of ["journey", "carrier", "lucidH"]) {
+  $("#snoreP").checked = S.snore; $("#markOnset").checked = S.markOnset;
+  for (const name of ["journey", "carrier", "lucidH", "snoreCue"]) {
     const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
     if (el) el.checked = true;
   }
@@ -467,7 +489,9 @@ function readForm() {
   S.box = readBox();
   S.jb = readBox(JB_IDS);
   S.sleepFade = parseFloat(document.querySelector("input[name=sleepFade]:checked").value);
-  S.snore = $("#snore").checked;
+  S.snore = S.mode === "portal" ? $("#snoreP").checked : $("#snore").checked;
+  S.markOnset = $("#markOnset").checked;
+  S.snoreCue = document.querySelector("input[name=snoreCue]:checked").value;
   S.volume = parseFloat($("#volume").value);
   S.ratio = parseFloat(document.querySelector("input[name=ratio]:checked").value);
   S.mode = document.querySelector("input[name=mode]:checked").value;
@@ -1317,6 +1341,176 @@ function lucidWatch(t) {
   if (dreamy) { logEvent("remLike", { cv: +cv.toFixed(2), rate: +rate.toFixed(1) }); J.cueSeq = { n: 0, next: t, start: t }; }
 }
 
+/* ================= Night: position, falling asleep, snoring, report, diary =================
+   Position: gravity now against gravity when you lay down (you start on your back): within 45° back,
+   beyond 135° belly, in between a side (which side from the turn about the phone's long axis), and
+   upright when the phone's long axis points down. A new position counts after 20 s.
+   Falling asleep, scored every 30 s after the first five minutes: lying still, breathing very even,
+   not faster than at the start, pulse lower than at the start, no longer following a leading sea.
+   Four high scores in a row (2 minutes) mark the onset, dated to the start of those two minutes.
+   Nothing here is a sleep lab; it is a careful guess, logged so the nights can be compared. */
+const NIGHT_CFG = { soStart: 300, posHold: 20, boutGap: 120, boutMin: 3 };
+const POS_NAME = { back: "Rücken", side1: "Seite ①", side2: "Seite ②", belly: "Bauch", up: "aufrecht" };
+const NIGHT = {};
+function nightReset() {
+  Object.assign(NIGHT, { g0: null, pos: null, posSince: 0, cand: null, candSince: 0, dur: {}, nextPos: 0,
+    so: { next: 0, hits: 0, base: null, baseHr: null }, asleep: false, onsets: [], wakes: [],
+    sn: { recent: [], inBout: false, boutStart: 0, last: -1e9, bouts: [], nudges: 0, boutNudges: 0, nextNudge: 0, first: null },
+    series: [], nextMin: 0, minSnore: 0, cues: [] });
+}
+nightReset();
+function posClassify() {
+  const g = sig.g2, n = Math.hypot(...g);
+  if (!NIGHT.g0 || !n) return null;
+  const u = g.map((v) => v / n), g0 = NIGHT.g0;
+  if (Math.abs(u[1]) > 0.8 && Math.abs(g0[1]) < 0.6) return "up";
+  const ang = Math.acos(clamp(dot(u, g0), -1, 1)) * 57.3;
+  if (ang < 45) return "back";
+  if (ang > 135) return "belly";
+  return g0[2] * u[0] - g0[0] * u[2] >= 0 ? "side1" : "side2";
+}
+const cvOf = (p) => { const m = p.reduce((a, b) => a + b, 0) / p.length; return Math.sqrt(p.reduce((a, b) => a + (b - m) ** 2, 0) / p.length) / m; };
+function softMark(vol) {
+  if (!A.ctx) return;
+  const ctx = A.ctx, t = ctx.currentTime;
+  for (const [f, v, d] of [[98, 1, 4], [196, 0.3, 2.5]]) {
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * v, t + 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g).connect(A.master); o.start(t); o.stop(t + d + 0.1);
+  }
+}
+function nightTick(t, dt) {
+  const ph = sess.phase;
+  if (!NIGHT.g0) {
+    if (ph !== "place" && !sig.disturbed && sig.g2) {
+      const n = Math.hypot(...sig.g2); NIGHT.g0 = sig.g2.map((v) => v / n);
+      NIGHT.pos = "back"; NIGHT.posSince = t; logEvent("pos", { pos: "back", start: true });
+    }
+    return;
+  }
+  // position, once a second
+  if (t >= NIGHT.nextPos) {
+    NIGHT.nextPos = t + 1;
+    const p = sig.disturbed ? null : posClassify();
+    if (p && p !== NIGHT.pos) {
+      if (NIGHT.cand !== p) { NIGHT.cand = p; NIGHT.candSince = t; }
+      else if (t - NIGHT.candSince >= NIGHT_CFG.posHold) {
+        NIGHT.dur[NIGHT.pos] = (NIGHT.dur[NIGHT.pos] || 0) + (NIGHT.candSince - NIGHT.posSince);
+        NIGHT.pos = p; NIGHT.posSince = NIGHT.candSince; NIGHT.cand = null;
+        logEvent("pos", { pos: p });
+      }
+    } else if (p === NIGHT.pos) NIGHT.cand = null;
+  }
+  // falling asleep, every 30 s
+  const sinceSea = t - sess.start;
+  if (sinceSea > NIGHT_CFG.soStart && t >= NIGHT.so.next) {
+    NIGHT.so.next = t + 30;
+    const p = btPeriods(10), rate = p.length >= 4 ? 60 / median(p) : null;
+    if (!NIGHT.so.base && rate) { NIGHT.so.base = rate; NIGHT.so.baseHr = HB.bpm; }
+    const still = !movedSince(300), regular = p.length >= 8 && cvOf(p) < 0.15;
+    const slower = rate && NIGHT.so.base && rate <= NIGHT.so.base * 1.05;
+    const hrDown = HB.bpm && NIGHT.so.baseHr && HB.bpm <= NIGHT.so.baseHr - 2;
+    const letGo = (ph === "seaLead" && SP.sync < 0.3) || ["fade", "night"].includes(J.stage) || ph === "night";
+    const score = (still ? 2 : 0) + (regular ? 2 : 0) + (slower ? 1 : 0) + (hrDown ? 1 : 0) + (letGo ? 1 : 0);
+    if (!NIGHT.asleep) {
+      NIGHT.so.hits = score >= 5 ? NIGHT.so.hits + 1 : 0;
+      if (NIGHT.so.hits >= 4) {
+        NIGHT.asleep = true; const at = t - 120 - sess.start;
+        NIGHT.onsets.push(at); logEvent("sleepOnset", { at: +at.toFixed(0), score, rate: rate && +rate.toFixed(1), hr: HB.bpm && Math.round(HB.bpm) });
+        if (S.markOnset) softMark(0.03);
+      }
+    } else if (movedSince(30) && !regular) {
+      NIGHT.asleep = false; NIGHT.so.hits = 0; NIGHT.wakes.push(sinceSea); logEvent("wake", { score });
+    }
+  }
+  // the microphone joins once the sounds are gone (or after 20 minutes)
+  if (S.snore && !MIC.stream && !MIC.starting && (J.stage === "night" || ph === "sleep" || sinceSea > 1200)) { MIC.starting = true; micStart().finally(() => { MIC.starting = false; }); }
+  // a snoring bout ends after two quiet minutes
+  const sn = NIGHT.sn;
+  if (sn.inBout && t - sn.last > NIGHT_CFG.boutGap) {
+    sn.inBout = false; sn.bouts.push([sn.boutStart - sess.start, sn.last - sess.start, NIGHT.pos]);
+    logEvent("snoreEnd", { dur: +(sn.last - sn.boutStart).toFixed(0) });
+  }
+  // a gentle nudge while snoring on the back: again every two minutes, a little stronger, at most six times a bout
+  if (sn.inBout && S.snoreCue !== "aus" && NIGHT.pos === "back" && t >= sn.nextNudge && sn.boutNudges < 6) {
+    const k = sn.boutNudges;
+    if (S.snoreCue === "Ton" || S.snoreCue === "beides") softMark(0.02 + 0.01 * k);
+    if (S.snoreCue === "Vibration" || S.snoreCue === "beides") haptic([150 + 50 * k, 120, 150 + 50 * k]);
+    sn.boutNudges++; sn.nudges++; sn.nextNudge = t + 120;
+    NIGHT.cues.push(t - sess.start); logEvent("nudge", { n: sn.boutNudges, pos: NIGHT.pos });
+  }
+  // one point per minute for the report
+  if (t >= NIGHT.nextMin) {
+    if (NIGHT.nextMin) {
+      const p = btPeriods(6);
+      NIGHT.series.push({ t: t - sess.start, rate: p.length >= 3 ? 60 / median(p) : null, hr: HB.bpm || null, pos: NIGHT.pos, snore: NIGHT.minSnore, asleep: NIGHT.asleep });
+    }
+    NIGHT.nextMin = t + 60; NIGHT.minSnore = 0;
+  }
+}
+// called for every snore sound the microphone hears
+function nightSnore() {
+  const t = now(), sn = NIGHT.sn;
+  NIGHT.minSnore++; sn.last = t;
+  sn.recent = sn.recent.filter((x) => x > t - 60); sn.recent.push(t);
+  if (!sn.inBout && sn.recent.length >= NIGHT_CFG.boutMin) {
+    sn.inBout = true; sn.boutStart = sn.recent[0]; sn.boutNudges = 0; sn.nextNudge = t;
+    if (sn.first == null) sn.first = sn.boutStart - sess.start;
+    logEvent("snoreStart", { pos: NIGHT.pos, at: +(sn.boutStart - sess.start).toFixed(0) });
+  }
+}
+function nightClose() {
+  const t = now();
+  if (NIGHT.pos) NIGHT.dur[NIGHT.pos] = (NIGHT.dur[NIGHT.pos] || 0) + (t - NIGHT.posSince);
+  const sn = NIGHT.sn;
+  if (sn.inBout) { sn.inBout = false; sn.bouts.push([sn.boutStart - sess.start, sn.last - sess.start, NIGHT.pos]); }
+}
+const clockAt = (sec) => { const d = new Date(Date.parse(LOG.startedAt) + sec * 1000); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+function nightRows() {
+  const rows = [], tot = Object.values(NIGHT.dur).reduce((a, b) => a + b, 0);
+  if (NIGHT.onsets.length) rows.push(["Eingeschlafen", "vermutlich um " + clockAt(NIGHT.onsets[0]) + " (nach " + Math.round(NIGHT.onsets[0] / 60) + " min)" + (NIGHT.wakes.length ? ", " + NIGHT.wakes.length + "× wach geworden" : "")]);
+  if (tot > 60) rows.push(["Lage", Object.entries(NIGHT.dur).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => POS_NAME[k] + " " + Math.round((100 * v) / tot) + " %").join(" · ")]);
+  if (S.snore) {
+    const b = NIGHT.sn.bouts, min = b.reduce((a, x) => a + (x[1] - x[0]), 0) / 60, back = b.filter((x) => x[2] === "back").reduce((a, x) => a + (x[1] - x[0]), 0) / 60;
+    rows.push(["Schnarchen", b.length ? b.length + " Phasen, " + Math.round(min) + " min" + (min > 0 ? ", " + Math.round((100 * back) / min) + " % davon in Rückenlage" : "") + ", erstmals " + clockAt(NIGHT.sn.first) : MIC.events ? MIC.events + " einzelne Geräusche, keine Phase" : "nichts gehört"]);
+    if (NIGHT.sn.nudges) rows.push(["Sanfte Hinweise", NIGHT.sn.nudges + " (" + S.snoreCue + ")"]);
+  }
+  return rows;
+}
+// the night as a picture: position band on top, breath and pulse below, onset and snoring marked
+function drawNight() {
+  const cv = $("#nightChart"), s = NIGHT.series;
+  if (!cv || s.length < 3) { if (cv) cv.hidden = true; return; }
+  cv.hidden = false;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = 190;
+  cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
+  const T = s[s.length - 1].t, X = (t) => 8 + ((W - 16) * t) / T;
+  const posCol = { back: col("--guide"), side1: col("--breath"), side2: "#5f8fd6", belly: col("--warn"), up: col("--muted") };
+  for (let i = 0; i < s.length; i++) { const t0 = i ? s[i - 1].t : 0; c.fillStyle = posCol[s[i].pos] || col("--line"); c.fillRect(X(t0), 8, Math.max(1, X(s[i].t) - X(t0)), 14); }
+  const top = 34, h = 120, Y = (v, lo, hi) => top + h - ((v - lo) / (hi - lo)) * h;
+  c.strokeStyle = col("--line"); c.lineWidth = 1; c.strokeRect(8, top, W - 16, h);
+  const line = (key, lo, hi, color) => { c.strokeStyle = color; c.lineWidth = 2; c.beginPath(); let pen = false; for (const p of s) { if (p[key] == null) { pen = false; continue; } const x = X(p.t), y = Y(clamp(p[key], lo, hi), lo, hi); pen ? c.lineTo(x, y) : c.moveTo(x, y); pen = true; } c.stroke(); };
+  line("rate", 0, 20, col("--breath")); line("hr", 40, 100, col("--muted"));
+  c.fillStyle = col("--warn"); for (const p of s) if (p.snore) c.fillRect(X(p.t) - 1, top + h + 6, 2, Math.min(18, 3 + p.snore * 2));
+  c.strokeStyle = col("--guide"); c.lineWidth = 2; for (const o of NIGHT.onsets) { c.beginPath(); c.moveTo(X(o), top); c.lineTo(X(o), top + h); c.stroke(); }
+  c.fillStyle = col("--muted"); c.font = "11px " + css.getPropertyValue("--body"); c.textAlign = "left";
+  c.fillText(clockAt(0), 8, H - 2); c.textAlign = "right"; c.fillText(clockAt(T), W - 8, H - 2);
+  c.textAlign = "center"; c.fillText("Atem (türkis, 0–20/min) · Puls (grau, 40–100) · Einschlafen (Linie) · Schnarchen (rot)", W / 2, top - 4);
+}
+
+/* Dream diary: one entry per night, kept on this phone, exportable as text. */
+const DIARY_KEY = "atemlotse-tagebuch";
+function diaryLoad() { try { return JSON.parse(localStorage.getItem(DIARY_KEY) || "[]"); } catch (e) { return []; } }
+function diarySave(list) { try { localStorage.setItem(DIARY_KEY, JSON.stringify(list.slice(-120))); } catch (e) {} }
+function diaryText(e) {
+  return [new Date(e.start).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" }) + " · " + e.what + " · " + e.dur, ...e.rows.map(([a, b]) => a + ": " + b), e.note ? "Traum: " + e.note : ""].filter(Boolean).join("\n");
+}
+function diaryRender() {
+  const list = diaryLoad().slice().reverse();
+  $("#diaryList").textContent = list.length ? list.map(diaryText).join("\n\n") : "Noch keine Nacht eingetragen.";
+}
+
 /* ---------------- Snoring (microphone, only once the sounds have faded) ----------------
    Only loudness and a low-frequency share are kept, never the audio itself.
    A snore = clearly above the room's noise floor, mostly below 500 Hz, 0.3–4 s long. */
@@ -1349,14 +1543,14 @@ function micTick() {
   }
   // noise floor: follows quiet moments quickly, loud ones only very slowly
   MIC.floor = MIC.floor == null ? db : MIC.floor + (db - MIC.floor) * (db < MIC.floor ? 0.2 : 0.002);
-  MIC.db = db;
+  MIC.db = db; MIC.low = low / (all || 1);
   const loud = db > MIC.floor + 10 && low / (all || 1) > 0.6, t = now();
   if (loud && !MIC.inEv) { MIC.inEv = true; MIC.evStart = t; MIC.peak = db; }
   else if (loud) MIC.peak = Math.max(MIC.peak, db);
   else if (MIC.inEv) {
     MIC.inEv = false;
     const d = t - MIC.evStart;
-    if (d >= 0.3 && d <= 4) { MIC.events++; logEvent("snore", { dur: +d.toFixed(2), db: +(MIC.peak - MIC.floor).toFixed(1) }); }
+    if (d >= 0.3 && d <= 4) { MIC.events++; logEvent("snore", { dur: +d.toFixed(2), db: +(MIC.peak - MIC.floor).toFixed(1) }); nightSnore(); }
   }
 }
 function micStop() {
@@ -1384,6 +1578,7 @@ function logSample(t, gAvg, rAvg) {
     sess.phase, sig.motion.toFixed(3), HB.bpm ? HB.bpm.toFixed(1) : "", HB.beat ? 1 : 0, MIC.db != null ? MIC.db.toFixed(1) : "",
     sess.flowEng ? sess.flowEng.flow.toFixed(3) : "", sess.flowEng ? sess.flowEng.u.toFixed(3) : "", sess.flowEng ? sess.flowEng.wgt.toFixed(2) : "",
     sess.phase === "seaLead" ? SP.flow.toFixed(3) : "", sess.phase === "seaLead" ? SP.sync.toFixed(2) : "",
+    MIC.db != null && MIC.low != null ? MIC.low.toFixed(2) : "", NIGHT.pos || "",
   ].join(","));
 }
 function buildLog() {
@@ -1401,7 +1596,8 @@ function buildLog() {
     "#   mic = microphone level dB (only while snore recording runs)",
     "#   flow = real-time airflow (signed, 1 = a usual strong breath), pos = chest position 0..1, gyro = share of the gyroscope in flow",
     "#   seaFlow = the leading sea's airflow, sync = how closely your flow follows it",
-    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic,flow,pos,gyro,seaFlow,sync",
+    "#   micLow = share of the microphone's sound below 500 Hz, lie = body position",
+    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic,flow,pos,gyro,seaFlow,sync,micLow,lie",
   ];
   return head.join("\n") + "\n" + LOG.rows.join("\n") + "\n";
 }
@@ -2300,6 +2496,7 @@ function tick() {
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
   if (S.mode === "portal" && ph !== "place" && ph !== "idle") (samOn() ? samUpdate : journeyUpdate)(t, dt);
+  if (isJB() && ph !== "idle") nightTick(t, dt);
   if (!isJB() && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
   updateReadouts();
 }
@@ -2464,7 +2661,8 @@ async function start(ev) {
   ev.preventDefault();
   readForm();
   initAudio();
-  if (isJB() && S.snore && S.sleepFade > 0 && navigator.mediaDevices) {
+  nightReset();
+  if (isJB() && S.snore && (S.mode === "portal" || S.sleepFade > 0) && navigator.mediaDevices) {
     // ask now, while you are awake; the microphone itself only starts once the sounds have faded
     S.snore = await micAllow();
   }
@@ -2514,11 +2712,12 @@ function finish(natural) {
   sess.phase = "idle";
   clearInterval(sess.timer);
   micStop();
+  if (isJB()) nightClose();
   window.removeEventListener("devicemotion", onMotion);
   if (natural) { chime(BOWL_HZ); setTimeout(() => chime(BOWL_HZ * 1.5), 900); say("Schön. Du kannst langsam zurückkommen."); }
   audioFade(0, natural ? 6 : 1.2);
   setBinaural(J.beat, 0);
-  $("#saveNote").textContent = "Notiz in den Log";
+  $("#saveNote").textContent = "Ins Tagebuch";
   try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
   $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false;
   setPrompt(natural ? "Fertig. Lass dir Zeit beim Aufstehen." : "Leg dich hin, Handy flach auf die Brust, Kopfhörer rein.");
@@ -2559,11 +2758,20 @@ function finish(natural) {
   if (RT.hr) rows.push(["Puls beim Luftanhalten", "~" + Math.round(RT.hr) + " /min"]);
   if (HB.n) rows.push(["Puls im Schnitt", "~" + Math.round(HB.sum / HB.n) + " /min"]);
   if (sess.matchN && S.mode !== "box") rows.push(["Ø Synchron", Math.round((sess.matchSum / sess.matchN) * 100) + " %"]);
+  if (isJB()) rows.push(...nightRows());
   rows.push(["Log", LOG.rows.length + " Messpunkte"]);
+  // every night of ten minutes or more goes into the diary; a dream note can be added below
+  sess.diaryId = null;
+  if (isJB() && dur >= 600) {
+    const what = S.mode === "portal" ? (samOn() ? SAM.j.titel : { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank" }[S.journey]) : "Just Breathe";
+    const entry = { id: LOG.startedAt, start: LOG.startedAt, what, dur: Math.round(dur / 60) + " min", rows: rows.filter(([a]) => !["Log", "Dauer"].includes(a)), note: "" };
+    const list = diaryLoad(); list.push(entry); diarySave(list); sess.diaryId = entry.id;
+  }
   $("#sumList").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
   $("#summary").hidden = false;
-  $("#noteField").hidden = S.mode !== "portal";
+  $("#noteField").hidden = !isJB();
   $("#dreamNote").value = "";
+  if (isJB()) requestAnimationFrame(drawNight); else $("#nightChart").hidden = true;
   updateReadouts();
 }
 
@@ -2574,7 +2782,9 @@ $("#saveNote").addEventListener("click", () => {
   const text = $("#dreamNote").value.trim();
   if (!text) return;
   logEvent("note", { text });
-  $("#saveNote").textContent = "Im Log gespeichert";
+  const list = diaryLoad(), e = list.find((x) => x.id === sess.diaryId);
+  if (e) { e.note = text; diarySave(list); diaryRender(); }
+  $("#saveNote").textContent = e ? "Im Tagebuch und im Log" : "Im Log gespeichert";
 });
 $("#shareLog").addEventListener("click", shareLog);
 $("#dimBtn").addEventListener("click", () => { $("#dim").hidden = false; });
@@ -2648,6 +2858,12 @@ $("#samDelete").addEventListener("click", () => {
   S.journey = "sleep"; samRender(); $("#samSrc").value = ""; $("#samReport").textContent = "Gelöscht.";
 });
 samRender();
+diaryRender();
+$("#diaryExport").addEventListener("click", () => {
+  const blob = new Blob([diaryLoad().map(diaryText).join("\n\n") + "\n"], { type: "text/plain" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "traumtagebuch.txt" });
+  document.body.appendChild(a); a.click(); a.remove();
+});
 // a journey shared as a link: open it in the builder, ready to check and save
 function samImportFromHash() {
   if (!location.hash.startsWith("#reise=")) return;
