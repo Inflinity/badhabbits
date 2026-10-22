@@ -157,6 +157,16 @@ input[type=range] { width: 100%; accent-color: var(--guide); }
   border: 1px solid var(--line);
   border-radius: 10px;
 }
+textarea {
+  font: 400 0.95rem/1.4 var(--body);
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  width: 100%;
+  resize: vertical;
+}
 select {
   flex: 2;
   min-width: 0;
@@ -233,6 +243,11 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
   <section class="summary" id="summary" hidden>
     <h2>Deine Runde</h2>
     <dl id="sumList"></dl>
+    <div class="field" id="noteField" hidden>
+      <label for="dreamNote">Traumnotiz</label>
+      <textarea id="dreamNote" rows="3" placeholder="Was hast du geträumt? Warst du dir bewusst, dass du träumst?"></textarea>
+      <button type="button" class="ghost" id="saveNote">Notiz in den Log</button>
+    </div>
     <div class="actions">
       <button type="button" class="ghost" id="saveLog">Log speichern</button>
       <button type="button" class="ghost" id="shareLog">Log teilen</button>
@@ -259,11 +274,36 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     <div class="field">
       <span>Modus</span>
       <div class="seg">
-        <input type="radio" name="mode" id="mJb" value="jb" checked><label for="mJb">Just Breathe</label>
+        <input type="radio" name="mode" id="mPortal" value="portal" checked><label for="mPortal">Portal</label>
+        <input type="radio" name="mode" id="mJb" value="jb"><label for="mJb">Just Breathe</label>
         <input type="radio" name="mode" id="mBox" value="box"><label for="mBox">Viereck</label>
         <input type="radio" name="mode" id="mTiefe" value="tiefe"><label for="mTiefe">Tiefe</label>
         <input type="radio" name="mode" id="mReal" value="realtime"><label for="mReal">Echtzeit</label>
         <input type="radio" name="mode" id="mLead" value="lead"><label for="mLead">Führen</label>
+      </div>
+    </div>
+    <div class="field" id="portalField">
+      <span>Reise</span>
+      <div class="seg">
+        <input type="radio" name="journey" id="jSleep" value="sleep" checked><label for="jSleep">Einschlafen</label>
+        <input type="radio" name="journey" id="jLucid" value="lucid"><label for="jLucid">Luzid</label>
+        <input type="radio" name="journey" id="jDeep" value="deep"><label for="jDeep">Tiefe</label>
+        <input type="radio" name="journey" id="jTank" value="tank"><label for="jTank">Tank</label>
+      </div>
+      <p class="hint" id="journeyHint"></p>
+      <span>Grundton der binauralen Beats</span>
+      <div class="seg">
+        <input type="radio" name="carrier" id="c136" value="136.1" checked><label for="c136">tief 136 Hz</label>
+        <input type="radio" name="carrier" id="c200" value="200"><label for="c200">mittel 200 Hz</label>
+        <input type="radio" name="carrier" id="c432" value="432"><label for="c432">hell 432 Hz</label>
+      </div>
+      <div id="lucidField">
+        <span>Signale im Schlaf ab</span>
+        <div class="seg">
+          <input type="radio" name="lucidH" id="l4" value="4"><label for="l4">4 Std.</label>
+          <input type="radio" name="lucidH" id="l5" value="5" checked><label for="l5">5 Std.</label>
+          <input type="radio" name="lucidH" id="l6" value="6"><label for="l6">6 Std.</label>
+        </div>
       </div>
     </div>
     <div class="field" id="jbField">
@@ -349,10 +389,12 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v14 · 23.10. 01:30";
-const S = { jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "jb", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
-try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse7") || "{}")); } catch (e) {}
-if (!["jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "jb";
+const VERSION = "v15 · 23.10. 02:30 · Portal";
+const S = { journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
+if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
+// the Portal journeys ride on Just Breathe: same start, same sea, then their own way
+const isJB = () => S.mode === "jb" || S.mode === "portal";
 const BOX_IDS = ["bIn", "bTop", "bOut", "bBot"], JB_IDS = ["jIn", "jTop", "jOut", "jBot"];
 function readBox(ids = BOX_IDS) {
   return ids.map((id, i) => {
@@ -360,12 +402,22 @@ function readBox(ids = BOX_IDS) {
     return clamp(isNaN(v) ? 4 : v, i % 2 ? 0 : 1, 12);
   });
 }
+const JOURNEY_HINT = {
+  sleep: "Das Meer folgt dir, dann führt es dich langsamer. Binaurale Beats gleiten von Alpha über Theta Richtung Delta, nur solange du mitgehst und dein Puls nicht steigt. Dann wird alles still, die Aufzeichnung läuft weiter.",
+  lucid: "Wie Einschlafen, dazu prägst du dir ein leises Glas-Signal ein: Hörst du es, weißt du, ich träume. In der zweiten Nachthälfte achtet die App auf traumtypisch unruhigen Atem bei ruhigem Körper und spielt dann das Signal, ganz leise. Ein Experiment, kein Versprechen.",
+  deep: "Resonanzatmung: Das Meer probiert ruhige Tempi von 6,5 bis 4,5 Atemzügen pro Minute und misst, wo dein Herzschlag am stärksten mitschwingt. Dort bleibt es, und ein heller Klang wächst mit der Welle.",
+  tank: "Schwarz und fast still. Nur dein Atem als Meer und ganz leise dein eigener Herzschlag. Alles wird langsam immer weniger. Schweben.",
+};
 function updateFields() {
   const mode = document.querySelector("input[name=mode]:checked").value;
   $("#boxField").hidden = mode !== "box";
   $("#jbField").hidden = mode !== "jb";
-  $("#durField").hidden = mode === "jb";
+  $("#portalField").hidden = mode !== "portal";
+  $("#durField").hidden = mode === "jb" || mode === "portal";
   $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead" || mode === "jb");
+  const j = document.querySelector("input[name=journey]:checked").value;
+  $("#lucidField").hidden = j !== "lucid";
+  $("#journeyHint").textContent = JOURNEY_HINT[j];
 }
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
@@ -376,6 +428,10 @@ function applySettingsToForm() {
   $("#volume").value = S.volume; $("#volumeOut").textContent = Math.round(S.volume * 100) + " %";
   $("#lTone").checked = S.tone; $("#lSea").checked = S.sea; $("#lBowl").checked = S.bowl; $("#lHeart").checked = S.heart;
   for (const name of ["ratio", "mode", "minutes"]) {
+    const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
+    if (el) el.checked = true;
+  }
+  for (const name of ["journey", "carrier", "lucidH"]) {
     const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
     if (el) el.checked = true;
   }
@@ -393,12 +449,15 @@ function readForm() {
   S.minutes = parseFloat(document.querySelector("input[name=minutes]:checked").value);
   S.tone = $("#lTone").checked; S.sea = $("#lSea").checked; S.bowl = $("#lBowl").checked; S.heart = $("#lHeart").checked;
   S.voiceName = $("#voiceSel").value;
+  S.journey = document.querySelector("input[name=journey]:checked").value;
+  S.carrier = parseFloat(document.querySelector("input[name=carrier]:checked").value);
+  S.lucidH = parseFloat(document.querySelector("input[name=lucidH]:checked").value);
   S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
-  try { localStorage.setItem("atemlotse7", JSON.stringify(S)); } catch (e) {}
+  try { localStorage.setItem("atemlotse8", JSON.stringify(S)); } catch (e) {}
 }
 applySettingsToForm();
 updateFields();
-document.querySelectorAll("input[name=mode]").forEach((el) => el.addEventListener("change", updateFields));
+document.querySelectorAll("input[name=mode], input[name=journey]").forEach((el) => el.addEventListener("change", updateFields));
 document.querySelectorAll(".presets button").forEach((b) => b.addEventListener("click", () => {
   b.dataset.box.split(",").forEach((v, i) => { $("#" + BOX_IDS[i]).value = v; });
 }));
@@ -762,8 +821,8 @@ function fitDetector() {
    the accelerometer too coarsely for it). The rate comes from a 16 s spectrum
    of the band-passed rotation (fundamental plus 2nd harmonic, kept close to
    the previous estimate); single beats come from peaks of its energy. */
-const HB = { slow: [0, 0, 0], lp: [0, 0, 0], buf: [], e: [0, 0, 0], eHist: [], bpm: null, conf: 0, nextEst: 0, lastBeat: 0, beat: false, sum: 0, n: 0 };
-function heartReset() { Object.assign(HB, { slow: [0, 0, 0], lp: [0, 0, 0], buf: [], e: [0, 0, 0], eHist: [], bpm: null, conf: 0, nextEst: 0, lastBeat: 0, beat: false, sum: 0, n: 0 }); }
+const HB = { slow: [0, 0, 0], lp: [0, 0, 0], buf: [], e: [0, 0, 0], eHist: [], bpm: null, conf: 0, nextEst: 0, lastBeat: 0, beat: false, sum: 0, n: 0, beats: [] };
+function heartReset() { Object.assign(HB, { slow: [0, 0, 0], lp: [0, 0, 0], buf: [], e: [0, 0, 0], eHist: [], bpm: null, conf: 0, nextEst: 0, lastBeat: 0, beat: false, sum: 0, n: 0, beats: [] }); }
 function heartSample(t, r, moving) {
   HB.beat = false;
   if (moving) { HB.buf = []; HB.eHist = []; HB.slow = r.slice(); HB.lp = [0, 0, 0]; return; }
@@ -785,6 +844,7 @@ function heartSample(t, r, moving) {
     const gap = HB.bpm ? 0.65 * 60 / HB.bpm : 0.45;
     if (h[n - 2] > 2 * med && t - 0.05 - HB.lastBeat > gap) {
       HB.lastBeat = t - 0.05; HB.beat = true;
+      HB.beats.push(HB.lastBeat); if (HB.beats.length > 400) HB.beats.shift();
       if (sess.phase !== "place") heartSound();
     }
   }
@@ -817,6 +877,169 @@ function heartEstimate() {
     HB.bpm = HB.bpm ? HB.bpm + (cand[bi] - HB.bpm) * 0.6 : cand[bi];
     HB.conf = raw; HB.sum += HB.bpm; HB.n++;
   }
+}
+
+/* ================= The Portal =================
+   Every journey starts like Just Breathe: the sea follows you, then you follow the sea. On top,
+   each journey turns its own dials, and only while the loop says you are with it (in sync, pulse
+   not rising): binaural beats (a slightly different tone in each ear; the difference is the beat),
+   how loud the sea is, a bright shimmer, the heartbeat, the lucid signal. Nothing here is clinical;
+   it is offered, logged, and the logs show what works. */
+const J = { stage: "", beat: 10, seaMul: 1, binMul: 0, heartMul: 0, bowl: 0, hr0: null, t0: 0, cues: [], log: {} };
+const BAND = (b) => (b >= 8 ? "Alpha" : b >= 4 ? "Theta" : "Delta");
+function initBinaural() {
+  if (A.binGain || !A.ctx) return;
+  const ctx = A.ctx, g = ctx.createGain(); g.gain.value = 0; g.connect(A.master);
+  const mk = (pan) => { const o = ctx.createOscillator(); o.type = "sine"; const pn = ctx.createStereoPanner(); pn.pan.value = pan; o.connect(pn).connect(g); o.start(); return o; };
+  A.binL = mk(-1); A.binR = mk(1); A.binGain = g;
+}
+function setBinaural(beat, level) {
+  if (!A.binGain) return;
+  const t = A.ctx.currentTime, c = S.carrier;
+  A.binL.frequency.setTargetAtTime(c - beat / 2, t, 0.8);
+  A.binR.frequency.setTargetAtTime(c + beat / 2, t, 0.8);
+  A.binGain.gain.setTargetAtTime(0.035 * level, t, 1.5);
+}
+// the lucid signal: three soft rising glass tones
+function portalCue(vol) {
+  if (!A.ctx) return;
+  const ctx = A.ctx, t0 = ctx.currentTime;
+  [1046.5, 1318.5, 1568].forEach((f, i) => {
+    for (const [m, pv, d] of [[1, 1, 3.5], [2.76, 0.2, 1.2]]) {
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f * m;
+      const g = ctx.createGain(), t = t0 + i * 0.4;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * pv, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(A.master); o.start(t); o.stop(t + d + 0.1);
+    }
+  });
+}
+const toward = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
+function jReset() {
+  Object.assign(J, { stage: "follow", beat: S.journey === "tank" ? 6 : 10, seaMul: 1, binMul: 0, heartMul: 0, bowl: 0, hr0: null, t0: now(), cues: [], wake: 0,
+    sweep: null, rsa: [], best: null, coh: 0, holdUntil: 0, nextCueAt: 0, cueVol: 1, baseRate: null, lastCycle: null });
+  SP.T = null; SP.faster = false;
+}
+const movedSince = (sec) => LOG.events.some((e) => e[1] === "moved" && +e[0] > now() - sess.start - sec);
+function J_stage(st, text, voice) {
+  J.stage = st; J.t0 = now();
+  logEvent("journey", { stage: st, beat: +J.beat.toFixed(2) });
+  if (text) setPrompt(text);
+  if (voice) say(voice);
+}
+// the heart wave of one breath: how far the pulse swings between its fastest and slowest beat
+function heartWave(t0, t1) {
+  const b = HB.beats.filter((x) => x >= t0 - 1.5 && x <= t1);
+  const hr = [];
+  for (let i = 1; i < b.length; i++) { const ibi = b[i] - b[i - 1]; if (ibi > 0.45 && ibi < 1.6) hr.push(60 / ibi); }
+  if (hr.length < 3) return null;
+  const m = median(hr), ok = hr.filter((x) => Math.abs(x - m) < 0.25 * m);
+  return ok.length < 3 ? null : Math.max(...ok) - Math.min(...ok);
+}
+J.onCycle = () => {
+  const t = now(), c0 = J.lastCycle; J.lastCycle = t;
+  if (S.journey === "deep" && J.sweep && c0 && SP.sync > 0.5 && Math.abs(SP.P - SP.T) < 0.08) {
+    const w = heartWave(c0, t);
+    if (w != null) J.sweep.data[J.sweep.i].push(w);
+  }
+  if (S.journey === "lucid" && J.stage === "imprint") {
+    J.imprintN = (J.imprintN || 0) + 1;
+    if (J.imprintN % 3 === 0) portalCue(0.05);
+  }
+};
+function journeyUpdate(t, dt) {
+  const ph = sess.phase, jn = S.journey, el = t - J.t0;
+  if (!A.binGain) initBinaural();
+  if (sess.flowEng && J.hr0 == null && HB.bpm && ph === "seaLead") J.hr0 = HB.bpm;
+  const hrUp = J.hr0 != null && HB.bpm && HB.bpm > J.hr0 + 5;
+  const withIt = ph === "seaLead" && SP.slowing && SP.sync > 0.5 && !hrUp && !sig.disturbed;
+  if (ph === "sea" || ph === "seaLead") J.binMul = toward(J.binMul, jn === "tank" ? 0.4 : 0.6, dt / 60);
+
+  if (jn === "tank") {
+    // schweben: everything slowly recedes over twenty minutes, while still breathing with you
+    const k = clamp((t - sess.start - 60) / 1200, 0, 1);
+    J.seaMul = 1 - 0.75 * k; J.beat = 6 - 2 * k; J.heartMul = HB.bpm ? 0.15 * (1 - 0.5 * k) : 0;
+    if (J.stage === "follow" && ph === "sea") J_stage("float", "Schweben. Nur dein Atem und dein Herz.");
+  } else if (jn === "deep") {
+    if (J.stage === "follow" && ph === "seaLead" && SP.slowing) {
+      J.sweep = { rates: [6.5, 6, 5.5, 5, 4.5], i: 0, data: [[], [], [], [], []], at: t };
+      SP.T = 60 / 6.5; SP.faster = true;
+      J_stage("sweep", "Ich suche dein Resonanztempo. Folge einfach dem Meer.", "Ich suche jetzt dein Resonanztempo. Folge einfach dem Meer.");
+    }
+    if (J.stage === "sweep") {
+      const sw = J.sweep, d = sw.data[sw.i];
+      if (d.length >= 6 || t - sw.at > 240) {
+        logEvent("sweep", { rate: sw.rates[sw.i], waves: d.map((x) => +x.toFixed(1)) });
+        if (sw.i < sw.rates.length - 1) { sw.i++; sw.at = t; SP.T = 60 / sw.rates[sw.i]; }
+        else {
+          const meds = sw.data.map((x) => (x.length >= 3 ? median(x) : -1));
+          const bi = meds.indexOf(Math.max(...meds));
+          J.best = bi >= 0 && meds[bi] > 0 ? sw.rates[bi] : 6;
+          J.bestWave = meds[bi] > 0 ? meds[bi] : null;
+          SP.T = 60 / J.best;
+          J_stage("resonance", "Dein Resonanztempo: " + String(J.best).replace(".", ",") + " Atemzüge pro Minute. Bleib einfach hier.",
+            "Gefunden. Bleib einfach hier, im Rhythmus des Meeres.");
+        }
+      }
+    }
+    if (J.stage === "resonance") {
+      // the shimmer grows with the heart wave of the last breaths
+      const w = J.lastCycle ? heartWave(J.lastCycle - SP.P * 3, t) : null;
+      if (w != null) J.coh += (clamp(w / ((J.bestWave || 6) * 1.2), 0, 1) - J.coh) * 0.05;
+      J.bowl = 0.025 * J.coh;
+    }
+    if (withIt) J.beat = toward(J.beat, 7, dt * 0.01);
+  } else {
+    // sleep and lucid: descend while with it, then let go into the night
+    if (J.stage === "follow" && ph === "seaLead" && SP.slowing) {
+      if (jn === "lucid") {
+        J_stage("imprint", "Präge dir das Signal ein. Hörst du es, weißt du: Ich träume.",
+          "Gleich hörst du ab und zu ein leises Signal. Wenn du es hörst, weißt du: Ich träume.");
+        J.imprintN = 0; setTimeout(() => portalCue(0.06), 5000);
+      } else J_stage("descend", "Das Meer wird ruhiger. Lass dich sinken.");
+    }
+    if (J.stage === "imprint" && el > 300) {
+      say("Ich erkenne, dass ich träume.");
+      J_stage("descend", "Lass dich sinken. Das Signal begleitet dich in den Traum.");
+    }
+    if (withIt) J.beat = toward(J.beat, J.stage === "descend" ? 4 : 7, dt * 0.012);
+    if (J.stage === "descend" && (SP.arrived || el > 600)) J_stage("fade", "Alles wird still. Schlaf gut.");
+    if (J.stage === "fade") {
+      if (movedSince(60)) J.holdUntil = t + 60;               // you moved: no hurry
+      if (t >= J.holdUntil) {
+        J.seaMul = toward(J.seaMul, 0, dt / 360);
+        J.binMul = toward(J.binMul, 0, dt / 360);
+        J.beat = toward(J.beat, 2.5, dt * 0.005);
+      }
+      if (J.seaMul <= 0 && J.binMul <= 0) { setPhase("night"); J_stage("night"); J.nightAt = t; J.lucidAt = sess.start + S.lucidH * 3600; }
+    }
+    if (J.stage === "night" && jn === "lucid") lucidWatch(t);
+  }
+  setBinaural(J.beat, J.binMul);
+}
+// Dream-like stretches: breathing grows uneven while the body stays still (in REM sleep the body is
+// held still and breathing becomes irregular). Then the signal, quietly, three times; if you move
+// right after, it probably woke you: wait longer and play softer next time.
+function lucidWatch(t) {
+  const p = btPeriods(10);
+  if (!J.baseRate && t - J.nightAt > 1800 && p.length >= 8) J.baseRate = 60 / median(p);
+  if (J.cueSeq) {
+    const s = J.cueSeq;
+    if (movedSince(30) && t - s.start < 90) {
+      logEvent("cueWake", {}); J.cueSeq = null; J.cueVol *= 0.7; J.nextCueAt = t + 1800; J.wake++;
+    } else if (t >= s.next) {
+      portalCue(0.012 * (1 + s.n) * J.cueVol);
+      J.cues.push(t - sess.start); logEvent("cue", { n: s.n + 1, vol: +J.cueVol.toFixed(2) });
+      s.n++; s.next = t + 20;
+      if (s.n >= 3) { J.cueSeq = null; J.nextCueAt = t + 1200; }
+    }
+    return;
+  }
+  if (t < J.lucidAt || t < J.nextCueAt || J.cues.length >= 24 || p.length < 8) return;
+  const m = p.reduce((a, b) => a + b, 0) / p.length;
+  const cv = Math.sqrt(p.reduce((a, b) => a + (b - m) ** 2, 0) / p.length) / m;
+  const rate = 60 / median(p);
+  const dreamy = cv > 0.2 && !movedSince(180) && (!J.baseRate || (rate > J.baseRate * 0.9 && rate < J.baseRate * 1.6));
+  if (dreamy) { logEvent("remLike", { cv: +cv.toFixed(2), rate: +rate.toFixed(1) }); J.cueSeq = { n: 0, next: t, start: t }; }
 }
 
 /* ---------------- Snoring (microphone, only once the sounds have faded) ----------------
@@ -875,6 +1098,8 @@ function logEvent(type, data) {
 }
 function logSample(t, gAvg, rAvg) {
   if (sess.phase === "idle" || !LOG.startedAt) return;
+  // long nights: full detail for the first half hour, then every fifth sample (4 Hz)
+  if (t - sess.start > 1800 && (LOG.skip = ((LOG.skip || 0) + 1) % 5)) return;
   const guiding = ["calib", "match", "lead", "dive", "box", "jb"].includes(sess.phase);
   LOG.rows.push([
     (t - sess.start).toFixed(3),
@@ -1142,8 +1367,9 @@ const BOWL_HZ = 196; // G3
 // In Just Breathe the sea carries everything; drone and heartbeat join at a whisper (5 %) with the sea,
 // the sustained bowl only as it starts to lead.
 function mix(layer) {
-  if (S.mode !== "jb") return 1;
-  if (sess.phase === "sea" || sess.phase === "seaLead" || (sess.phase === "sleep" && sess.flowEng)) return 0;
+  if (S.mode === "portal" && layer === "heart") return S.journey === "tank" ? J.heartMul : 0;
+  if (!isJB()) return 1;
+  if (sess.phase === "sea" || sess.phase === "seaLead" || sess.phase === "night" || (sess.phase === "sleep" && sess.flowEng)) return 0;
   if (layer === "bowl") return sess.phase === "blend" ? 0.3 * sess.alpha : ["jb", "sleep"].includes(sess.phase) ? 0.3 : 0;
   return sess.layersOn ? 0.05 : 0;
 }
@@ -1165,9 +1391,9 @@ function audioSea(dt) {
   const pu = (1 - a) * puYou + a * (SP.y + 1) / 2;
   A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 0.05);
   // the sea is the whole of Just Breathe, so it plays regardless of the sound chips
-  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2), t, 0.04);
+  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2) * (S.mode === "portal" ? J.seaMul : 1), t, 0.04);
   A.padGain.gain.setTargetAtTime(0, t, 0.5);
-  if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(0, t, 0.5);
+  if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(S.mode === "portal" ? J.bowl : 0, t, 0.8);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
   A.vGain.gain.setTargetAtTime(0, t, 0.3);
   A.hGain.gain.setTargetAtTime(0, t, 0.5);
@@ -1201,7 +1427,7 @@ function bowlLevel(v, k) {
   for (const p of A.bowlParts) if (p.ratio > 1) p.g.gain.setTargetAtTime(p.vol * (0.25 + 0.75 * v), t, k);
 }
 function heartSound() {
-  if (!A.ctx || !S.heart) return;
+  if (!A.ctx || !(S.heart || (S.mode === "portal" && S.journey === "tank"))) return;
   // soft "lub-dub": two low, short thumps
   const ctx = A.ctx, t = ctx.currentTime;
   for (const [dt, f, v0] of [[0, 62, 0.22], [0.17, 52, 0.14]]) {
@@ -1400,11 +1626,13 @@ function spCycle() {
   if (SP.slowing && SP.sync <= 0.5 && !SP.arrived) setPrompt("Folge dem Meer, so gut es geht. Es wartet auf dich.");
   if (SP.slowing && SP.sync > 0.5) {
     if (!SP.arrived) setPrompt("Du bist im Takt. Das Meer wird langsam ruhiger.");
-    const T = 60 / S.target;
+    const T = SP.T || 60 / S.target;
     if (SP.P < T) SP.P = Math.min(T, SP.P * 1.03);
+    else if (SP.faster && SP.P > T) SP.P = Math.max(T, SP.P / 1.03);
     SP.rIn += (1 / (1 + S.ratio) - SP.rIn) * 0.15;
     if (!SP.arrived && SP.P >= T - 0.01) { SP.arrived = true; setPrompt("Angekommen. Bleib einfach im Rhythmus des Meeres."); }
   }
+  if (S.mode === "portal") J.onCycle();
   logEvent("seaCycle", { P: +SP.P.toFixed(2), rIn: +SP.rIn.toFixed(2), sync: +SP.sync.toFixed(2), a: +SP.a.toFixed(2), slowing: SP.slowing });
 }
 
@@ -1435,7 +1663,9 @@ function setPhase(p) {
   const prevPhase = sess.phase;
   sess.phase = p; sess.phaseStart = now();
   logEvent("phase", { to: p });
-  if (p === "seaLead") {
+  if (p === "night") {
+    setPrompt(S.journey === "lucid" ? "Gute Nacht. Später kommt manchmal ganz leise das Signal: Du träumst." : "Gute Nacht. Die Aufzeichnung läuft weiter.");
+  } else if (p === "seaLead") {
     const P = clamp(median(btPeriods(6)), 2.5, 15);
     const rIn = clamp(BT.ins.length ? median(BT.ins.slice(-6)) / P : 0.45, 0.3, 0.6);
     Object.assign(SP, { P, rIn, a: 0, aOut: SP.aOut, slowing: false, arrived: false, ring: [], cab: 0, caa: 1e-9, cbb: 1e-9, sync: 0, bad: 0 });
@@ -1523,7 +1753,7 @@ function setPhase(p) {
   } else if (p === "realtime") {
     setPrompt("Hebt sich dein Brustkorb, wird der Ton heller. Senkt er sich, wird er tiefer.");
     say("Und ausatmen. Ab jetzt folgt der Ton deinem Brustkorb.");
-  } else if (p === "place" && S.mode === "jb") {
+  } else if (p === "place" && isJB()) {
     sess.cueIdx = 0; sess.cap = null; sess.inSum = [0, 0, 0]; sess.inN = 0; sess.flowEng = null;
     setPrompt("Leg das Handy flach auf deine Brust und atme ganz in deinem Tempo.");
     say("Leg das Handy flach auf deine Brust und atme ganz in deinem Tempo.");
@@ -1531,7 +1761,7 @@ function setPhase(p) {
     setPrompt("Handy flach auf die Brust legen und ruhig liegen.");
     say("Leg das Handy flach auf deine Brust und lieg ganz ruhig.");
     setTimeout(() => {
-      if (sess.phase === "place" && S.mode !== "jb" && (sess.hasSensor || S.mode === "box"))
+      if (sess.phase === "place" && !isJB() && (sess.hasSensor || S.mode === "box"))
         say(S.mode === "box"
           ? "Gleich hörst du die Klangschale. Sie steigt beim Einatmen, bleibt stehen beim Halten und sinkt beim Ausatmen. Es gibt kein Richtig oder Falsch."
           : S.mode !== "lead"
@@ -1673,7 +1903,7 @@ function tick() {
 
   if (ph === "place") {
     level = -0.6;
-    if (S.mode === "jb") jbIntro(t, el);
+    if (isJB()) jbIntro(t, el);
     else if (el > PLACE_SECONDS) setPhase(S.mode === "box" ? "box" : !(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
   } else if (ph === "hold") {
     if (el >= HOLD_SECONDS) { rtEndHold(); setPhase("deep"); }
@@ -1698,13 +1928,14 @@ function tick() {
     level = RT.q * 2 - 1; yForMatch = ph === "jb" ? G.y : null;
     if (!sess.hrStart && t - sess.start > 60 && HB.bpm) sess.hrStart = HB.bpm;
     if (ph === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
-  } else if (ph === "sea" || ph === "seaLead") {
+  } else if (ph === "sea" || ph === "seaLead" || ph === "night") {
     seaDirection(t, dt);
     if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
     const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
-    if (ph === "sea" && rested && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
+    const handOver = !(S.mode === "portal" && S.journey === "tank");
+    if (ph === "sea" && rested && handOver && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
     if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
-    if (S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
+    if (S.mode === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
   } else if (ph === "box") {
     boxStep(dt);
     level = RT.q * 2 - 1; yForMatch = G.y;
@@ -1754,8 +1985,8 @@ function tick() {
     }
   }
   const shimmer = ph === "lead" && sess.hasSensor ? clamp((sess.match - 0.55) / 0.35, 0, 1) : 0;
-  if (S.mode === "jb" && (ph === "sea" || ph === "seaLead" || ph === "sleep")) audioSea(dt);
-  else if (S.mode === "jb" && ph !== "place") audioJB(ph, dt);
+  if (isJB() && (ph === "sea" || ph === "seaLead" || ph === "sleep" || ph === "night")) audioSea(dt);
+  else if (isJB() && ph !== "place") audioJB(ph, dt);
   else if (ph === "hold" || ph === "deep") audioRealtime(0, false, null);
   else if (["realtime", "dive", "box", "arrive", "jb", "sleep"].includes(ph)) {
     // while the phone settles or relearns, the chest sounds drift to a calm middle instead of jumping
@@ -1764,16 +1995,17 @@ function tick() {
     audioRealtime(sess.qOut, ready, ["dive", "box", "jb"].includes(ph) ? G.y : null);
   } else audioUpdate(level, shimmer);
 
-  const jbPhase = S.mode === "jb" && ph !== "place";
+  const jbPhase = isJB() && ph !== "place";
   if (jbPhase && (ph === "jb" || ph === "sleep")) level = TD.hgt * 2 - 1;
-  if (sess.flowEng && (ph === "sea" || ph === "seaLead" || ph === "sleep")) level = sess.flowEng.u * 2 - 1;
+  if (sess.flowEng && (ph === "sea" || ph === "seaLead" || ph === "sleep" || ph === "night")) level = sess.flowEng.u * 2 - 1;
   const chestPhase = jbPhase || ["realtime", "dive", "box"].includes(ph);
   const xNow = chestPhase ? (sig.disturbed || t < sig.relearnUntil ? null : level) : (ph === "hold" || ph === "deep" ? null : sig.x);
   const guided = ["calib", "lead", "match", "dive", "box", "jb", "blend"].includes(ph);
   sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: ph === "seaLead" ? SP.y : guided ? G.y : null });
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
-  if (S.mode !== "jb" && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
+  if (S.mode === "portal" && ph !== "place" && ph !== "idle") journeyUpdate(t, dt);
+  if (!isJB() && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
   updateReadouts();
 }
 
@@ -1790,14 +2022,14 @@ function updateReadouts() {
   $("#youRate").textContent = up ? (60 / up).toFixed(1) : "–";
   const real = S.mode === "realtime" && ["hold", "deep", "realtime"].includes(sess.phase);
   const tiefe = ["tiefe", "box", "jb"].includes(S.mode) && sess.phase !== "idle";
-  const boxm = S.mode === "box" || S.mode === "jb";
+  const boxm = S.mode === "box" || isJB();
   const guiding = ["lead", "calib", "match", "dive"].includes(sess.phase);
-  const tapping = S.mode === "jb" && TAP_PHASES.includes(sess.phase);
-  $("#guideLabel").textContent = real ? "Puls" : tapping ? "Tipps" : S.mode === "jb" ? "Rhythmus" : boxm ? "Viereck" : "Lotse";
+  const tapping = isJB() && TAP_PHASES.includes(sess.phase);
+  $("#guideLabel").textContent = real ? "Puls" : tapping ? "Tipps" : isJB() ? "Rhythmus" : boxm ? "Viereck" : "Lotse";
   $("#guideNote").textContent = real ? "Schläge/min" : boxm ? "Sekunden" : "Atemzüge/min";
   $("#syncLabel").textContent = real ? "Brustkorb" : tiefe ? "Puls" : "Synchron";
   $("#syncNote").textContent = real ? "0 % = Ruhelage" : tiefe ? "Schläge/min" : "mit dem Klang";
-  if (S.mode === "jb" && (sess.flowEng || sess.phase === "place") && sess.phase !== "idle") {
+  if (isJB() && (sess.flowEng || sess.phase === "place") && sess.phase !== "idle") {
     const bp = btPeriods(4);
     if (bp.length >= 2) $("#youRate").textContent = (60 / median(bp)).toFixed(1);
     const leading = sess.phase === "seaLead";
@@ -1805,8 +2037,16 @@ function updateReadouts() {
     $("#guideRate").textContent = leading ? (60 / SP.P).toFixed(1) : HB.bpm ? "~" + Math.round(HB.bpm) : "–";
     $("#syncLabel").textContent = leading ? "Synchron" : "Luft"; $("#syncNote").textContent = leading ? "mit dem Meer" : "fließt gerade";
     $("#sync").textContent = leading ? Math.round(Math.max(0, SP.sync) * 100) + "%" : sess.flowEng ? Math.round(clamp(Math.abs(sess.flowEng.flow), 0, 1) * 100) + "%" : "–";
+    if (S.mode === "portal") {
+      $("#guideLabel").textContent = "Frequenz"; $("#guideNote").textContent = BAND(J.beat) + (J.binMul > 0.01 ? "" : " · leise");
+      $("#guideRate").textContent = J.beat.toFixed(1).replace(".", ",") + " Hz";
+      const deepWave = S.journey === "deep" && J.stage === "resonance";
+      $("#syncLabel").textContent = deepWave ? "Herzwelle" : leading ? "Synchron" : "Puls";
+      $("#syncNote").textContent = deepWave ? "Resonanz " + String(J.best).replace(".", ",") + "/min" : leading ? "mit dem Meer" : "Schläge/min";
+      $("#sync").textContent = deepWave ? Math.round(J.coh * 100) + "%" : leading ? Math.round(Math.max(0, SP.sync) * 100) + "%" : HB.bpm ? "~" + Math.round(HB.bpm) : "–";
+    }
   } else if (boxm) {
-    const pat = sess.phase === "idle" || !sess.boxDur ? readBox(S.mode === "jb" ? JB_IDS : BOX_IDS) : sess.phase === "arrive" || sess.phase === "place" ? null : sess.boxDur;
+    const pat = sess.phase === "idle" || !sess.boxDur ? readBox(isJB() ? JB_IDS : BOX_IDS) : sess.phase === "arrive" || sess.phase === "place" ? null : sess.boxDur;
     $("#guideRate").textContent = tapping ? String(LEARN.taps.length) : pat && ["blend", "jb", "sleep", "idle"].includes(sess.phase) ? pat.map((v) => Math.round(v)).join("·") : "–";
     if (tiefe) $("#sync").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
     else { $("#syncLabel").textContent = "Puls"; $("#syncNote").textContent = "Schläge/min"; $("#sync").textContent = "–"; }
@@ -1924,7 +2164,7 @@ async function start(ev) {
   ev.preventDefault();
   readForm();
   initAudio();
-  if (S.mode === "jb" && S.snore && S.sleepFade > 0 && navigator.mediaDevices) {
+  if (isJB() && S.snore && S.sleepFade > 0 && navigator.mediaDevices) {
     // ask now, while you are awake; the microphone itself only starts once the sounds have faded
     S.snore = await micAllow();
   }
@@ -1943,6 +2183,7 @@ async function start(ev) {
   sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0; sess.qOut = 0.3; sess.boxDur = S.box.slice(); sess.jbStart = null; sess.polPrior = false;
   sess.turns = []; sess.alpha = 0; sess.layersOn = false; sess.flowOut = 0; sess.fit = null;
   btReset(); SP.a = 0; SP.aOut = 0; sess.seaBackAt = null;
+  jReset(); if (A.ctx) { initBinaural(); setBinaural(J.beat, 0); }
   LEARN.on = false; LEARN.buf = []; LEARN.taps = []; turnReset();
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
@@ -1970,6 +2211,8 @@ function finish(natural) {
   window.removeEventListener("devicemotion", onMotion);
   if (natural) { chime(BOWL_HZ); setTimeout(() => chime(BOWL_HZ * 1.5), 900); say("Schön. Du kannst langsam zurückkommen."); }
   audioFade(0, natural ? 6 : 1.2);
+  setBinaural(J.beat, 0);
+  $("#saveNote").textContent = "Notiz in den Log";
   try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
   $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false;
   setPrompt(natural ? "Fertig. Lass dir Zeit beim Aufstehen." : "Leg dich hin, Handy flach auf die Brust, Kopfhörer rein.");
@@ -1978,17 +2221,28 @@ function finish(natural) {
   if (up) rows.push(["Atem am Ende", (60 / up).toFixed(1) + " /min"]);
   if (sess.hrStart && HB.bpm) rows.push(["Puls Anfang → Ende", "~" + Math.round(sess.hrStart) + " → ~" + Math.round(HB.bpm) + " /min"]);
   if (S.mode === "box") rows.push(["Viereck", S.box.join(" · ") + " s, " + (sess.boxCycles || 0) + " Runden"]);
-  if (S.mode === "jb" && sess.jbStart) {
+  if (isJB() && sess.jbStart) {
     rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => v.toFixed(1).replace(".0", "")).join(" · ") + " s"]);
     rows.push(["Viereck", "Höhe " + Math.round(sess.progH * 100) + " %, Breite " + Math.round(sess.progW * 100) + " %"]);
   }
-  if (S.mode === "jb" && SP.a > 0) {
+  if (S.mode === "portal") {
+    const name = { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank" }[S.journey];
+    rows.push(["Reise", name + (J.stage === "night" ? ", bis in die Nacht" : "")]);
+    rows.push(["Frequenz zuletzt", J.beat.toFixed(1).replace(".", ",") + " Hz (" + BAND(J.beat) + ")"]);
+    if (S.journey === "deep" && J.best) rows.push(["Dein Resonanztempo", String(J.best).replace(".", ",") + " Atemzüge/min" + (J.bestWave ? ", Herzwelle " + J.bestWave.toFixed(1).replace(".", ",") + " Schläge/min" : "")]);
+    if (S.journey === "lucid") {
+      const clock = (sec) => { const d = new Date(Date.parse(LOG.startedAt) + sec * 1000); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+      rows.push(["Signale im Schlaf", J.cues.length ? J.cues.length + " (" + J.cues.filter((_, i) => i % 3 === 0).map(clock).join(", ") + ")" : "keine"]);
+      if (J.wake) rows.push(["Davon aufgewacht", J.wake + " Mal, danach leiser"]);
+    }
+  }
+  if (isJB() && SP.a > 0) {
     rows.push(["Meer zuletzt", (60 / SP.P).toFixed(1).replace(".", ",") + " Atemzüge/min" + (SP.arrived ? " (Ziel erreicht)" : "")]);
     rows.push(["Synchron mit dem Meer", Math.round(Math.max(0, SP.sync) * 100) + " %"]);
   }
-  if (S.mode === "jb" && sess.fit) rows.push(["Gelernt aus Tipps", sess.fit.taps + " Tipps, " + sess.fit.hits + " getroffen (Ø " + sess.fit.err.toFixed(1).replace(".", ",") + " s)"]);
+  if (isJB() && sess.fit) rows.push(["Gelernt aus Tipps", sess.fit.taps + " Tipps, " + sess.fit.hits + " getroffen (Ø " + sess.fit.err.toFixed(1).replace(".", ",") + " s)"]);
   if (wasSleep) rows.push(["Klänge ausgeblendet nach", S.sleepFade + " min"]);
-  if (S.mode === "jb" && S.snore) rows.push(["Schnarch-Geräusche", MIC.events + " Mal"]);
+  if (isJB() && S.snore) rows.push(["Schnarch-Geräusche", MIC.events + " Mal"]);
   const moves = LOG.events.filter((e) => e[1] === "moved").length;
   if (moves) rows.push(["Handy verrutscht / neu gelegt", moves + " Mal"]);
   if ((S.mode === "tiefe" || S.mode === "lead") && G.P) rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
@@ -1998,12 +2252,20 @@ function finish(natural) {
   rows.push(["Log", LOG.rows.length + " Messpunkte"]);
   $("#sumList").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
   $("#summary").hidden = false;
+  $("#noteField").hidden = S.mode !== "portal";
+  $("#dreamNote").value = "";
   updateReadouts();
 }
 
 $("#setup").addEventListener("submit", start);
 $("#stopBtn").addEventListener("click", () => finish(false));
 $("#saveLog").addEventListener("click", saveLog);
+$("#saveNote").addEventListener("click", () => {
+  const text = $("#dreamNote").value.trim();
+  if (!text) return;
+  logEvent("note", { text });
+  $("#saveNote").textContent = "Im Log gespeichert";
+});
 $("#shareLog").addEventListener("click", shareLog);
 $("#dimBtn").addEventListener("click", () => { $("#dim").hidden = false; });
 const TAP_PHASES = ["learn", "echo", "check"];
