@@ -1355,7 +1355,7 @@ const NIGHT = {};
 function nightReset() {
   Object.assign(NIGHT, { g0: null, pos: null, posSince: 0, cand: null, candSince: 0, dur: {}, nextPos: 0,
     so: { next: 0, hits: 0, base: null, baseHr: null }, asleep: false, onsets: [], wakes: [],
-    sn: { recent: [], inBout: false, boutStart: 0, last: -1e9, bouts: [], nudges: 0, boutNudges: 0, nextNudge: 0, first: null },
+    sn: { recent: [], inBout: false, boutStart: 0, last: -1e9, bouts: [], nudges: 0, boutNudges: 0, nextNudge: 0, first: null, byPos: {} },
     series: [], nextMin: 0, minSnore: 0, cues: [] });
 }
 nightReset();
@@ -1452,6 +1452,7 @@ function nightTick(t, dt) {
 function nightSnore() {
   const t = now(), sn = NIGHT.sn;
   NIGHT.minSnore++; sn.last = t;
+  if (NIGHT.pos) sn.byPos[NIGHT.pos] = (sn.byPos[NIGHT.pos] || 0) + 1;
   sn.recent = sn.recent.filter((x) => x > t - 60); sn.recent.push(t);
   if (!sn.inBout && sn.recent.length >= NIGHT_CFG.boutMin) {
     sn.inBout = true; sn.boutStart = sn.recent[0]; sn.boutNudges = 0; sn.nextNudge = t;
@@ -1471,8 +1472,9 @@ function nightRows() {
   if (NIGHT.onsets.length) rows.push(["Eingeschlafen", "vermutlich um " + clockAt(NIGHT.onsets[0]) + " (nach " + Math.round(NIGHT.onsets[0] / 60) + " min)" + (NIGHT.wakes.length ? ", " + NIGHT.wakes.length + "× wach geworden" : "")]);
   if (tot > 60) rows.push(["Lage", Object.entries(NIGHT.dur).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => POS_NAME[k] + " " + Math.round((100 * v) / tot) + " %").join(" · ")]);
   if (S.snore) {
-    const b = NIGHT.sn.bouts, min = b.reduce((a, x) => a + (x[1] - x[0]), 0) / 60, back = b.filter((x) => x[2] === "back").reduce((a, x) => a + (x[1] - x[0]), 0) / 60;
-    rows.push(["Schnarchen", b.length ? b.length + " Phasen, " + Math.round(min) + " min" + (min > 0 ? ", " + Math.round((100 * back) / min) + " % davon in Rückenlage" : "") + ", erstmals " + clockAt(NIGHT.sn.first) : MIC.events ? MIC.events + " einzelne Geräusche, keine Phase" : "nichts gehört"]);
+    const b = NIGHT.sn.bouts, min = b.reduce((a, x) => a + (x[1] - x[0]), 0) / 60, bp = NIGHT.sn.byPos;
+    const all = Object.values(bp).reduce((a, x) => a + x, 0), back = Math.round((100 * (bp.back || 0)) / (all || 1));
+    rows.push(["Schnarchen", b.length ? b.length + (b.length === 1 ? " Phase, " : " Phasen, ") + Math.max(1, Math.round(min)) + " min, " + back + " % der Geräusche in Rückenlage, erstmals " + clockAt(NIGHT.sn.first) : MIC.events ? MIC.events + " einzelne Geräusche, keine Phase" : "nichts gehört"]);
     if (NIGHT.sn.nudges) rows.push(["Sanfte Hinweise", NIGHT.sn.nudges + " (" + S.snoreCue + ")"]);
   }
   return rows;
@@ -2751,7 +2753,7 @@ function finish(natural) {
   }
   if (isJB() && sess.fit) rows.push(["Gelernt aus Tipps", sess.fit.taps + " Tipps, " + sess.fit.hits + " getroffen (Ø " + sess.fit.err.toFixed(1).replace(".", ",") + " s)"]);
   if (wasSleep) rows.push(["Klänge ausgeblendet nach", S.sleepFade + " min"]);
-  if (isJB() && S.snore) rows.push(["Schnarch-Geräusche", MIC.events + " Mal"]);
+
   const moves = LOG.events.filter((e) => e[1] === "moved").length;
   if (moves) rows.push(["Handy verrutscht / neu gelegt", moves + " Mal"]);
   if ((S.mode === "tiefe" || S.mode === "lead") && G.P) rows.push(["Lotse zuletzt", (60 / G.P).toFixed(1) + " /min"]);
