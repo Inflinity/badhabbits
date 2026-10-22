@@ -1047,7 +1047,9 @@ function samCycle() {
     SP.glideLeft = Math.max(1, SP.glideLeft - 1);
   }
   const with_ = SP.sync > 0.5;
-  if (with_ && SAM.st && SAM.st.meer === "führen") SAM.breaths++;
+  // only breaths in the step's own pattern count, not the ones gliding toward it
+  const arrived = !SP.Dt || SP.D.every((v, k) => Math.abs(v - SP.Dt[k]) < 0.05);
+  if (with_ && arrived && SAM.st && SAM.st.meer === "führen") SAM.breaths++;
   SAM.notWith = SP.sync < 0.3 ? SAM.notWith + 1 : with_ ? 0 : SAM.notWith;
   if (SP.a >= 1 && SAM.notWith >= 5) { logEvent("seaBack", { sam: true }); SAM.resumeAt = now() + 30; samToFollow(now()); }
   logEvent("seaCycle", { D: SP.D && SP.D.map((v) => +v.toFixed(1)), sync: +SP.sync.toFixed(2), step: SAM.i });
@@ -2302,7 +2304,7 @@ function updateReadouts() {
   $("#youRate").textContent = up ? (60 / up).toFixed(1) : "–";
   const real = S.mode === "realtime" && ["hold", "deep", "realtime"].includes(sess.phase);
   const tiefe = ["tiefe", "box", "jb"].includes(S.mode) && sess.phase !== "idle";
-  const boxm = S.mode === "box" || isJB();
+  const boxm = S.mode === "box" || S.mode === "jb";
   const guiding = ["lead", "calib", "match", "dive"].includes(sess.phase);
   const tapping = isJB() && TAP_PHASES.includes(sess.phase);
   $("#guideLabel").textContent = real ? "Puls" : tapping ? "Tipps" : isJB() ? "Rhythmus" : boxm ? "Viereck" : "Lotse";
