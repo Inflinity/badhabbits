@@ -330,7 +330,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <button type="button" class="ghost" id="voiceTest">Probe</button>
       </div>
     </div>
-    <p class="hint"><b>Just Breathe</b>: Lass dich fallen. Erst folgt dir der Klang (Ding oben, Gong unten). Dann übernimmt die Klangschale dein Auf und Ab und formt Runde für Runde zuerst die Höhe, danach die Breite des Vierecks; leise Ticks zählen das Halten. Zum Einschlafen blendet sie aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <p class="hint"><b>Just Breathe</b>: Lass dich fallen. Zwei Minuten lang folgt dir nur das Meer, dann markieren Ding und Gong deinen eigenen höchsten und tiefsten Punkt. Ton, Herz und Klangschale bleiben ganz leise. Dann übernimmt die Klangschale dein Auf und Ab und formt Runde für Runde zuerst die Höhe, danach die Breite des Vierecks; leise Ticks zählen das Halten. Zum Einschlafen blendet sie aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -349,7 +349,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v9 · 22.10. 09:00";
+const VERSION = "v10 · 22.10. 21:00";
 const S = { jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "jb", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse7") || "{}")); } catch (e) {}
 if (!["jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "jb";
@@ -431,6 +431,7 @@ function resetSignal() {
 // After the phone was moved: forget the old axis and range and learn them again quietly.
 // The PCA restarts from the previous axis, so "inhale" keeps pointing the same way.
 function relearn(t) {
+  turnReset();
   sig.disturbed = false;
   sig.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; sig.t0 = t; sig.ms = 0;
   sig.gRef = sig.g2.slice(); sig.relearnUntil = t + 15;
@@ -509,6 +510,7 @@ function sample(t, moving) {
   detect(t, s, moving);
   rtSample(t, moving);
   heartSample(t, rAvg, moving);
+  turnSample(t, gAvg, moving);
   logSample(t, gAvg, rAvg);
 }
 
@@ -570,6 +572,38 @@ function rtEndDeep() {
   sig.polarity = dot(RT.dir, sig.u) < 0 ? -1 : 1;
   resetDetector();
   logEvent("deep", { inMax: +RT.inMax.toFixed(4), dir: RT.dir.map((c) => +c.toFixed(3)), polarity: sig.polarity });
+}
+
+/* ---------------- Summit and valley of your own breath ----------------
+   The chest slows down just before it turns. A summit is marked when the upward speed
+   has almost died out near the top of the last few seconds' range (a valley likewise),
+   and the two always alternate. On recorded sessions this lands within ~0.4 s of the real
+   turn with few false marks, where a plain threshold on the position fired at mid-breath. */
+const TD = { p: null, v: 0, prev: null, hist: [], st: 0 };
+function turnReset() { Object.assign(TD, { p: null, v: 0, prev: null, hist: [], st: 0 }); }
+function turnSample(t, gAvg, moving) {
+  if (moving || t < sig.relearnUntil) { turnReset(); return; }
+  const x = dot(gAvg, sig.u) * sig.polarity;
+  TD.p = TD.p == null ? x : TD.p + (x - TD.p) * (0.05 / 0.4);
+  if (TD.prev != null) TD.v += ((TD.p - TD.prev) / 0.05 - TD.v) * (0.05 / 0.35);
+  TD.prev = TD.p;
+  TD.hist.push([t, TD.p, Math.abs(TD.v)]);
+  while (TD.hist[0][0] < t - 8) TD.hist.shift();
+  if (TD.hist.length < 40) return;
+  let lo = Infinity, hi = -Infinity;
+  for (const h of TD.hist) { if (h[1] < lo) lo = h[1]; if (h[1] > hi) hi = h[1]; }
+  if (hi - lo < 1e-6) return;
+  const sp = TD.hist.map((h) => h[2]).sort((a, b) => a - b), vmax = sp[Math.floor(sp.length * 0.9)];
+  const hgt = (TD.p - lo) / (hi - lo), v = TD.v;
+  if (v > 0.2 * vmax && (TD.st === 0 || TD.st === -2)) TD.st = 1;
+  if (v < -0.2 * vmax && (TD.st === 0 || TD.st === 2)) TD.st = -1;
+  if (TD.st === 1 && v < 0.3 * vmax && hgt > 0.6) { TD.st = 2; onBreathTurn("top"); }
+  if (TD.st === -1 && v > -0.3 * vmax && hgt < 0.4) { TD.st = -2; onBreathTurn("bottom"); }
+}
+function onBreathTurn(kind) {
+  logEvent("turn", { kind });
+  // during "arrive" the markers come from your breath, once they are switched on
+  if (sess.phase === "arrive" && sess.marks) (kind === "top" ? markTop : markBottom)();
 }
 
 /* ---------------- Heartbeat from the gyroscope ----------------
@@ -939,7 +973,7 @@ function audioRealtime(q, follow, guideY) {
   const f = 130.81 * Math.pow(2, (u * 5) / 12); // C3 up to F3 at the calibrated breath
   for (const p of A.pad) p.o.frequency.setTargetAtTime(f * p.mult, t, k);
   A.padFilter.frequency.setTargetAtTime(240 + u * 650, t, k);
-  A.padGain.gain.setTargetAtTime(S.tone ? 0.04 + u * 0.012 : 0, t, follow ? 0.15 : 1.2);
+  A.padGain.gain.setTargetAtTime(S.tone ? (0.04 + u * 0.012) * mix("tone") : 0, t, follow ? 0.15 : 1.2);
   const sea = S.sea && follow;
   A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, u * 3.2), t, 0.1);
   A.nGain.gain.setTargetAtTime(sea ? 0.02 + u * 0.07 : 0, t, 0.1);
@@ -950,11 +984,18 @@ function audioRealtime(q, follow, guideY) {
   A.hGain.gain.setTargetAtTime(0, t, 0.5);
 }
 const BOWL_HZ = 196; // G3
+// In Just Breathe the sea carries everything; drone, heartbeat and the sustained bowl stay at a whisper.
+// The bowl comes up a little once it leads, so its rise and fall stay audible.
+function mix(layer) {
+  if (S.mode !== "jb") return 1;
+  if (layer === "bowl") return sess.phase === "jb" ? 0.3 : 0.1;
+  return 0.1;
+}
 function bowlLevel(v, k) {
   if (!A.bowlGain) return;
   const t = A.ctx.currentTime;
   v = clamp(v, 0, 1);
-  A.bowlGain.gain.setTargetAtTime(S.bowl ? 0.01 + v * 0.035 : 0, t, k);
+  A.bowlGain.gain.setTargetAtTime(S.bowl ? (0.01 + v * 0.035) * mix("bowl") : 0, t, k);
   // brighter at the top of the breath: upper partials open up
   for (const p of A.bowlParts) if (p.ratio > 1) p.g.gain.setTargetAtTime(p.vol * (0.25 + 0.75 * v), t, k);
 }
@@ -962,7 +1003,8 @@ function heartSound() {
   if (!A.ctx || !S.heart) return;
   // soft "lub-dub": two low, short thumps
   const ctx = A.ctx, t = ctx.currentTime;
-  for (const [dt, f, vol] of [[0, 62, 0.22], [0.17, 52, 0.14]]) {
+  for (const [dt, f, v0] of [[0, 62, 0.22], [0.17, 52, 0.14]]) {
+    const vol = v0 * mix("heart");
     const o = ctx.createOscillator(); o.type = "sine";
     o.frequency.setValueAtTime(f * 1.4, t + dt); o.frequency.exponentialRampToValueAtTime(f, t + dt + 0.06);
     const g = ctx.createGain();
@@ -1038,6 +1080,7 @@ const sess = {
   m: { xy: 0, xx: 1e-6, yy: 1e-6 }, match: 0, flipBad: 0,
   leadCycles: 0, naturalRate: null, matchSum: 0, matchN: 0, history: [],
 };
+const ARRIVE_SEA_SECONDS = 120, ARRIVE_SECONDS = 200;
 const PLACE_SECONDS = 12, CALIB_SECONDS = 20, MATCH_SECONDS = 60, HOLD_SECONDS = 10, DEEP_SECONDS = 7, SETTLE_SECONDS = 45;
 
 function setPrompt(t) { $("#prompt").textContent = t; }
@@ -1055,8 +1098,8 @@ function setPhase(p) {
   logEvent("phase", { to: p });
   if (p === "arrive") {
     sig.relearnUntil = Math.max(sig.relearnUntil, now() + 20);
-    sess.rx = { dir: 1, ext: 0 };
-    setPrompt("Matchen: Der Klang folgt dir. Ding heißt oben, Gong heißt unten.");
+    sess.marks = false;
+    setPrompt("Nur das Meer. Es folgt deinem Atem. Lass dir Zeit.");
   } else if (p === "jb") {
     const up = clamp(userPeriod() || 5, 2.5, 12);
     const inD = clamp(userInhale() || up * 0.42, 1, up - 1);
@@ -1095,7 +1138,7 @@ function setPhase(p) {
     setTimeout(() => {
       if (sess.phase === "place" && (sess.hasSensor || S.mode === "box" || S.mode === "jb"))
         say(S.mode === "jb"
-          ? "Lass dich einfach fallen. Du musst nichts tun. Oben klingt ein Ding, unten ein Gong."
+          ? "Lass dich einfach fallen. Du musst nichts tun. Erst hörst du nur das Meer."
           : S.mode === "box"
           ? "Gleich hörst du die Klangschale. Sie steigt beim Einatmen, bleibt stehen beim Halten und sinkt beim Ausatmen. Es gibt kein Richtig oder Falsch."
           : S.mode !== "lead"
@@ -1168,11 +1211,11 @@ function jbProgress() {
   const ease = sess.badRounds >= 3;
   if (ease) sess.badRounds = 0;
   if (sess.stage === "height") {
-    if (following) sess.progH = Math.min(1, sess.progH + 1 / 6);
+    if (following) sess.progH = Math.min(1, sess.progH + 1 / 10);
     if (sess.progH >= 1) { sess.stage = "width"; setPrompt("Jetzt wird das Viereck breiter. Die leisen Ticks zählen das Halten."); say("Jetzt wird das Viereck breiter. Die leisen Ticks zählen das Halten."); }
   } else if (sess.stage === "width") {
-    if (following) sess.progW = Math.min(1, sess.progW + 1 / 8);
-    else if (ease) sess.progW = Math.max(0, sess.progW - 1 / 8);
+    if (following) sess.progW = Math.min(1, sess.progW + 1 / 12);
+    else if (ease) sess.progW = Math.max(0, sess.progW - 1 / 12);
     if (sess.progW >= 1) { sess.stage = "square"; setPrompt("Ding · halten · ding · Gong · halten · gong. Male das Viereck."); }
   }
   const kh = sm(sess.progH), kw = sm(sess.progW), T = S.jb, st = sess.jbStart;
@@ -1239,13 +1282,13 @@ function tick() {
     if (S.mode === "tiefe" && el > SETTLE_SECONDS && userPeriod()) setPhase("dive");
   } else if (ph === "arrive") {
     level = RT.q * 2 - 1;
-    // matching: the summit and valley markers come from your own breath
-    if (sess.hasSensor && !sig.disturbed && t >= sig.relearnUntil) {
-      const r = sess.rx, q = RT.q;
-      if (r.dir > 0) { if (q > r.ext) r.ext = q; else if (q < r.ext - 0.15) { r.dir = -1; r.ext = q; markTop(); } }
-      else { if (q < r.ext) r.ext = q; else if (q > r.ext + 0.15) { r.dir = 1; r.ext = q; markBottom(); } }
+    // first only the sea follows you; after two minutes your own summits and valleys get their Ding and Gong
+    if (!sess.marks && el > ARRIVE_SEA_SECONDS) {
+      sess.marks = true;
+      setPrompt("Ding heißt oben, Gong heißt unten. Beides kommt von deinem eigenen Atem.");
+      say("Jetzt hörst du oben ein Ding und unten einen Gong.");
     }
-    if (el > 45 && (userPeriod() || el > 80)) setPhase("jb");
+    if (el > ARRIVE_SECONDS && (userPeriod() || el > ARRIVE_SECONDS + 40)) setPhase("jb");
   } else if (ph === "jb" || ph === "sleep") {
     boxStep(dt);
     level = RT.q * 2 - 1; yForMatch = ph === "jb" ? G.y : null;
@@ -1403,7 +1446,7 @@ function draw() {
   // phase word in the middle
   let word = "";
   if (!idle && (sess.phase === "box" || sess.phase === "jb")) word = BOX_WORDS[B.i];
-  else if (!idle && sess.phase === "arrive" && sess.rx && sig.relearnUntil < now()) word = sess.rx.dir > 0 ? "ein" : "aus";
+  else if (!idle && sess.phase === "arrive" && TD.st) word = TD.st === 1 || TD.st === 2 ? "ein" : "aus";
   else if (!idle && sess.phase === "sleep") word = "";
   else if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
   else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
