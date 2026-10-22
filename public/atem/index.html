@@ -410,7 +410,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v16 · 23.10. 04:00 · Samsara";
+const VERSION = "v17 · 23.10. 22:30 · Samsara";
 const S = { journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
@@ -424,7 +424,7 @@ function readBox(ids = BOX_IDS) {
   });
 }
 const JOURNEY_HINT = {
-  sleep: "Das Meer folgt dir, dann führt es dich langsamer. Binaurale Beats gleiten von Alpha über Theta Richtung Delta, nur solange du mitgehst und dein Puls nicht steigt. Dann wird alles still, die Aufzeichnung läuft weiter.",
+  sleep: "Genau so, wie es dich zum ersten Mal schlafen ließ, bleibt es eingefroren unter /atem/klassik/. Das Meer folgt dir, dann führt es dich langsamer. Binaurale Beats gleiten von Alpha über Theta Richtung Delta, nur solange du mitgehst und dein Puls nicht steigt. Dann wird alles still, die Aufzeichnung läuft weiter.",
   lucid: "Wie Einschlafen, dazu prägst du dir ein leises Glas-Signal ein: Hörst du es, weißt du, ich träume. In der zweiten Nachthälfte achtet die App auf traumtypisch unruhigen Atem bei ruhigem Körper und spielt dann das Signal, ganz leise. Ein Experiment, kein Versprechen.",
   deep: "Resonanzatmung: Das Meer probiert ruhige Tempi von 6,5 bis 4,5 Atemzügen pro Minute und misst, wo dein Herzschlag am stärksten mitschwingt. Dort bleibt es, und ein heller Klang wächst mit der Welle.",
   tank: "Schwarz und fast still. Nur dein Atem als Meer und ganz leise dein eigener Herzschlag. Alles wird langsam immer weniger. Schweben.",
@@ -892,14 +892,26 @@ function heartEstimate() {
     }
     return p;
   };
+  // the single beats give an independent pulse; if the spectrum has strayed far from it
+  // (e.g. locked onto the overtone at twice the rate), it re-anchors there
+  let anchor = HB.bpm;
+  const ibis = [];
+  for (let i = HB.beats.length - 1; i > 0 && HB.beats[i] > HB.lastBeat - 20; i--) { const d = HB.beats[i] - HB.beats[i - 1]; if (d > 0.4 && d < 1.6) ibis.push(60 / d); }
+  if (ibis.length >= 8) { const m = median(ibis); if (!anchor || Math.abs(anchor - m) / m > 0.25) anchor = m; }
   const cand = [], H = [];
   for (let bpm = 45; bpm <= 130; bpm += 0.5) { cand.push(bpm); H.push(power(bpm) + 0.6 * power(2 * bpm)); }
   const med = H.slice().sort((a, b) => a - b)[H.length >> 1] || 1;
   let best = -1, bi = 0;
   for (let i = 0; i < H.length; i++) {
-    const prior = HB.bpm ? Math.exp(-0.5 * ((cand[i] - HB.bpm) / 15) ** 2) : 1;
+    const prior = anchor ? Math.exp(-0.5 * ((cand[i] - anchor) / 15) ** 2) : 1;
     const sc = (H[i] / med) * prior;
     if (sc > best) { best = sc; bi = i; }
+  }
+  // a pulse far above resting with real power at half the rate is the overtone: take the half
+  if (cand[bi] > 95) {
+    let hj = -1;
+    cand.forEach((c, i) => { if (Math.abs(c - cand[bi] / 2) <= 2 && (hj < 0 || H[i] > H[hj])) hj = i; });
+    if (hj >= 0 && H[hj] >= 0.35 * H[bi]) bi = hj;
   }
   const raw = H[bi] / med;
   if (raw >= 3) {
@@ -1937,7 +1949,8 @@ function seaDirection(t, dt) {
     if (net < 0) { e.flip(); d.votes = d.votes.map((x) => -x); }
     d.sure = true;
     logEvent("direction", { decided: true, flipped: net < 0, votes: d.votes.length });
-  } else if (d.sure && d.votes.length >= 8 && net <= -6) {
+  } else if (d.sure && d.votes.length >= 10 && net <= -8 && t - (d.flippedAt || 0) > 180) {
+    d.flippedAt = t;
     e.flip(); d.votes = d.votes.map((x) => -x); d.mix = 0;
     logEvent("direction", { decided: true, flipped: true, later: true });
   }
@@ -2369,6 +2382,7 @@ function draw() {
   cx.setTransform(dpr, 0, 0, dpr, 0, 0);
   cx.clearRect(0, 0, W, H);
   const orbH = H * 0.72, cxp = W / 2, cyp = orbH / 2, R = Math.min(W, orbH) / 2 - 6;
+  if (R <= 4) { requestAnimationFrame(draw); return; }   // canvas not laid out yet
   const h = sess.history, last = h[h.length - 1];
   const idle = sess.phase === "idle";
   idleT += 0.016;
