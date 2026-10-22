@@ -154,6 +154,10 @@
   color: var(--text-muted);
 }
 
+.breathe-bubble {
+  color: var(--accent);
+}
+
 /* Instruction */
 .mood-instruction {
   font-size: 12px;
