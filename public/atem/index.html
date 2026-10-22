@@ -267,8 +267,8 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
       </div>
     </div>
     <div class="field" id="jbField">
-      <span>Ziel-Rhythmus in Sekunden</span>
-      <div class="box">
+      <span hidden>Ziel-Rhythmus in Sekunden</span>
+      <div class="box" hidden>
         <label>Ein<input type="number" id="jIn" min="1" max="12" step="1" inputmode="numeric"></label>
         <label>Halten<input type="number" id="jTop" min="0" max="12" step="1" inputmode="numeric"></label>
         <label>Aus<input type="number" id="jOut" min="1" max="12" step="1" inputmode="numeric"></label>
@@ -330,7 +330,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <button type="button" class="ghost" id="voiceTest">Probe</button>
       </div>
     </div>
-    <p class="hint"><b>Just Breathe</b>: Lass dich fallen. Zwei Minuten lang folgt dir nur das Meer, dann markieren Ding und Gong deinen eigenen höchsten und tiefsten Punkt. Ton, Herz und Klangschale bleiben ganz leise. Dann übernimmt die Klangschale dein Auf und Ab und formt Runde für Runde zuerst die Höhe, danach die Breite des Vierecks; leise Ticks zählen das Halten. Zum Einschlafen blendet sie aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <p class="hint"><b>Just Breathe</b>: Handy auf die Brust, atme in deinem Tempo. Das Meer folgt dir in Echtzeit: Es rauscht, solange Luft fließt, und schweigt in jeder Pause. Sobald die App sicher weiß, wo bei dir „ein“ ist, steigt es beim Einatmen und sinkt beim Ausatmen. Wird dein Atem gleichmäßig, heißt es „Jetzt folge du dem Meer“: Aus den Böen wird ein ruhiges Auf und Ab in deinem Tempo, und wenn du mitgehst, wird es langsam ruhiger, bis zu deinem Ziel. Zum Einschlafen blendet es aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -349,7 +349,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v10 · 22.10. 21:00";
+const VERSION = "v14 · 23.10. 01:30";
 const S = { jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "jb", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse7") || "{}")); } catch (e) {}
 if (!["jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "jb";
@@ -365,7 +365,7 @@ function updateFields() {
   $("#boxField").hidden = mode !== "box";
   $("#jbField").hidden = mode !== "jb";
   $("#durField").hidden = mode === "jb";
-  $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead");
+  $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead" || mode === "jb");
 }
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
@@ -447,7 +447,15 @@ function onMotion(e) {
   if (!a || a.x == null) return;
   sig.seen = true;
   const t = now();
-  const g = [a.x, a.y, a.z];
+  let g = [a.x, a.y, a.z];
+  // a tap on the screen is a short jolt: carry the smooth value through it so it is neither
+  // a breath nor a moved phone. A jolt that lasts longer than 0.4 s is a real move and passes.
+  if (sig.init) {
+    if (Math.hypot(g[0] - sig.g1[0], g[1] - sig.g1[1], g[2] - sig.g1[2]) > 0.5) {
+      if (!sig.spiking) { sig.spiking = true; sig.spikeStart = t; }
+      if (t - sig.spikeStart < 0.4) g = sig.g1.slice();
+    } else sig.spiking = false;
+  }
   if (!sig.init) {
     sig.slow = g.slice(); sig.lp = [0, 0, 0]; sig.lp2 = [0, 0, 0];
     sig.g1 = g.slice(); sig.g2 = g.slice(); sig.acc = [0, 0, 0]; sig.accN = 0; sig.rot = [0, 0, 0]; sig.rotN = 0; sig.lastT = t; sig.t0 = t; sig.nextSample = t;
@@ -511,6 +519,7 @@ function sample(t, moving) {
   rtSample(t, moving);
   heartSample(t, rAvg, moving);
   turnSample(t, gAvg, moving);
+  if (sess.flowEng) sess.flowEng.step(t, gAvg, rAvg, !moving);
   logSample(t, gAvg, rAvg);
 }
 
@@ -574,36 +583,178 @@ function rtEndDeep() {
   logEvent("deep", { inMax: +RT.inMax.toFixed(4), dir: RT.dir.map((c) => +c.toFixed(3)), polarity: sig.polarity });
 }
 
+/* ---------------- Real-time breath flow ----------------
+   The gyroscope sees the chest tilting the moment it happens; the accelerometer knows
+   where the chest is but only after smoothing (~0.4 s late). The tilt rate along the
+   inhale direction comes from the gyro (g × ω), checked against the accelerometer all
+   the time: it decides the gyro's sign and whether to trust it at all. Position is the
+   gyro integrated and gently pulled toward the accelerometer, so it cannot drift. */
+function makeFlow(dIn) {
+  const f = { dIn, g1: null, w0: null, fa: 0, fb: 0, pa: null, prevA: null, va: 0, prevV: 0, aa: 0, pos: null,
+    ring: [], cab: 0, caa: 1e-12, cbb: 1e-12, trust: 0, gsign: 1, hist: [], flow: 0, u: 0.5 };
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  f.step = (t, g, w, quiet = true) => {
+    if (!f.g1) { f.g1 = g.slice(); f.w0 = [0, 0, 0]; }
+    for (let k = 0; k < 3; k++) f.g1[k] += (g[k] - f.g1[k]) * 0.2;
+    // accelerometer: position, speed and its change, then looked 0.3 s ahead to make up for the smoothing
+    const x = dot3(g, f.dIn);
+    f.pa = f.pa == null ? x : f.pa + (x - f.pa) * (0.05 / 0.35);
+    // gyro: slow offset removed (learned only while lying still), jolts clipped, then the rate at which gravity turns along dIn
+    const wr = w.map((v, k) => { if (quiet) f.w0[k] += (v - f.w0[k]) * 0.005; return Math.max(-6, Math.min(6, v - f.w0[k])) * Math.PI / 180; });
+    const G = f.g1, cr = [G[1] * wr[2] - G[2] * wr[1], G[2] * wr[0] - G[0] * wr[2], G[0] * wr[1] - G[1] * wr[0]];
+    f.fa += (dot3(cr, f.dIn) - f.fa) * 0.33; f.fb += (f.fa - f.fb) * 0.33;
+    if (f.prevA != null) f.va += ((f.pa - f.prevA) / 0.05 - f.va) * (0.05 / 0.3);
+    f.prevA = f.pa;
+    f.aa += ((f.va - f.prevV) / 0.05 - f.aa) * (0.05 / 0.3); f.prevV = f.va;
+    const a = f.pa + f.va * 0.3, flowA = f.va + f.aa * 0.3;
+    // moving the phone produces swings a hundred times a breath: start the comparison afresh
+    if (!quiet) { f.cab = 0; f.caa = 1e-12; f.cbb = 1e-12; f.ring = []; f.n = 0; }
+    f.n = (f.n || 0) + 1;
+    // agreement over ~20 s, giving the accelerometer its 0.3 s of lag
+    f.ring.push(f.fb); if (f.ring.length > 7) f.ring.shift();
+    const gb = f.ring[0], al = 0.05 / 20;
+    f.cab += (f.va * gb - f.cab) * al; f.caa += (f.va * f.va - f.caa) * al; f.cbb += (gb * gb - f.cbb) * al;
+    const r = f.n > 100 ? f.cab / Math.sqrt(f.caa * f.cbb) : 0;
+    f.gsign = r < 0 ? -1 : 1; f.trust = Math.abs(r);
+    // blend: trusted gyro carries the flow; otherwise the (later) accelerometer does
+    const wgt = Math.max(0, Math.min(1, (f.trust - 0.4) / 0.3));
+    const scale = Math.sqrt(f.caa / f.cbb);                  // gyro rate in accelerometer units
+    const flow = wgt * f.gsign * f.fb * scale + (1 - wgt) * flowA;
+    // where the chest is: the accelerometer, looked ahead (integrating the gyro drifts)
+    f.pos = a;
+    f.hist.push([t, f.pos, Math.abs(flow)]);
+    while (f.hist[0][0] < t - 30) f.hist.shift();
+    let lo = Infinity, hi = -Infinity;
+    for (const h of f.hist) { if (h[1] < lo) lo = h[1]; if (h[1] > hi) hi = h[1]; }
+    const sp = f.hist.map((h) => h[2]).sort((x, y) => x - y), fmax = sp[Math.floor(sp.length * 0.9)] || 1e-9;
+    f.flow = flow / fmax; f.u = hi > lo ? (f.pos - lo) / (hi - lo) : 0.5; f.wgt = wgt;
+  };
+  // inhale was the other way round: mirror every signed quantity (the agreement check is unaffected)
+  f.flip = () => {
+    f.dIn = f.dIn.map((v) => -v);
+    for (const k of ["pa", "prevA", "va", "prevV", "aa", "fa", "fb", "pos"]) if (f[k] != null) f[k] = -f[k];
+    f.ring = f.ring.map((v) => -v); f.hist = f.hist.map((h) => [h[0], -h[1], h[2]]);
+  };
+  // Which way is "in"? After breathing out the chest settles on the same floor every time,
+  // while breaths in reach up by different amounts: the side where the signal rests is "out".
+  // One vote per 30 s window; on recorded sessions 71 % and 100 % of windows were right.
+  f.vote = () => {
+    if (f.hist.length < 500) return 0;
+    let lo = Infinity, hi = -Infinity;
+    for (const h of f.hist) { if (h[1] < lo) lo = h[1]; if (h[1] > hi) hi = h[1]; }
+    const r = hi - lo; if (r <= 0) return 0;
+    let nLo = 0, nHi = 0;
+    for (const h of f.hist) { if (h[1] < lo + 0.2 * r) nLo++; if (h[1] > hi - 0.2 * r) nHi++; }
+    return nLo > nHi ? 1 : nLo < nHi ? -1 : 0;
+  };
+  return f;
+}
+
 /* ---------------- Summit and valley of your own breath ----------------
    The chest slows down just before it turns. A summit is marked when the upward speed
    has almost died out near the top of the last few seconds' range (a valley likewise),
    and the two always alternate. On recorded sessions this lands within ~0.4 s of the real
    turn with few false marks, where a plain threshold on the position fired at mid-breath. */
-const TD = { p: null, v: 0, prev: null, hist: [], st: 0 };
-function turnReset() { Object.assign(TD, { p: null, v: 0, prev: null, hist: [], st: 0 }); }
-function turnSample(t, gAvg, moving) {
-  if (moving || t < sig.relearnUntil) { turnReset(); return; }
-  const x = dot(gAvg, sig.u) * sig.polarity;
-  TD.p = TD.p == null ? x : TD.p + (x - TD.p) * (0.05 / 0.4);
-  if (TD.prev != null) TD.v += ((TD.p - TD.prev) / 0.05 - TD.v) * (0.05 / 0.35);
-  TD.prev = TD.p;
-  TD.hist.push([t, TD.p, Math.abs(TD.v)]);
-  while (TD.hist[0][0] < t - 8) TD.hist.shift();
-  if (TD.hist.length < 40) return;
-  let lo = Infinity, hi = -Infinity;
-  for (const h of TD.hist) { if (h[1] < lo) lo = h[1]; if (h[1] > hi) hi = h[1]; }
-  if (hi - lo < 1e-6) return;
-  const sp = TD.hist.map((h) => h[2]).sort((a, b) => a - b), vmax = sp[Math.floor(sp.length * 0.9)];
-  const hgt = (TD.p - lo) / (hi - lo), v = TD.v;
-  if (v > 0.2 * vmax && (TD.st === 0 || TD.st === -2)) TD.st = 1;
-  if (v < -0.2 * vmax && (TD.st === 0 || TD.st === 2)) TD.st = -1;
-  if (TD.st === 1 && v < 0.3 * vmax && hgt > 0.6) { TD.st = 2; onBreathTurn("top"); }
-  if (TD.st === -1 && v > -0.3 * vmax && hgt < 0.4) { TD.st = -2; onBreathTurn("bottom"); }
+// vf: how far the speed must have died out, hf: how near the end of the range,
+// ex: how much of a usual breath's travel since the last turn (so a wobble is not a turn).
+function makeDetector(par) {
+  const d = { par, p: null, v: 0, prev: null, hist: [], st: 0, lastP: null, exc: par.exc0 || 0, hgt: 0.5, vmax: 0 };
+  d.step = (t, x) => {
+    d.p = d.p == null ? x : d.p + (x - d.p) * (0.05 / 0.4);
+    if (d.prev != null) d.v += ((d.p - d.prev) / 0.05 - d.v) * (0.05 / 0.35);
+    d.prev = d.p;
+    d.hist.push([t, d.p, Math.abs(d.v)]);
+    while (d.hist[0][0] < t - 8) d.hist.shift();
+    if (d.hist.length < 40) return null;
+    let lo = Infinity, hi = -Infinity;
+    for (const h of d.hist) { if (h[1] < lo) lo = h[1]; if (h[1] > hi) hi = h[1]; }
+    if (hi - lo < 1e-6) return null;
+    const sp = d.hist.map((h) => h[2]).sort((a, b) => a - b);
+    d.vmax = sp[Math.floor(sp.length * 0.9)]; d.hgt = (d.p - lo) / (hi - lo);
+    const v = d.v, vm = d.vmax;
+    if (v > 0.2 * vm && (d.st === 0 || d.st === -2)) d.st = 1;
+    if (v < -0.2 * vm && (d.st === 0 || d.st === 2)) d.st = -1;
+    const far = !par.ex || d.lastP == null || !d.exc || Math.abs(d.p - d.lastP) > par.ex * d.exc;
+    let kind = null;
+    if (d.st === 1 && v < par.vf * vm && d.hgt > par.hf && far) { d.st = 2; kind = "top"; }
+    else if (d.st === -1 && v > -par.vf * vm && d.hgt < 1 - par.hf && far) { d.st = -2; kind = "bottom"; }
+    if (kind) {
+      // the usual travel adapts, so smaller breaths later on are still found
+      if (d.lastP != null) { const e = Math.abs(d.p - d.lastP); d.exc = d.exc ? d.exc + (e - d.exc) * 0.3 : e; }
+      d.lastP = d.p;
+    }
+    return kind;
+  };
+  return d;
 }
-function onBreathTurn(kind) {
+let TD = makeDetector({ vf: 0.3, hf: 0.6, ex: 0, exc0: 0 });
+function turnReset() { TD = makeDetector({ ...TD.par, exc0: TD.exc }); }
+function turnSample(t, gAvg, moving) {
+  if (!moving && LEARN.on) LEARN.buf.push([t, gAvg.slice()]);
+  if (moving || t < sig.relearnUntil) { turnReset(); return; }
+  const kind = TD.step(t, dot(gAvg, sig.u) * sig.polarity);
+  if (kind) onBreathTurn(kind, t);
+}
+function onBreathTurn(kind, t) {
   logEvent("turn", { kind });
-  // during "arrive" the markers come from your breath, once they are switched on
-  if (sess.phase === "arrive" && sess.marks) (kind === "top" ? markTop : markBottom)();
+  sess.turns.push([t, kind]); if (sess.turns.length > 30) sess.turns.shift();
+  // from "check" on, Ding and Gong come from your breath until the bowl leads
+  if (["check", "flat", "flow"].includes(sess.phase) || (sess.phase === "blend" && sess.alpha < 0.5)) (kind === "top" ? markTop : markBottom)();
+}
+
+/* ---------------- Learning from taps ----------------
+   For about a minute you breathe deeply and tap the phone at the top and the bottom.
+   The taps say where "up" is, how big a breath is, and which detector settings land
+   on your turns; the settings are chosen by replaying that minute with each candidate. */
+const LEARN = { on: false, buf: [], taps: [] };
+function onTap(t) {
+  let label = null;
+  if (sess.phase !== "learn" && TD.hist.length > 40) label = TD.hgt > 0.5 ? "top" : "bottom";
+  LEARN.taps.push({ t, label });
+  logEvent("tap", { label, phase: sess.phase });
+  if (sess.phase === "learn") tickSound();
+  else if (sess.phase === "echo" && label) (label === "top" ? markTop : markBottom)();
+}
+function fitDetector() {
+  const buf = LEARN.buf, T = LEARN.taps.map((x) => x.t).filter((t) => buf.length && t >= buf[0][0] && t <= buf[buf.length - 1][0]);
+  if (buf.length < 400 || T.length < 4) {
+    logEvent("fit", { ok: false, taps: T.length });
+    if (!sess.fit) sig.polarity = sig.u[1] >= 0 ? 1 : -1;
+    return;
+  }
+  const u = sig.u.slice(), raw = buf.map((b) => dot(b[1], u));
+  const pos = raw.map((_, i) => { let a = 0, n = 0; for (let j = Math.max(0, i - 4); j <= Math.min(raw.length - 1, i + 4); j++) { a += raw[j]; n++; } return a / n; });
+  const at = (t) => { let lo = 0, hi = buf.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (buf[m][0] < t) lo = m + 1; else hi = m; } return pos[lo]; };
+  const pt = T.map(at), med = [...pt].sort((a, b) => a - b)[pt.length >> 1];
+  const high = pt.map((v) => v > med);
+  // you were asked to start at the top, so the side of the first tap is "up"
+  const pol = high[0] ? 1 : -1;
+  const labels = high.map((h) => (h === (pol > 0) ? "top" : "bottom"));
+  const ex = [];
+  for (let i = 1; i < pt.length; i++) if (labels[i] !== labels[i - 1]) ex.push(Math.abs(pt[i] - pt[i - 1]));
+  const exc0 = ex.length ? ex.sort((a, b) => a - b)[ex.length >> 1] : 0;
+  let best = null;
+  for (const vf of [0.15, 0.3, 0.45]) for (const hf of [0.5, 0.6, 0.7]) for (const exr of [0, 0.35, 0.55]) {
+    const par = { vf, hf, ex: exr, exc0 }, d = makeDetector(par), turns = [];
+    for (const [t, g] of buf) { const k = d.step(t, dot(g, u) * pol); if (k) turns.push([t, k]); }
+    let hits = 0, err = 0;
+    const used = new Set();
+    T.forEach((tt, i) => {
+      let bj = -1, be = 9;
+      turns.forEach(([t, k], j) => { if (k === labels[i] && !used.has(j) && Math.abs(t - tt) < Math.abs(be)) { be = t - tt; bj = j; } });
+      if (bj >= 0 && Math.abs(be) <= 1) { hits++; err += Math.abs(be); used.add(bj); }
+    });
+    // marks only count as wrong near your taps: where you did not tap, nothing is known
+    const wrong = turns.filter(([t], j) => !used.has(j) && T.some((tt) => Math.abs(t - tt) < 3)).length;
+    const score = hits - 0.7 * wrong - 0.3 * err;
+    if (!best || score > best.score) best = { score, par, hits, wrong, err: hits ? err / hits : 0 };
+  }
+  sig.polarity = pol;
+  TD = makeDetector(best.par);
+  sess.fit = { taps: T.length, hits: best.hits, wrong: best.wrong, err: best.err };
+  // in every calibrated session so far, inhaling tilted the phone along its long axis; note if this disagrees
+  const prior = Math.sign(u[1]) || 1;
+  logEvent("fit", { taps: T.length, hits: best.hits, wrong: best.wrong, err: +best.err.toFixed(2), par: best.par, pol, priorAgrees: pol === prior });
 }
 
 /* ---------------- Heartbeat from the gyroscope ----------------
@@ -729,8 +880,10 @@ function logSample(t, gAvg, rAvg) {
     (t - sess.start).toFixed(3),
     gAvg[0].toFixed(4), gAvg[1].toFixed(4), gAvg[2].toFixed(4),
     rAvg[0].toFixed(3), rAvg[1].toFixed(3), rAvg[2].toFixed(3),
-    sig.s.toFixed(5), sig.x.toFixed(3), RT.q.toFixed(3), guiding ? G.y.toFixed(3) : "",
+    sig.s.toFixed(5), sig.x.toFixed(3), RT.q.toFixed(3), sess.phase === "seaLead" ? SP.y.toFixed(3) : guiding ? G.y.toFixed(3) : "",
     sess.phase, sig.motion.toFixed(3), HB.bpm ? HB.bpm.toFixed(1) : "", HB.beat ? 1 : 0, MIC.db != null ? MIC.db.toFixed(1) : "",
+    sess.flowEng ? sess.flowEng.flow.toFixed(3) : "", sess.flowEng ? sess.flowEng.u.toFixed(3) : "", sess.flowEng ? sess.flowEng.wgt.toFixed(2) : "",
+    sess.phase === "seaLead" ? SP.flow.toFixed(3) : "", sess.phase === "seaLead" ? SP.sync.toFixed(2) : "",
   ].join(","));
 }
 function buildLog() {
@@ -746,7 +899,9 @@ function buildLog() {
     ...LOG.events.map((e) => "# " + e.join(" ")),
     "#   hr = heart rate estimate from the gyroscope, beat = 1 where a heartbeat was detected",
     "#   mic = microphone level dB (only while snore recording runs)",
-    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic",
+    "#   flow = real-time airflow (signed, 1 = a usual strong breath), pos = chest position 0..1, gyro = share of the gyroscope in flow",
+    "#   seaFlow = the leading sea's airflow, sync = how closely your flow follows it",
+    "t,gx,gy,gz,rx,ry,rz,s,x,q,guide,phase,motion,hr,beat,mic,flow,pos,gyro,seaFlow,sync",
   ];
   return head.join("\n") + "\n" + LOG.rows.join("\n") + "\n";
 }
@@ -984,12 +1139,58 @@ function audioRealtime(q, follow, guideY) {
   A.hGain.gain.setTargetAtTime(0, t, 0.5);
 }
 const BOWL_HZ = 196; // G3
-// In Just Breathe the sea carries everything; drone, heartbeat and the sustained bowl stay at a whisper.
-// The bowl comes up a little once it leads, so its rise and fall stay audible.
+// In Just Breathe the sea carries everything; drone and heartbeat join at a whisper (5 %) with the sea,
+// the sustained bowl only as it starts to lead.
 function mix(layer) {
   if (S.mode !== "jb") return 1;
-  if (layer === "bowl") return sess.phase === "jb" ? 0.3 : 0.1;
-  return 0.1;
+  if (sess.phase === "sea" || sess.phase === "seaLead" || (sess.phase === "sleep" && sess.flowEng)) return 0;
+  if (layer === "bowl") return sess.phase === "blend" ? 0.3 * sess.alpha : ["jb", "sleep"].includes(sess.phase) ? 0.3 : 0;
+  return sess.layersOn ? 0.05 : 0;
+}
+// The sea is the air: it sounds while air flows (rising pitch on the way in, falling on the way out)
+// and goes quiet where the chest rests, at the top as at the bottom. First it is your own flow,
+// then it blends over to the guide's.
+// Just Breathe: only the sea. It is the air: silent while the chest rests (also mid-breath, also
+// when you stumble), sounding with the flow, its pitch following where the chest is right now.
+function audioSea(dt) {
+  if (!A.ctx) return;
+  const t = A.ctx.currentTime, e = sess.flowEng;
+  const ok = e && sig.seen && !sig.disturbed;
+  const fl = ok ? clamp((Math.abs(e.flow) - 0.12) / 0.88, 0, 1) : 0;
+  sess.flowOut += (fl - sess.flowOut) * Math.min(1, dt / 0.06);
+  const mix = sess.dir ? sess.dir.mix : 0, puYou = 0.45 + ((ok ? e.u : 0.45) - 0.45) * mix;
+  // once the sea leads, your gusts cross over into its even swell
+  const a = SP.aOut;
+  const level = (1 - a) * sess.flowOut + a * (0.08 + 0.92 * Math.abs(SP.flow));
+  const pu = (1 - a) * puYou + a * (SP.y + 1) / 2;
+  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 0.05);
+  // the sea is the whole of Just Breathe, so it plays regardless of the sound chips
+  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2), t, 0.04);
+  A.padGain.gain.setTargetAtTime(0, t, 0.5);
+  if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(0, t, 0.5);
+  A.dGain.gain.setTargetAtTime(0, t, 0.5);
+  A.vGain.gain.setTargetAtTime(0, t, 0.3);
+  A.hGain.gain.setTargetAtTime(0, t, 0.5);
+}
+function audioJB(ph, dt) {
+  if (!A.ctx) return;
+  const t = A.ctx.currentTime;
+  const ready = sess.hasSensor && sig.seen && !sig.disturbed && now() >= sig.relearnUntil && TD.vmax > 0;
+  const uf = ready ? clamp(Math.abs(TD.v) / TD.vmax, 0, 1.2) : 0, up = ready ? TD.hgt : 0.3;
+  const a = ph === "blend" ? sess.alpha : ph === "jb" || ph === "sleep" ? 1 : 0;
+  const gf = a > 0 ? G.flow : 0, gp = (G.y + 1) / 2;
+  sess.flowOut += ((1 - a) * uf + a * gf - sess.flowOut) * Math.min(1, dt / 0.12);
+  const pos = (1 - a) * up + a * gp;
+  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pos * 3.2), t, 0.1);
+  A.nGain.gain.setTargetAtTime(S.sea && sess.layersOn ? 0.13 * Math.pow(Math.min(1, sess.flowOut), 1.3) : 0, t, 0.08);
+  const f = 130.81 * Math.pow(2, (pos * 5) / 12);
+  for (const p of A.pad) p.o.frequency.setTargetAtTime(f * p.mult, t, 0.1);
+  A.padFilter.frequency.setTargetAtTime(240 + pos * 650, t, 0.1);
+  A.padGain.gain.setTargetAtTime(S.tone ? (0.04 + pos * 0.012) * mix("tone") : 0, t, 0.5);
+  bowlLevel(gp, 0.35);
+  A.dGain.gain.setTargetAtTime(0, t, 0.5);
+  A.vGain.gain.setTargetAtTime(0, t, 0.3);
+  A.hGain.gain.setTargetAtTime(0, t, 0.5);
 }
 function bowlLevel(v, k) {
   if (!A.bowlGain) return;
@@ -1080,7 +1281,6 @@ const sess = {
   m: { xy: 0, xx: 1e-6, yy: 1e-6 }, match: 0, flipBad: 0,
   leadCycles: 0, naturalRate: null, matchSum: 0, matchN: 0, history: [],
 };
-const ARRIVE_SEA_SECONDS = 120, ARRIVE_SECONDS = 200;
 const PLACE_SECONDS = 12, CALIB_SECONDS = 20, MATCH_SECONDS = 60, HOLD_SECONDS = 10, DEEP_SECONDS = 7, SETTLE_SECONDS = 45;
 
 function setPrompt(t) { $("#prompt").textContent = t; }
@@ -1092,14 +1292,205 @@ function alignGuide() {
   else if (sess.hasSensor && det.dir < 0 && lastPk) G.phase = G.rIn + (1 - G.rIn) * clamp((t - lastPk) / (G.P * (1 - G.rIn)), 0, 0.95);
   else G.phase = 0;
 }
+// The two "tief ein" cues tell which way inhaling moves the phone: right after each cue,
+// the furthest the (tap-free) gravity reading travels is the inhale direction.
+const JB_CUES = [[6, "Atme tief ein", true], [11, "und aus"], [17, "Und noch einmal, tief ein", true], [22, "und aus"]];
+function jbIntro(t, el) {
+  // the sea starts as soon as the phone lies still and the breathing axis has settled
+  if ((el > 12 && t > sig.relearnUntil - 5) || el > 35) {
+    sess.flowEng = makeFlow(sig.u.slice());
+    sess.dir = { votes: [], next: t + 30, sure: false, mix: 0 };
+    logEvent("seaStart", { axis: sig.u.map((v) => +v.toFixed(2)) });
+    setPhase("sea");
+  }
+}
+function jbIntroCues(t, el) {
+  const c = JB_CUES[sess.cueIdx];
+  if (c && el >= c[0]) {
+    say(c[1]); sess.cueIdx++;
+    if (c[2]) sess.cap = { from: t + 0.4, to: t + 4.5, ref: null, best: null, bestN: 0 };
+  }
+  const cap = sess.cap;
+  if (cap && t >= cap.from && t <= cap.to && !sig.disturbed) {
+    if (!cap.ref) cap.ref = sig.g1.slice();
+    const d = sub(sig.g1, cap.ref), n = Math.hypot(...d);
+    if (n > cap.bestN) { cap.bestN = n; cap.best = d; }
+  } else if (cap && t > cap.to) {
+    if (cap.best && cap.bestN > 0.01) { for (let k = 0; k < 3; k++) sess.inSum[k] += cap.best[k] / cap.bestN; sess.inN++; }
+    logEvent("cue", { move: +cap.bestN.toFixed(3), dir: cap.best && cap.best.map((v) => +(v / cap.bestN).toFixed(2)) });
+    sess.cap = null;
+  }
+  if (el > 30) {
+    const m = Math.hypot(...sess.inSum);
+    // no clear movement after the cues: fall back to the breathing axis, inhale along the long axis
+    const dIn = sess.inN && m > 0.5 ? sess.inSum.map((v) => v / m) : sig.u.map((v) => v * (sig.u[1] >= 0 ? 1 : -1));
+    sess.flowEng = makeFlow(dIn);
+    logEvent("dIn", { dir: dIn.map((v) => +v.toFixed(2)), fromCues: sess.inN && m > 0.5 ? sess.inN : 0 });
+    setPhase("sea");
+  }
+}
+/* Breaths on the real-time flow: a change of direction counts once the air has gone the new way
+   for 0.5 s, so a stumble does not split a breath (checked on a recorded session: 9.0–9.3/min
+   steady, where counting every turn gave 0.8 s "breaths"). */
+const BT = { st: 0, cand: null, on: [], ins: [], lastOff: null };
+function btReset() { Object.assign(BT, { st: 0, cand: null, on: [], ins: [], lastOff: null }); }
+function btStep(t, v) {
+  const want = v > 0.2 ? 1 : v < -0.2 ? -1 : 0;
+  if (want && want !== BT.st) {
+    if (!BT.cand || BT.cand[0] !== want) BT.cand = [want, t];
+    else if (t - BT.cand[1] >= 0.5) {
+      if (want === 1) { BT.on.push(BT.cand[1]); if (BT.on.length > 12) BT.on.shift(); }
+      else if (BT.on.length) { BT.ins.push(BT.cand[1] - BT.on[BT.on.length - 1]); if (BT.ins.length > 12) BT.ins.shift(); BT.lastOff = BT.cand[1]; }
+      BT.st = want; BT.cand = null;
+    }
+  } else if (want === BT.st) BT.cand = null;
+}
+const median = (a) => { const b = [...a].sort((x, y) => x - y); return b[b.length >> 1]; };
+function btPeriods(n) {
+  const p = [];
+  for (let i = Math.max(1, BT.on.length - n); i < BT.on.length; i++) p.push(BT.on[i] - BT.on[i - 1]);
+  return p;
+}
+// steady: of the last six breaths, five within 30 % of their median length
+function btSteady() {
+  const p = btPeriods(6);
+  if (p.length < 6) return false;
+  const m = median(p);
+  return p.filter((x) => Math.abs(x - m) < 0.3 * m).length >= 5;
+}
+
+/* The sea that leads: an even swell (sounding while its air flows, quiet at each turn), started at
+   your own length and split of a breath, where you are in it. Over five breaths your gusts give way
+   to it. Once you breathe with it, it lengthens each breath by 3 % toward the target, and only
+   while you stay with it. It never gets faster. */
+const SP = { ph: 0, P: 6, rIn: 0.45, y: -1, flow: 0, ring: [], cab: 0, caa: 1e-9, cbb: 1e-9, sync: 0, a: 0, aOut: 0, slowing: false, arrived: false, bad: 0 };
+function spStep(dt) {
+  SP.ph += dt / SP.P;
+  if (SP.ph >= 1) { SP.ph -= 1; spCycle(); }
+  const f = SP.ph;
+  if (f < SP.rIn) { const x = f / SP.rIn; SP.y = -Math.cos(Math.PI * x); SP.flow = Math.sin(Math.PI * x); }
+  else { const x = (f - SP.rIn) / (1 - SP.rIn); SP.y = Math.cos(Math.PI * x); SP.flow = -Math.sin(Math.PI * x); }
+  SP.aOut += (SP.a - SP.aOut) * Math.min(1, dt / 3);
+  if (SP.a === 0 && SP.aOut < 0.02) SP.aOut = 0;
+  // are you with it? your flow against the sea's, allowing half a second to follow
+  SP.ring.push(SP.flow); if (SP.ring.length > 10) SP.ring.shift();
+  const e = sess.flowEng;
+  if (!e || sig.disturbed) return;
+  const g = SP.ring[0], u = clamp(e.flow, -1.5, 1.5), al = dt / 12;
+  SP.cab += (u * g - SP.cab) * al; SP.caa += (u * u - SP.caa) * al; SP.cbb += (g * g - SP.cbb) * al;
+  SP.sync = SP.cab / Math.sqrt(SP.caa * SP.cbb);
+}
+function spCycle() {
+  if (sess.phase !== "seaLead") return;
+  // five breaths in a row not with it: no pushing, the sea goes back to following you
+  SP.bad = SP.sync < 0.3 ? SP.bad + 1 : SP.sync > 0.5 ? 0 : SP.bad;
+  if (SP.a >= 1 && SP.bad >= 5) {
+    SP.a = 0; sess.seaBackAt = now();
+    logEvent("seaBack", { P: +SP.P.toFixed(2), sync: +SP.sync.toFixed(2) });
+    setPhase("sea");
+    setPrompt("Das Meer folgt wieder dir. Lass dir Zeit.");
+    return;
+  }
+  SP.a = Math.min(1, SP.a + 1 / 5);
+  if (SP.a >= 1 && !SP.slowing && SP.sync > 0.6) {
+    SP.slowing = true;
+    setPrompt("Du bist im Takt. Das Meer wird jetzt langsam ruhiger.");
+    say("Schön. Das Meer wird jetzt langsam ruhiger.");
+  }
+  if (SP.slowing && SP.sync <= 0.5 && !SP.arrived) setPrompt("Folge dem Meer, so gut es geht. Es wartet auf dich.");
+  if (SP.slowing && SP.sync > 0.5) {
+    if (!SP.arrived) setPrompt("Du bist im Takt. Das Meer wird langsam ruhiger.");
+    const T = 60 / S.target;
+    if (SP.P < T) SP.P = Math.min(T, SP.P * 1.03);
+    SP.rIn += (1 / (1 + S.ratio) - SP.rIn) * 0.15;
+    if (!SP.arrived && SP.P >= T - 0.01) { SP.arrived = true; setPrompt("Angekommen. Bleib einfach im Rhythmus des Meeres."); }
+  }
+  logEvent("seaCycle", { P: +SP.P.toFixed(2), rIn: +SP.rIn.toFixed(2), sync: +SP.sync.toFixed(2), a: +SP.a.toFixed(2), slowing: SP.slowing });
+}
+
+// Every 5 s: keep the axis aligned with the breathing (same sign), and vote on which way is in.
+// The pitch only joins once the votes clearly agree; until then the sea follows the flow alone,
+// which is right whichever way round. A later clear majority the other way turns it around.
+function seaDirection(t, dt) {
+  const e = sess.flowEng, d = sess.dir;
+  if (!e) return;
+  d.mix = d.sure ? Math.min(1, d.mix + dt / 10) : 0;
+  if (t < d.next || sig.disturbed || t < sig.relearnUntil) return;
+  d.next = t + 5;
+  const al = dot(sig.u, e.dIn) < 0 ? -1 : 1;
+  e.dIn = sig.u.map((v) => v * al);
+  const v = e.vote(); if (!v) return;
+  d.votes.push(v); if (d.votes.length > 12) d.votes.shift();
+  const net = d.votes.reduce((a, b) => a + b, 0);
+  if (!d.sure && d.votes.length >= 5 && Math.abs(net) >= 4) {
+    if (net < 0) { e.flip(); d.votes = d.votes.map((x) => -x); }
+    d.sure = true;
+    logEvent("direction", { decided: true, flipped: net < 0, votes: d.votes.length });
+  } else if (d.sure && d.votes.length >= 8 && net <= -6) {
+    e.flip(); d.votes = d.votes.map((x) => -x); d.mix = 0;
+    logEvent("direction", { decided: true, flipped: true, later: true });
+  }
+}
 function setPhase(p) {
   const prevPhase = sess.phase;
   sess.phase = p; sess.phaseStart = now();
   logEvent("phase", { to: p });
-  if (p === "arrive") {
-    sig.relearnUntil = Math.max(sig.relearnUntil, now() + 20);
-    sess.marks = false;
-    setPrompt("Nur das Meer. Es folgt deinem Atem. Lass dir Zeit.");
+  if (p === "seaLead") {
+    const P = clamp(median(btPeriods(6)), 2.5, 15);
+    const rIn = clamp(BT.ins.length ? median(BT.ins.slice(-6)) / P : 0.45, 0.3, 0.6);
+    Object.assign(SP, { P, rIn, a: 0, aOut: SP.aOut, slowing: false, arrived: false, ring: [], cab: 0, caa: 1e-9, cbb: 1e-9, sync: 0, bad: 0 });
+    // join you where you are in your breath
+    const t = now(), on = BT.on[BT.on.length - 1];
+    if (BT.st === 1 && on) SP.ph = clamp((t - on) / P, 0, rIn * 0.95);
+    else if (BT.lastOff) SP.ph = rIn + clamp((t - BT.lastOff) / P, 0, (1 - rIn) * 0.95);
+    else SP.ph = 0;
+    sess.naturalRate = 60 / P; sess.hrStart = HB.bpm;
+    logEvent("seaLead", { P: +P.toFixed(2), rIn: +rIn.toFixed(2) });
+    setPrompt("Jetzt folge du dem Meer.");
+    say("Jetzt folge du dem Meer.");
+  } else if (p === "sea" && prevPhase === "seaLead") {
+    // quietly back to following; the even swell fades out over a few seconds
+  } else if (p === "sea") {
+    setPrompt("Das Meer folgt deinem Atem. Es rauscht, solange Luft fließt.");
+    say("Jetzt kommt das Meer. Es folgt dir.");
+  } else if (p === "learn") {
+    LEARN.on = true; LEARN.buf = []; LEARN.taps = [];
+    $("#dim").textContent = "Oben und unten kurz tippen";
+    setPrompt("Atme tief ein und aus. Tippe ganz oben kurz auf den Bildschirm, und ganz unten auch. Fang oben an.");
+    say("Atme jetzt tief ein und aus. Tippe ganz oben einmal kurz auf das Handy, und ganz unten auch. Fang oben an.");
+  } else if (p === "echo") {
+    setPrompt("Dein Tippen klingt jetzt: oben Ding, unten Gong. Tippe weiter.");
+    say("Danke. Jetzt klingt dein Tippen. Oben Ding, unten Gong. Tippe einfach weiter.");
+  } else if (p === "check") {
+    setPrompt("Jetzt höre ich selbst hin. Tippe nur, wenn ich danebenliege.");
+    say("Jetzt höre ich selbst hin. Du musst nicht mehr tippen. Nur wenn ich danebenliege.");
+  } else if (p === "flat") {
+    LEARN.on = false; $("#dim").textContent = "Tippen zum Aufwecken";
+    setPrompt("Atme langsam flacher, so wie es von allein kommt.");
+    say("Atme jetzt langsam flacher. Ganz so, wie es von allein kommt.");
+  } else if (p === "flow") {
+    sess.layersOn = true;
+    setPrompt("Das Meer folgt dir. Es rauscht nur, solange Luft fließt.");
+    say("Jetzt kommt das Meer dazu. Es rauscht nur, solange Luft fließt.");
+  } else if (p === "blend") {
+    // the guide starts with your own rhythm and joins you where you are
+    const tops = sess.turns.filter((x) => x[1] === "top").map((x) => x[0]);
+    const med = (a) => { const b = [...a].sort((x, y) => x - y); return b[b.length >> 1]; };
+    const per = clamp(tops.length > 2 ? med(tops.slice(1).map((v, i) => v - tops[i])) : userPeriod() || 5, 2.5, 12);
+    const ins = [];
+    for (const [tt, k] of sess.turns) if (k === "top") { const b = sess.turns.filter((x) => x[1] === "bottom" && x[0] < tt).pop(); if (b) ins.push(tt - b[0]); }
+    const inD = clamp(ins.length ? med(ins) : per * 0.42, 1, per - 1);
+    sess.boxDur = [inD, 0, per - inD, 0]; sess.boxCycles = 0; sess.alpha = 0; sess.naturalRate = 60 / per;
+    const last = sess.turns[sess.turns.length - 1], t = now();
+    if (last && last[1] === "bottom") { B.i = 0; B.el = clamp(t - last[0], 0, inD * 0.9); }
+    else if (last) { B.i = 2; B.el = clamp(t - last[0], 0, (per - inD) * 0.9); }
+    else { B.i = 0; B.el = 0; }
+    setPrompt("Das Meer geht langsam voraus. Die Klangschale zeigt den Weg.");
+    say("Jetzt geht das Meer langsam voraus. Die Klangschale zeigt dir den Weg.");
+  } else if (p === "jb" && prevPhase === "blend") {
+    sess.jbStart = sess.boxDur.slice(); sess.boxCycles = 0;
+    sess.stage = "height"; sess.progH = 0; sess.progW = 0; sess.badRounds = 0;
+    setPrompt("Jetzt formt die Klangschale ganz langsam das Viereck.");
   } else if (p === "jb") {
     const up = clamp(userPeriod() || 5, 2.5, 12);
     const inD = clamp(userInhale() || up * 0.42, 1, up - 1);
@@ -1132,14 +1523,16 @@ function setPhase(p) {
   } else if (p === "realtime") {
     setPrompt("Hebt sich dein Brustkorb, wird der Ton heller. Senkt er sich, wird er tiefer.");
     say("Und ausatmen. Ab jetzt folgt der Ton deinem Brustkorb.");
+  } else if (p === "place" && S.mode === "jb") {
+    sess.cueIdx = 0; sess.cap = null; sess.inSum = [0, 0, 0]; sess.inN = 0; sess.flowEng = null;
+    setPrompt("Leg das Handy flach auf deine Brust und atme ganz in deinem Tempo.");
+    say("Leg das Handy flach auf deine Brust und atme ganz in deinem Tempo.");
   } else if (p === "place") {
     setPrompt("Handy flach auf die Brust legen und ruhig liegen.");
     say("Leg das Handy flach auf deine Brust und lieg ganz ruhig.");
     setTimeout(() => {
-      if (sess.phase === "place" && (sess.hasSensor || S.mode === "box" || S.mode === "jb"))
-        say(S.mode === "jb"
-          ? "Lass dich einfach fallen. Du musst nichts tun. Erst hörst du nur das Meer."
-          : S.mode === "box"
+      if (sess.phase === "place" && S.mode !== "jb" && (sess.hasSensor || S.mode === "box"))
+        say(S.mode === "box"
           ? "Gleich hörst du die Klangschale. Sie steigt beim Einatmen, bleibt stehen beim Halten und sinkt beim Ausatmen. Es gibt kein Richtig oder Falsch."
           : S.mode !== "lead"
           ? "Gleich atmest du aus und hältst kurz die Luft an. So lerne ich deine Ruhelage."
@@ -1187,18 +1580,26 @@ const BOX_SAY = ["Ein", "Halten", "Aus", "Halten"];
 // Corner i has just begun: 1 = arrived on top, 2 = leaving the top, 3 = arrived below, 0 = leaving the bottom.
 // A leaving marker only sounds when there was a real hold before it.
 function boxCorner() {
-  const d = sess.boxDur, jb = sess.phase === "jb";
-  if (B.i === 1) markTop();
-  else if (B.i === 2 && d[1] >= 0.5) markDescend();
-  else if (B.i === 3) markBottom();
-  else if (B.i === 0 && d[3] >= 0.5) markAscend();
+  const d = sess.boxDur, jb = sess.phase === "jb", blend = sess.phase === "blend";
+  if (!blend || sess.alpha >= 0.5) {
+    if (B.i === 1) markTop();
+    else if (B.i === 2 && d[1] >= 0.5) markDescend();
+    else if (B.i === 3) markBottom();
+    else if (B.i === 0 && d[3] >= 0.5) markAscend();
+  }
   B.ticks = 0;
   if (B.i === 0) {
     sess.boxCycles++;
     if (jb) jbProgress();
+    if (blend) {
+      // the sea moves from following you to leading you, a sixth per round you are with it
+      if (sess.boxCycles <= 2 || sess.match > 0.3) sess.alpha = Math.min(1, sess.alpha + 1 / 6);
+      logEvent("blend", { alpha: +sess.alpha.toFixed(2) });
+      if (sess.alpha >= 1) setPhase("jb");
+    }
   }
   // count along only for the first two rounds, and only when there is time to say it
-  if (!jb && sess.boxCycles <= 2 && d[B.i] >= 2) say(BOX_SAY[B.i]);
+  if (S.mode === "box" && sess.boxCycles <= 2 && d[B.i] >= 2) say(BOX_SAY[B.i]);
   logEvent("box", { i: B.i });
 }
 // Just Breathe builds the square in two steps, a little per round and only while you are with it:
@@ -1234,6 +1635,7 @@ function boxStep(dt) {
   if ((B.i === 1 || B.i === 3) && Math.floor(B.el) > B.ticks && B.el < d[B.i] - 0.4) { B.ticks = Math.floor(B.el); tickSound(); }
   const f = d[B.i] ? clamp(B.el / d[B.i], 0, 1) : 1;
   G.y = B.i === 0 ? -Math.cos(Math.PI * f) : B.i === 1 ? 1 : B.i === 2 ? Math.cos(Math.PI * f) : -1;
+  G.flow = B.i === 0 || B.i === 2 ? Math.sin(Math.PI * f) : 0;
 }
 
 function guideStep(dt, adapt) {
@@ -1271,7 +1673,8 @@ function tick() {
 
   if (ph === "place") {
     level = -0.6;
-    if (el > PLACE_SECONDS) setPhase(S.mode === "box" ? "box" : S.mode === "jb" ? (sess.hasSensor && sig.seen ? "arrive" : "jb") : !(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
+    if (S.mode === "jb") jbIntro(t, el);
+    else if (el > PLACE_SECONDS) setPhase(S.mode === "box" ? "box" : !(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
   } else if (ph === "hold") {
     if (el >= HOLD_SECONDS) { rtEndHold(); setPhase("deep"); }
   } else if (ph === "deep") {
@@ -1280,20 +1683,28 @@ function tick() {
     level = RT.q * 2 - 1;
     if (!sess.naturalRate && el > 40 && userPeriod()) sess.naturalRate = 60 / userPeriod();
     if (S.mode === "tiefe" && el > SETTLE_SECONDS && userPeriod()) setPhase("dive");
-  } else if (ph === "arrive") {
-    level = RT.q * 2 - 1;
-    // first only the sea follows you; after two minutes your own summits and valleys get their Ding and Gong
-    if (!sess.marks && el > ARRIVE_SEA_SECONDS) {
-      sess.marks = true;
-      setPrompt("Ding heißt oben, Gong heißt unten. Beides kommt von deinem eigenen Atem.");
-      say("Jetzt hörst du oben ein Ding und unten einen Gong.");
-    }
-    if (el > ARRIVE_SECONDS && (userPeriod() || el > ARRIVE_SECONDS + 40)) setPhase("jb");
+  } else if (["learn", "echo", "check", "flat", "flow"].includes(ph)) {
+    level = TD.hgt * 2 - 1;
+    if (ph === "learn" && ((el > 45 && LEARN.taps.length >= 8) || el > 120)) { fitDetector(); setPhase("echo"); }
+    else if (ph === "echo" && el > 25) setPhase("check");
+    else if (ph === "check" && el > 45) { fitDetector(); setPhase("flat"); }
+    else if (ph === "flat" && el > 60) setPhase("flow");
+    else if (ph === "flow" && el > 90 && (sess.turns.length >= 4 || el > 150)) setPhase("blend");
+  } else if (ph === "blend") {
+    boxStep(dt);
+    level = TD.hgt * 2 - 1; yForMatch = G.y;
   } else if (ph === "jb" || ph === "sleep") {
     boxStep(dt);
     level = RT.q * 2 - 1; yForMatch = ph === "jb" ? G.y : null;
     if (!sess.hrStart && t - sess.start > 60 && HB.bpm) sess.hrStart = HB.bpm;
     if (ph === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
+  } else if (ph === "sea" || ph === "seaLead") {
+    seaDirection(t, dt);
+    if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
+    const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
+    if (ph === "sea" && rested && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
+    if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
+    if (S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
   } else if (ph === "box") {
     boxStep(dt);
     level = RT.q * 2 - 1; yForMatch = G.y;
@@ -1334,16 +1745,18 @@ function tick() {
       sess.m.xx += (sig.x * sig.x - sess.m.xx) * al;
       sess.m.yy += (yd * yd - sess.m.yy) * al;
       sess.match = clamp(sess.m.xy / Math.sqrt(sess.m.xx * sess.m.yy + 1e-9), -1, 1);
-      if (["lead", "match", "dive", "box", "jb"].includes(ph) && t - sess.phaseStart > 20) {
+      if (["lead", "match", "dive", "box", "jb", "blend"].includes(ph) && t - sess.phaseStart > 20) {
         sess.matchSum += Math.max(0, sess.match); sess.matchN++;
         // persistently opposite? then the sign of the signal is flipped: fix it
         sess.flipBad = sess.match < -0.4 ? sess.flipBad + dt : 0;
-        if (sess.flipBad > (ph === "box" || ph === "jb" ? 6 : 12)) { sig.polarity = -sig.polarity; RT.init = false; sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 }; sess.flipBad = 0; resetDetector(); }
+        if (sess.flipBad > (ph === "box" || ph === "jb" ? 6 : 12)) { sig.polarity = -sig.polarity; RT.init = false; turnReset(); sess.m = { xy: 0, xx: 1e-6, yy: 1e-6 }; sess.flipBad = 0; resetDetector(); }
       }
     }
   }
   const shimmer = ph === "lead" && sess.hasSensor ? clamp((sess.match - 0.55) / 0.35, 0, 1) : 0;
-  if (ph === "hold" || ph === "deep") audioRealtime(0, false, null);
+  if (S.mode === "jb" && (ph === "sea" || ph === "seaLead" || ph === "sleep")) audioSea(dt);
+  else if (S.mode === "jb" && ph !== "place") audioJB(ph, dt);
+  else if (ph === "hold" || ph === "deep") audioRealtime(0, false, null);
   else if (["realtime", "dive", "box", "arrive", "jb", "sleep"].includes(ph)) {
     // while the phone settles or relearns, the chest sounds drift to a calm middle instead of jumping
     const ready = sess.hasSensor && sig.seen && !sig.disturbed && t >= sig.relearnUntil;
@@ -1351,10 +1764,13 @@ function tick() {
     audioRealtime(sess.qOut, ready, ["dive", "box", "jb"].includes(ph) ? G.y : null);
   } else audioUpdate(level, shimmer);
 
-  const chestPhase = ["realtime", "dive", "box", "arrive", "jb", "sleep"].includes(ph);
+  const jbPhase = S.mode === "jb" && ph !== "place";
+  if (jbPhase && (ph === "jb" || ph === "sleep")) level = TD.hgt * 2 - 1;
+  if (sess.flowEng && (ph === "sea" || ph === "seaLead" || ph === "sleep")) level = sess.flowEng.u * 2 - 1;
+  const chestPhase = jbPhase || ["realtime", "dive", "box"].includes(ph);
   const xNow = chestPhase ? (sig.disturbed || t < sig.relearnUntil ? null : level) : (ph === "hold" || ph === "deep" ? null : sig.x);
-  const guided = ["calib", "lead", "match", "dive", "box", "jb"].includes(ph);
-  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: guided ? G.y : null });
+  const guided = ["calib", "lead", "match", "dive", "box", "jb", "blend"].includes(ph);
+  sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: ph === "seaLead" ? SP.y : guided ? G.y : null });
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
   if (S.mode !== "jb" && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
@@ -1363,7 +1779,7 @@ function tick() {
 
 function delayedGuide() {
   // your trace lags by the filter; when following the guide you also lag by reaction time
-  const h = sess.history, target = now() - (["lead", "dive", "box", "jb"].includes(sess.phase) ? LAG + 0.4 : LAG);
+  const h = sess.history, target = now() - (["lead", "dive", "box", "jb", "blend"].includes(sess.phase) ? LAG + 0.4 : LAG);
   for (let i = h.length - 1; i >= 0; i--) if (h[i].t <= target) return h[i].y;
   return null;
 }
@@ -1376,13 +1792,22 @@ function updateReadouts() {
   const tiefe = ["tiefe", "box", "jb"].includes(S.mode) && sess.phase !== "idle";
   const boxm = S.mode === "box" || S.mode === "jb";
   const guiding = ["lead", "calib", "match", "dive"].includes(sess.phase);
-  $("#guideLabel").textContent = real ? "Puls" : S.mode === "jb" ? "Rhythmus" : boxm ? "Viereck" : "Lotse";
+  const tapping = S.mode === "jb" && TAP_PHASES.includes(sess.phase);
+  $("#guideLabel").textContent = real ? "Puls" : tapping ? "Tipps" : S.mode === "jb" ? "Rhythmus" : boxm ? "Viereck" : "Lotse";
   $("#guideNote").textContent = real ? "Schläge/min" : boxm ? "Sekunden" : "Atemzüge/min";
   $("#syncLabel").textContent = real ? "Brustkorb" : tiefe ? "Puls" : "Synchron";
   $("#syncNote").textContent = real ? "0 % = Ruhelage" : tiefe ? "Schläge/min" : "mit dem Klang";
-  if (boxm) {
+  if (S.mode === "jb" && (sess.flowEng || sess.phase === "place") && sess.phase !== "idle") {
+    const bp = btPeriods(4);
+    if (bp.length >= 2) $("#youRate").textContent = (60 / median(bp)).toFixed(1);
+    const leading = sess.phase === "seaLead";
+    $("#guideLabel").textContent = leading ? "Meer" : "Puls"; $("#guideNote").textContent = leading ? "Atemzüge/min" : "Schläge/min";
+    $("#guideRate").textContent = leading ? (60 / SP.P).toFixed(1) : HB.bpm ? "~" + Math.round(HB.bpm) : "–";
+    $("#syncLabel").textContent = leading ? "Synchron" : "Luft"; $("#syncNote").textContent = leading ? "mit dem Meer" : "fließt gerade";
+    $("#sync").textContent = leading ? Math.round(Math.max(0, SP.sync) * 100) + "%" : sess.flowEng ? Math.round(clamp(Math.abs(sess.flowEng.flow), 0, 1) * 100) + "%" : "–";
+  } else if (boxm) {
     const pat = sess.phase === "idle" || !sess.boxDur ? readBox(S.mode === "jb" ? JB_IDS : BOX_IDS) : sess.phase === "arrive" || sess.phase === "place" ? null : sess.boxDur;
-    $("#guideRate").textContent = pat ? pat.map((v) => Math.round(v)).join("·") : "–";
+    $("#guideRate").textContent = tapping ? String(LEARN.taps.length) : pat && ["blend", "jb", "sleep", "idle"].includes(sess.phase) ? pat.map((v) => Math.round(v)).join("·") : "–";
     if (tiefe) $("#sync").textContent = HB.bpm ? "~" + Math.round(HB.bpm) : "–";
     else { $("#syncLabel").textContent = "Puls"; $("#syncNote").textContent = "Schläge/min"; $("#sync").textContent = "–"; }
   } else if (tiefe) {
@@ -1445,9 +1870,10 @@ function draw() {
   }
   // phase word in the middle
   let word = "";
-  if (!idle && (sess.phase === "box" || sess.phase === "jb")) word = BOX_WORDS[B.i];
-  else if (!idle && sess.phase === "arrive" && TD.st) word = TD.st === 1 || TD.st === 2 ? "ein" : "aus";
+  if (!idle && (sess.phase === "box" || sess.phase === "jb" || sess.phase === "blend")) word = BOX_WORDS[B.i];
+  else if (!idle && ["learn", "echo", "check", "flat", "flow"].includes(sess.phase) && TD.st) word = TD.st === 1 || TD.st === 2 ? "ein" : "aus";
   else if (!idle && sess.phase === "sleep") word = "";
+  else if (!idle && sess.phase === "seaLead") word = SP.ph < SP.rIn ? "ein" : "aus";
   else if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
   else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
   if (word) {
@@ -1515,6 +1941,9 @@ async function start(ev) {
   sess.hasSensor = "DeviceMotionEvent" in window;
   sess.start = now(); sess.lastTick = now(); sess.history = [];
   sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0; sess.qOut = 0.3; sess.boxDur = S.box.slice(); sess.jbStart = null; sess.polPrior = false;
+  sess.turns = []; sess.alpha = 0; sess.layersOn = false; sess.flowOut = 0; sess.fit = null;
+  btReset(); SP.a = 0; SP.aOut = 0; sess.seaBackAt = null;
+  LEARN.on = false; LEARN.buf = []; LEARN.taps = []; turnReset();
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
   setPhase("place");
@@ -1553,6 +1982,11 @@ function finish(natural) {
     rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => v.toFixed(1).replace(".0", "")).join(" · ") + " s"]);
     rows.push(["Viereck", "Höhe " + Math.round(sess.progH * 100) + " %, Breite " + Math.round(sess.progW * 100) + " %"]);
   }
+  if (S.mode === "jb" && SP.a > 0) {
+    rows.push(["Meer zuletzt", (60 / SP.P).toFixed(1).replace(".", ",") + " Atemzüge/min" + (SP.arrived ? " (Ziel erreicht)" : "")]);
+    rows.push(["Synchron mit dem Meer", Math.round(Math.max(0, SP.sync) * 100) + " %"]);
+  }
+  if (S.mode === "jb" && sess.fit) rows.push(["Gelernt aus Tipps", sess.fit.taps + " Tipps, " + sess.fit.hits + " getroffen (Ø " + sess.fit.err.toFixed(1).replace(".", ",") + " s)"]);
   if (wasSleep) rows.push(["Klänge ausgeblendet nach", S.sleepFade + " min"]);
   if (S.mode === "jb" && S.snore) rows.push(["Schnarch-Geräusche", MIC.events + " Mal"]);
   const moves = LOG.events.filter((e) => e[1] === "moved").length;
@@ -1572,7 +2006,12 @@ $("#stopBtn").addEventListener("click", () => finish(false));
 $("#saveLog").addEventListener("click", saveLog);
 $("#shareLog").addEventListener("click", shareLog);
 $("#dimBtn").addEventListener("click", () => { $("#dim").hidden = false; });
-$("#dim").addEventListener("click", () => { $("#dim").hidden = true; });
+const TAP_PHASES = ["learn", "echo", "check"];
+document.addEventListener("pointerdown", (e) => {
+  if (!TAP_PHASES.includes(sess.phase) || e.target.closest("button")) return;
+  onTap(now());
+});
+$("#dim").addEventListener("click", () => { if (!TAP_PHASES.includes(sess.phase)) $("#dim").hidden = true; });
 function fillVoices() {
   if (!("speechSynthesis" in window)) return;
   const sel = $("#voiceSel");
