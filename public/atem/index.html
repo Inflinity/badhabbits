@@ -330,7 +330,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <button type="button" class="ghost" id="voiceTest">Probe</button>
       </div>
     </div>
-    <p class="hint"><b>Just Breathe</b>: Lass dich fallen. Erst folgt dir die Klangschale, dann bringt sie dich Runde für Runde sanft zu deinem Ziel-Rhythmus und blendet zum Einschlafen aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
+    <p class="hint"><b>Just Breathe</b>: Lass dich fallen. Erst folgt dir der Klang (Ding oben, Gong unten). Dann übernimmt die Klangschale dein Auf und Ab und formt Runde für Runde zuerst die Höhe, danach die Breite des Vierecks; leise Ticks zählen das Halten. Zum Einschlafen blendet sie aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
   </form>
 
@@ -349,7 +349,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v8 · 22.10. 02:00";
+const VERSION = "v9 · 22.10. 09:00";
 const S = { jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "jb", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse7") || "{}")); } catch (e) {}
 if (!["jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "jb";
@@ -538,10 +538,10 @@ function rtSample(t, moving) {
       sess.polPrior = true; sig.polarity = sig.u[1] >= 0 ? 1 : -1;
     }
     const p = dot(sig.g2, sig.u) * sig.polarity;
-    if (!RT.init) { RT.lo = p; RT.hi = p + 1e-3; RT.init = true; }
+    if (!RT.init || now() < sig.relearnUntil - 8) { RT.lo = p; RT.hi = p + 1e-3; RT.init = true; }
     if (!moving) {
-      if (p < RT.lo) RT.lo = p; else RT.lo += (p - RT.lo) * (0.05 / 60);
-      if (p > RT.hi) RT.hi = p; else RT.hi += (p - RT.hi) * (0.05 / 120);
+      if (p < RT.lo) RT.lo = p; else RT.lo += (p - RT.lo) * (0.05 / 45);
+      if (p > RT.hi) RT.hi = p; else RT.hi += (p - RT.hi) * (0.05 / 45);
     }
     RT.q = clamp((p - RT.lo) / Math.max(RT.hi - RT.lo, 0.01), 0, 1);
   } else if ((ph === "realtime" || ph === "dive") && RT.dir) {
@@ -971,6 +971,39 @@ function heartSound() {
     o.connect(g).connect(A.master); o.start(t + dt); o.stop(t + dt + 0.3);
   }
 }
+// The four corners of the square, each with its own voice, plus a quiet tick that counts the hold.
+function strike(freq, vol, decay, partials, bend) {
+  if (!A.ctx || !S.chimes) return;
+  const ctx = A.ctx, t = ctx.currentTime;
+  for (const [mult, pv, pd] of partials) {
+    for (const off of [0, 0.6]) {
+      const o = ctx.createOscillator(); o.type = "sine";
+      const f = freq * mult + off;
+      o.frequency.setValueAtTime(f * (bend || 1), t); o.frequency.exponentialRampToValueAtTime(f, t + 0.4);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime((vol * pv) / 2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay * pd);
+      o.connect(g).connect(A.master); o.start(t); o.stop(t + decay * pd + 0.1);
+    }
+  }
+}
+const BOWL_PARTS = [[1, 1, 1], [2.71, 0.3, 0.5], [5.15, 0.1, 0.25]];
+const GONG_PARTS = [[1, 1, 1], [1.48, 0.45, 0.7], [2.02, 0.3, 0.5], [2.74, 0.12, 0.3]];
+const markTop = () => strike(BOWL_HZ * 2, 0.045, 5, BOWL_PARTS);           // Ding: summit
+const markDescend = () => strike(BOWL_HZ * 1.5, 0.025, 4, BOWL_PARTS);     // ding: on the way down
+const markBottom = () => strike(BOWL_HZ / 2, 0.08, 8, GONG_PARTS, 1.012);  // Gong: arrived in the valley
+const markAscend = () => strike(BOWL_HZ * 0.75, 0.04, 6, GONG_PARTS);      // gong: on the way up
+function tickSound() {
+  if (!A.ctx || !S.chimes) return;
+  const ctx = A.ctx, t = ctx.currentTime;
+  const n = ctx.createBufferSource(), buf = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.03), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.004));
+  n.buffer = buf;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2200; bp.Q.value = 4;
+  const g = ctx.createGain(); g.gain.value = 0.05;
+  n.connect(bp).connect(g).connect(A.master); n.start(t);
+}
 function chime(freq) {
   // a softly struck singing bowl
   if (!A.ctx || !S.chimes) return;
@@ -1022,19 +1055,21 @@ function setPhase(p) {
   logEvent("phase", { to: p });
   if (p === "arrive") {
     sig.relearnUntil = Math.max(sig.relearnUntil, now() + 20);
-    setPrompt("Lass dich fallen. Du musst nichts tun.");
+    sess.rx = { dir: 1, ext: 0 };
+    setPrompt("Matchen: Der Klang folgt dir. Ding heißt oben, Gong heißt unten.");
   } else if (p === "jb") {
     const up = clamp(userPeriod() || 5, 2.5, 12);
     const inD = clamp(userInhale() || up * 0.42, 1, up - 1);
-    sess.jbStart = [inD, 0, up - inD, 0]; sess.jbProg = 0; sess.boxDur = sess.jbStart.slice(); sess.boxCycles = 0;
+    sess.jbStart = [inD, 0, up - inD, 0]; sess.boxDur = sess.jbStart.slice(); sess.boxCycles = 0;
+    sess.stage = "height"; sess.progH = 0; sess.progW = 0; sess.badRounds = 0;
     sess.naturalRate = 60 / up;
     // join the breath where it is right now
     const t = now(), lastTr = det.troughs[det.troughs.length - 1], lastPk = det.peaks[det.peaks.length - 1];
     if (det.dir > 0 && lastTr) { B.i = 0; B.el = clamp(t - lastTr, 0, inD * 0.9); }
     else if (lastPk) { B.i = 2; B.el = clamp(t - lastPk, 0, (up - inD) * 0.9); }
     else { B.i = 0; B.el = 0; }
-    setPrompt("Die Klangschale atmet mit dir. Lass dich tragen.");
-    say("Die Klangschale atmet jetzt mit dir. Lass dich von ihr tragen.");
+    setPrompt("Die Klangschale übernimmt dein Auf und Ab. Ding oben, Gong unten.");
+    say("Die Klangschale übernimmt jetzt dein Auf und Ab. Lass dich von ihr tragen.");
   } else if (p === "sleep") {
     audioFade(0, 180);
     setPrompt("Schlaf gut. Die Aufzeichnung läuft weiter.");
@@ -1060,7 +1095,7 @@ function setPhase(p) {
     setTimeout(() => {
       if (sess.phase === "place" && (sess.hasSensor || S.mode === "box" || S.mode === "jb"))
         say(S.mode === "jb"
-          ? "Lass dich einfach fallen. Du musst nichts tun. Die Klangschale findet dich."
+          ? "Lass dich einfach fallen. Du musst nichts tun. Oben klingt ein Ding, unten ein Gong."
           : S.mode === "box"
           ? "Gleich hörst du die Klangschale. Sie steigt beim Einatmen, bleibt stehen beim Halten und sinkt beim Ausatmen. Es gibt kein Richtig oder Falsch."
           : S.mode !== "lead"
@@ -1103,29 +1138,46 @@ function setPhase(p) {
   }
 }
 
-const B = { i: 0, el: 0 };
+const B = { i: 0, el: 0, ticks: 0 };
 const BOX_WORDS = ["ein", "halten", "aus", "halten"];
 const BOX_SAY = ["Ein", "Halten", "Aus", "Halten"];
-const BOX_PITCH = [1, 1.5, 1.26, 0.75];
+// Corner i has just begun: 1 = arrived on top, 2 = leaving the top, 3 = arrived below, 0 = leaving the bottom.
+// A leaving marker only sounds when there was a real hold before it.
 function boxCorner() {
-  const jb = sess.phase === "jb";
-  if (!jb || B.i === 0) chime(BOWL_HZ * BOX_PITCH[B.i]);
+  const d = sess.boxDur, jb = sess.phase === "jb";
+  if (B.i === 1) markTop();
+  else if (B.i === 2 && d[1] >= 0.5) markDescend();
+  else if (B.i === 3) markBottom();
+  else if (B.i === 0 && d[3] >= 0.5) markAscend();
+  B.ticks = 0;
   if (B.i === 0) {
     sess.boxCycles++;
     if (jb) jbProgress();
   }
   // count along only for the first two rounds, and only when there is time to say it
-  if (!jb && sess.boxCycles <= 2 && sess.boxDur[B.i] >= 2) say(BOX_SAY[B.i]);
+  if (!jb && sess.boxCycles <= 2 && d[B.i] >= 2) say(BOX_SAY[B.i]);
   logEvent("box", { i: B.i });
 }
-// Just Breathe: start from your own in/out, then move a twelfth of the way per round
-// toward the target, and only while you are roughly with it. Nothing ever speeds up on you.
+// Just Breathe builds the square in two steps, a little per round and only while you are with it:
+// first its height (in and out move from your own timing to the target), then its width (the holds grow).
+// Rounds you are not with it make it ease back a step. Nothing ever speeds up on you.
+const sm = (k) => k * k * (3 - 2 * k);
 function jbProgress() {
-  const following = !sess.hasSensor || sess.boxCycles <= 3 || sess.match > 0.3;
-  if (following) sess.jbProg = Math.min(1, sess.jbProg + 1 / 12);
-  const k = sess.jbProg * sess.jbProg * (3 - 2 * sess.jbProg);
-  sess.boxDur = sess.jbStart.map((a, i) => a + (S.jb[i] - a) * k);
-  logEvent("jb", { prog: +sess.jbProg.toFixed(2), dur: sess.boxDur.map((v) => +v.toFixed(2)) });
+  const following = !sess.hasSensor || sess.boxCycles <= 2 || sess.match > 0.3;
+  sess.badRounds = following ? 0 : sess.badRounds + 1;
+  const ease = sess.badRounds >= 3;
+  if (ease) sess.badRounds = 0;
+  if (sess.stage === "height") {
+    if (following) sess.progH = Math.min(1, sess.progH + 1 / 6);
+    if (sess.progH >= 1) { sess.stage = "width"; setPrompt("Jetzt wird das Viereck breiter. Die leisen Ticks zählen das Halten."); say("Jetzt wird das Viereck breiter. Die leisen Ticks zählen das Halten."); }
+  } else if (sess.stage === "width") {
+    if (following) sess.progW = Math.min(1, sess.progW + 1 / 8);
+    else if (ease) sess.progW = Math.max(0, sess.progW - 1 / 8);
+    if (sess.progW >= 1) { sess.stage = "square"; setPrompt("Ding · halten · ding · Gong · halten · gong. Male das Viereck."); }
+  }
+  const kh = sm(sess.progH), kw = sm(sess.progW), T = S.jb, st = sess.jbStart;
+  sess.boxDur = [st[0] + (T[0] - st[0]) * kh, T[1] * kw, st[2] + (T[2] - st[2]) * kh, T[3] * kw];
+  logEvent("jb", { stage: sess.stage, h: +sess.progH.toFixed(2), w: +sess.progW.toFixed(2), dur: sess.boxDur.map((v) => +v.toFixed(2)) });
 }
 function boxStep(dt) {
   const d = sess.boxDur;
@@ -1133,8 +1185,10 @@ function boxStep(dt) {
   for (let guard = 0; guard < 4 && B.el >= d[B.i]; guard++) {
     B.el -= d[B.i];
     B.i = (B.i + 1) % 4;
-    if (d[B.i] > 0) boxCorner();
+    boxCorner();
   }
+  // a tick for every full second of a hold, but not right before it ends
+  if ((B.i === 1 || B.i === 3) && Math.floor(B.el) > B.ticks && B.el < d[B.i] - 0.4) { B.ticks = Math.floor(B.el); tickSound(); }
   const f = d[B.i] ? clamp(B.el / d[B.i], 0, 1) : 1;
   G.y = B.i === 0 ? -Math.cos(Math.PI * f) : B.i === 1 ? 1 : B.i === 2 ? Math.cos(Math.PI * f) : -1;
 }
@@ -1185,7 +1239,13 @@ function tick() {
     if (S.mode === "tiefe" && el > SETTLE_SECONDS && userPeriod()) setPhase("dive");
   } else if (ph === "arrive") {
     level = RT.q * 2 - 1;
-    if (el > 40 && (userPeriod() || el > 75)) setPhase("jb");
+    // matching: the summit and valley markers come from your own breath
+    if (sess.hasSensor && !sig.disturbed && t >= sig.relearnUntil) {
+      const r = sess.rx, q = RT.q;
+      if (r.dir > 0) { if (q > r.ext) r.ext = q; else if (q < r.ext - 0.15) { r.dir = -1; r.ext = q; markTop(); } }
+      else { if (q < r.ext) r.ext = q; else if (q > r.ext + 0.15) { r.dir = 1; r.ext = q; markBottom(); } }
+    }
+    if (el > 45 && (userPeriod() || el > 80)) setPhase("jb");
   } else if (ph === "jb" || ph === "sleep") {
     boxStep(dt);
     level = RT.q * 2 - 1; yForMatch = ph === "jb" ? G.y : null;
@@ -1343,6 +1403,7 @@ function draw() {
   // phase word in the middle
   let word = "";
   if (!idle && (sess.phase === "box" || sess.phase === "jb")) word = BOX_WORDS[B.i];
+  else if (!idle && sess.phase === "arrive" && sess.rx && sig.relearnUntil < now()) word = sess.rx.dir > 0 ? "ein" : "aus";
   else if (!idle && sess.phase === "sleep") word = "";
   else if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
   else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
@@ -1445,7 +1506,10 @@ function finish(natural) {
   if (up) rows.push(["Atem am Ende", (60 / up).toFixed(1) + " /min"]);
   if (sess.hrStart && HB.bpm) rows.push(["Puls Anfang → Ende", "~" + Math.round(sess.hrStart) + " → ~" + Math.round(HB.bpm) + " /min"]);
   if (S.mode === "box") rows.push(["Viereck", S.box.join(" · ") + " s, " + (sess.boxCycles || 0) + " Runden"]);
-  if (S.mode === "jb" && sess.jbStart) rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => Math.round(v)).join(" · ") + " s (" + Math.round((sess.jbProg || 0) * 100) + " % am Ziel)"]);
+  if (S.mode === "jb" && sess.jbStart) {
+    rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => v.toFixed(1).replace(".0", "")).join(" · ") + " s"]);
+    rows.push(["Viereck", "Höhe " + Math.round(sess.progH * 100) + " %, Breite " + Math.round(sess.progW * 100) + " %"]);
+  }
   if (wasSleep) rows.push(["Klänge ausgeblendet nach", S.sleepFade + " min"]);
   if (S.mode === "jb" && S.snore) rows.push(["Schnarch-Geräusche", MIC.events + " Mal"]);
   const moves = LOG.events.filter((e) => e[1] === "moved").length;
