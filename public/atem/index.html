@@ -157,6 +157,12 @@ input[type=range] { width: 100%; accent-color: var(--guide); }
   border: 1px solid var(--line);
   border-radius: 10px;
 }
+#samBuilder { display: flex; flex-direction: column; gap: 8px; }
+#samBuilder summary { cursor: pointer; color: var(--guide); font-size: 0.92rem; padding-block: 6px; }
+#samBuilder[open] { display: flex; }
+#samSrc { font: 400 0.8rem/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
+#samReport { white-space: pre-wrap; margin: 0; }
+#journeyHint { white-space: pre-line; }
 textarea {
   font: 400 0.95rem/1.4 var(--body);
   color: var(--fg);
@@ -291,6 +297,20 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <input type="radio" name="journey" id="jTank" value="tank"><label for="jTank">Tank</label>
       </div>
       <p class="hint" id="journeyHint"></p>
+      <details id="samBuilder">
+        <summary>Samsara: eigene Reise schreiben, einfügen, teilen</summary>
+        <textarea id="samSrc" rows="14" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="actions">
+          <button type="button" class="ghost" id="samTemplate">Vorlage</button>
+          <button type="button" class="ghost" id="samCheck">Prüfen</button>
+          <button type="button" class="ghost" id="samSave">Speichern</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="samShare">Als Link teilen</button>
+          <button type="button" class="ghost" id="samDelete">Löschen</button>
+        </div>
+        <pre class="hint" id="samReport"></pre>
+      </details>
       <span>Grundton der binauralen Beats</span>
       <div class="seg">
         <input type="radio" name="carrier" id="c136" value="136.1" checked><label for="c136">tief 136 Hz</label>
@@ -376,6 +396,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
 
   <div class="actions" id="running" hidden>
     <button type="button" class="ghost" id="dimBtn">Abdunkeln</button>
+    <button type="button" class="ghost" id="pauseBtn" hidden>Pause</button>
     <button type="button" id="stopBtn">Beenden</button>
   </div>
 
@@ -389,7 +410,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v15 · 23.10. 02:30 · Portal";
+const VERSION = "v16 · 23.10. 04:00 · Samsara";
 const S = { journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
@@ -415,9 +436,13 @@ function updateFields() {
   $("#portalField").hidden = mode !== "portal";
   $("#durField").hidden = mode === "jb" || mode === "portal";
   $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead" || mode === "jb");
-  const j = document.querySelector("input[name=journey]:checked").value;
+  const jEl = document.querySelector("input[name=journey]:checked"), j = jEl ? jEl.value : "sleep";
   $("#lucidField").hidden = j !== "lucid";
-  $("#journeyHint").textContent = JOURNEY_HINT[j];
+  let hint = JOURNEY_HINT[j] || "";
+  if (j.startsWith("s:")) {
+    try { const f = samFind(j), v = f && samValidate(f.src); hint = v && v.ok ? (v.journey.über ? v.journey.über + "\n\n" : "") + samOutline(v.journey) : "Diese Reise ist fehlerhaft."; } catch (e) { hint = ""; }
+  }
+  $("#journeyHint").textContent = hint;
 }
 function applySettingsToForm() {
   $("#target").value = S.target; $("#targetOut").textContent = S.target;
@@ -449,7 +474,8 @@ function readForm() {
   S.minutes = parseFloat(document.querySelector("input[name=minutes]:checked").value);
   S.tone = $("#lTone").checked; S.sea = $("#lSea").checked; S.bowl = $("#lBowl").checked; S.heart = $("#lHeart").checked;
   S.voiceName = $("#voiceSel").value;
-  S.journey = document.querySelector("input[name=journey]:checked").value;
+  const jEl = document.querySelector("input[name=journey]:checked");
+  S.journey = jEl ? jEl.value : "sleep";
   S.carrier = parseFloat(document.querySelector("input[name=carrier]:checked").value);
   S.lucidH = parseFloat(document.querySelector("input[name=lucidH]:checked").value);
   S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
@@ -507,6 +533,7 @@ function onMotion(e) {
   sig.seen = true;
   const t = now();
   let g = [a.x, a.y, a.z];
+  if (sig.init && t < (sess.hapticUntil || 0)) g = sig.g1.slice();
   // a tap on the screen is a short jolt: carry the smooth value through it so it is neither
   // a breath nor a moved phone. A jolt that lasts longer than 0.4 s is a real move and passes.
   if (sig.init) {
@@ -535,7 +562,8 @@ function onMotion(e) {
     sig.gRef = sig.gRef.map((c, i) => c + (sig.g2[i] - c) * Math.min(1, dt / (sig.disturbed ? 2 : 20)));
   } else sig.gRef = sig.g2.slice();
   const r = e.rotationRate;
-  if (r && r.alpha != null) { sig.rot[0] += r.alpha; sig.rot[1] += r.beta; sig.rot[2] += r.gamma; sig.rotN++; }
+  const buzzing = t < (sess.hapticUntil || 0);
+  if (r && r.alpha != null && !buzzing) { sig.rot[0] += r.alpha; sig.rot[1] += r.beta; sig.rot[2] += r.gamma; sig.rotN++; }
   for (let i = 0; i < 3; i++) {
     sig.acc[i] += g[i];
     sig.g1[i] += (g[i] - sig.g1[i]) * Math.min(1, dt / 0.25);
@@ -556,7 +584,8 @@ function sample(t, moving) {
   moving = moving || sig.disturbed;
   // 20 Hz box averages of the raw readings (for the heartbeat band and the log)
   const gAvg = sig.accN ? sig.acc.map((c) => c / sig.accN) : sig.g2.slice();
-  const rAvg = sig.rotN ? sig.rot.map((c) => c / sig.rotN) : [0, 0, 0];
+  const rAvg = sig.rotN ? sig.rot.map((c) => c / sig.rotN) : (sig.lastR || [0, 0, 0]);
+  sig.lastR = rAvg;
   sig.acc = [0, 0, 0]; sig.accN = 0; sig.rot = [0, 0, 0]; sig.rotN = 0;
   const v = sig.lp2;
   if (!moving) {
@@ -879,6 +908,238 @@ function heartEstimate() {
   }
 }
 
+/* ================= Samsara =================
+   The engine behind written journeys. A journey is a list of steps; each says what the sea does
+   (follow you, lead you, or rest), in which pattern (in, hold, out, hold), for how long (breaths,
+   seconds, or until something is true), and what else sounds, is said, or is felt.
+   Leading steps only count the breaths you actually take with the sea. If you do not go along,
+   the sea goes back to following you and the step picks up again later.
+   Guardrails no journey can switch off: patterns are clamped, fast breathing is limited in time,
+   a racing pulse stops the leading, and a tap on the screen always pauses. */
+const SAM_LIMIT = { phase: [1, 20], holdTop: 20, holdBottom: 15, rapidPeriod: 4, rapidStep: 30, rapidTotal: 90, stepMax: 1200 };
+const SAM_BUILTIN = [
+  { id: "vortex", src: {
+    titel: "Vortex im Regelkreis",
+    von: "Atemlotse",
+    über: "Die Vortex-Folge von 13 · 13 bis 1 · 1, aber im Regelkreis: jede Stufe zählt nur Atemzüge, die du wirklich mit dem Meer gehst. Im Liegen, nicht im Wasser, nicht beim Fahren.",
+    ende: "ausklingen",
+    schritte: [
+      { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 45, sagen: "Leg dich bequem hin. Erst folgt das Meer dir." },
+      { name: "13 · 13", meer: "führen", muster: [13, 0, 13, 0], atemzüge: 2, übergang: 2, frequenz: [10, 9], sagen: "Jetzt führt das Meer. Ganz langsam. Dreizehn ein, dreizehn aus." },
+      { name: "8 · 8", meer: "führen", muster: [8, 0, 8, 0], atemzüge: 3, übergang: 1, frequenz: [9, 8] },
+      { name: "5 · 5", meer: "führen", muster: [5, 0, 5, 0], atemzüge: 4, übergang: 1, frequenz: [8, 7] },
+      { name: "3 · 3", meer: "führen", muster: [3, 0, 3, 0], atemzüge: 5, übergang: 1, frequenz: [7, 6] },
+      { name: "2 · 2", meer: "führen", muster: [2, 0, 2, 0], atemzüge: 6, übergang: 1, frequenz: [6, 6] },
+      { name: "1 · 1", meer: "führen", muster: [1, 0, 1, 0], sekunden: 20, übergang: 1, frequenz: [6, 5], sagen: "Schnell und leicht." },
+      { name: "Nachspüren", meer: "folgen", sekunden: 120, lautstärke: 0.6, frequenz: [5, 4], herz: "hören", sagen: "Lass los. Spür nach." },
+    ],
+  } },
+];
+const SAM_TEMPLATE = JSON.stringify(SAM_BUILTIN[0].src, null, 2);
+
+// Reads a journey, fixes what it can (and says so), refuses what it cannot.
+function samValidate(text) {
+  const errors = [], warnings = [];
+  let j;
+  try { j = typeof text === "string" ? JSON.parse(text) : text; } catch (e) { return { ok: false, errors: ["Kein gültiges JSON: " + e.message], warnings }; }
+  if (!j || typeof j !== "object") return { ok: false, errors: ["Eine Reise ist ein Objekt mit „titel“ und „schritte“."], warnings };
+  const str = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
+  const num = (v, lo, hi, name) => {
+    if (typeof v !== "number" || !isFinite(v)) return null;
+    const c = clamp(v, lo, hi);
+    if (c !== v) warnings.push(`${name}: ${v} → ${c} (erlaubt ${lo} bis ${hi})`);
+    return c;
+  };
+  const out = { titel: str(j.titel, 60), von: str(j.von, 60), über: str(j.über, 400), ende: j.ende === "bleiben" ? "bleiben" : "ausklingen", schritte: [] };
+  if (!out.titel) errors.push("„titel“ fehlt.");
+  if (!Array.isArray(j.schritte) || !j.schritte.length) errors.push("„schritte“ fehlt oder ist leer.");
+  else if (j.schritte.length > 60) errors.push("Höchstens 60 Schritte.");
+  (Array.isArray(j.schritte) ? j.schritte.slice(0, 60) : []).forEach((s, i) => {
+    const n = `Schritt ${i + 1}`;
+    if (!s || typeof s !== "object") { errors.push(`${n} ist kein Objekt.`); return; }
+    const st = { name: str(s.name, 40) || n, meer: ["folgen", "führen", "aus"].includes(s.meer) ? s.meer : "folgen" };
+    if (s.meer && st.meer !== s.meer) warnings.push(`${n}: meer „${s.meer}“ unbekannt, nehme „folgen“.`);
+    if (st.meer === "führen") {
+      const m = Array.isArray(s.muster) ? s.muster : null;
+      if (!m || m.length !== 4 || m.some((v) => typeof v !== "number")) { errors.push(`${n}: „führen“ braucht ein „muster“ mit vier Zahlen [ein, halten, aus, halten].`); return; }
+      const [lo, hi] = SAM_LIMIT.phase;
+      st.muster = [num(m[0], lo, hi, `${n} ein`), num(m[1], 0, SAM_LIMIT.holdTop, `${n} halten oben`), num(m[2], lo, hi, `${n} aus`), num(m[3], 0, SAM_LIMIT.holdBottom, `${n} halten unten`)];
+      if (st.muster[0] + st.muster[2] < SAM_LIMIT.rapidPeriod) {
+        if (st.muster[1] + st.muster[3] > 0) { st.muster[1] = st.muster[3] = 0; warnings.push(`${n}: bei schnellem Atmen kein Halten.`); }
+        warnings.push(`${n}: schnelles Atmen, höchstens ${SAM_LIMIT.rapidStep} s am Stück und ${SAM_LIMIT.rapidTotal} s pro Reise.`);
+      }
+    }
+    if (s.atemzüge != null) st.atemzüge = num(s.atemzüge, 1, 200, `${n} atemzüge`);
+    if (s.sekunden != null) st.sekunden = num(s.sekunden, 5, 7200, `${n} sekunden`);
+    if (s.mindestens != null) st.mindestens = num(s.mindestens, 0, 3600, `${n} mindestens`);
+    if (s.bis && typeof s.bis === "object") {
+      st.bis = {};
+      if (s.bis.gleichmäßig) st.bis.gleichmäßig = true;
+      if (s.bis.synchron != null) st.bis.synchron = num(s.bis.synchron, 0.3, 0.95, `${n} bis synchron`);
+      if (s.bis.stille != null) st.bis.stille = num(s.bis.stille, 10, 1800, `${n} bis stille`);
+      if (s.bis.puls_unter != null) st.bis.puls_unter = num(s.bis.puls_unter, 40, 120, `${n} bis puls_unter`);
+    }
+    if (!st.atemzüge && !st.sekunden && !st.bis) st[st.meer === "führen" ? "atemzüge" : "sekunden"] = st.meer === "führen" ? 5 : 60;
+    if (s.sagen) st.sagen = str(s.sagen, 300);
+    if (s.frequenz != null) {
+      const f = Array.isArray(s.frequenz) ? s.frequenz : [s.frequenz, s.frequenz];
+      st.frequenz = [num(f[0], 1, 40, `${n} frequenz`) ?? 10, num(f[1] ?? f[0], 1, 40, `${n} frequenz`) ?? 10];
+      st.frequenz_lautstärke = s.frequenz_lautstärke != null ? num(s.frequenz_lautstärke, 0, 1, `${n} frequenz_lautstärke`) : 0.6;
+    }
+    st.lautstärke = s.lautstärke != null ? num(s.lautstärke, 0, 1, `${n} lautstärke`) : 1;
+    st.übergang = s.übergang != null ? num(s.übergang, 0, 10, `${n} übergang`) : 2;
+    if (["hören", "spüren", "beides"].includes(s.herz)) st.herz = s.herz;
+    if (s.vibration === "atem") st.vibration = "atem";
+    if (s.signal) st.signal = true;
+    if (s.klangschale) st.klangschale = true;
+    out.schritte.push(st);
+  });
+  return { ok: !errors.length, journey: out, errors, warnings };
+}
+// a readable outline of a journey, with its safety notes
+function samOutline(j) {
+  const lines = j.schritte.map((s, i) => {
+    const how = s.meer === "führen" ? s.muster.map((v) => String(v).replace(".", ",")).join(" · ") + " s" : s.meer === "folgen" ? "Meer folgt dir" : "Meer ruht";
+    const dur = s.atemzüge ? `${s.atemzüge} Atemzüge` : s.sekunden ? `${s.sekunden} s` : "bis es passt";
+    return `${i + 1}. ${s.name}: ${how}, ${dur}`;
+  });
+  const fast = j.schritte.some((s) => s.muster && s.muster[0] + s.muster[2] < SAM_LIMIT.rapidPeriod);
+  const holds = j.schritte.some((s) => s.muster && s.muster[1] + s.muster[3] > 0);
+  if (fast || holds) lines.push("Nur im Liegen. Nicht im Wasser, nicht beim Fahren. Wird dir schwindlig: einfach tippen.");
+  return lines.join("\n");
+}
+
+const SAM = { j: null, i: -1, st: null, t0: 0, breaths: 0, n0: 0, notWith: 0, rapidStep: 0, rapidTotal: 0, pulseHigh: 0, resumeAt: 0, paused: false, ending: false, ledBefore: false, guards: [] };
+const samOn = () => S.mode === "portal" && !!SAM.j;
+function samStart(j) {
+  Object.assign(SAM, { j, i: -1, st: null, rapidTotal: 0, pulseHigh: 0, resumeAt: 0, paused: false, ending: false, ledBefore: false, guards: [], hr0: null });
+  SP.D = null; SP.Dt = null;
+}
+function samEnter(i, t) {
+  const st = SAM.j.schritte[i];
+  Object.assign(SAM, { i, st, t0: t, breaths: 0, n0: BT.n, notWith: 0, rapidStep: 0 });
+  logEvent("sam", { i, name: st.name });
+  setPrompt(st.name + (st.sagen ? " · " + st.sagen : ""));
+  if (st.sagen) say(st.sagen);
+  if (st.signal) portalCue(0.06);
+  if (st.meer === "führen") samPattern(st);
+}
+function samPattern(st) {
+  let m = st.muster.slice();
+  // past the fast-breathing allowance, fast patterns are slowed to 3 · 3
+  if (m[0] + m[2] < SAM_LIMIT.rapidPeriod && SAM.rapidTotal >= SAM_LIMIT.rapidTotal) m = [3, 0, 3, 0];
+  SP.Dt = m; SP.glideLeft = Math.max(1, Math.round(st.übergang));
+}
+function samGuard(kind, text) {
+  SAM.guards.push(kind); logEvent("samGuard", { kind });
+  if (text) { say(text); setPrompt(text); }
+}
+function samToFollow(t, quiet) {
+  if (sess.phase === "seaLead") { SP.a = 0; setPhase("sea"); }
+  if (!quiet) setPrompt("Das Meer folgt wieder dir. Es geht gleich weiter.");
+}
+// once per breath of the leading sea
+function samCycle() {
+  SP.a = Math.min(1, SP.a + 1 / 3);
+  if (SP.Dt) {
+    if (!SP.D) SP.D = [SP.P * SP.rIn, 0, SP.P * (1 - SP.rIn), 0];
+    SP.D = SP.glideLeft > 1 ? SP.D.map((v, k) => v + (SP.Dt[k] - v) / SP.glideLeft) : SP.Dt.slice();
+    SP.glideLeft = Math.max(1, SP.glideLeft - 1);
+  }
+  const with_ = SP.sync > 0.5;
+  if (with_ && SAM.st && SAM.st.meer === "führen") SAM.breaths++;
+  SAM.notWith = SP.sync < 0.3 ? SAM.notWith + 1 : with_ ? 0 : SAM.notWith;
+  if (SP.a >= 1 && SAM.notWith >= 5) { logEvent("seaBack", { sam: true }); SAM.resumeAt = now() + 30; samToFollow(now()); }
+  logEvent("seaCycle", { D: SP.D && SP.D.map((v) => +v.toFixed(1)), sync: +SP.sync.toFixed(2), step: SAM.i });
+}
+function samUpdate(t, dt) {
+  const ph = sess.phase;
+  if (!A.binGain) initBinaural();
+  if (SAM.i < 0) { if (ph === "sea") samEnter(0, t); else return; }
+  const st = SAM.st, el = t - SAM.t0;
+  if (SAM.hr0 == null && HB.bpm && el > 30) SAM.hr0 = HB.bpm;
+
+  // what this step wants from the sea
+  if (SAM.paused || SAM.ending) { if (ph === "seaLead") samToFollow(t, true); }
+  else if (st.meer === "führen") {
+    if (ph === "sea" && t >= SAM.resumeAt && sess.dir && sess.dir.sure && BT.n >= 3) {
+      setPhase("seaLead"); SAM.ledBefore = true;
+      SP.D = [SP.P * SP.rIn, 0, SP.P * (1 - SP.rIn), 0]; samPattern(st);
+    } else if (ph === "sea" && !(sess.dir && sess.dir.sure)) setPrompt(st.name + " · Einen Moment, ich lerne noch deinen Atem.");
+  } else if (ph === "seaLead") samToFollow(t, true);
+
+  // breaths in steps where the sea follows: your own
+  if (st.meer !== "führen") SAM.breaths = BT.n - SAM.n0;
+
+  // guardrails
+  if (ph === "seaLead" && SP.P < SAM_LIMIT.rapidPeriod) {
+    SAM.rapidStep += dt; SAM.rapidTotal += dt;
+    if (SAM.rapidStep > SAM_LIMIT.rapidStep || SAM.rapidTotal > SAM_LIMIT.rapidTotal) {
+      samGuard("rapid", "Genug schnell geatmet. Wir werden wieder ruhiger.");
+      SP.Dt = [3, 0, 3, 0]; SP.glideLeft = 1; SAM.rapidStep = 0;
+      if (SAM.i < SAM.j.schritte.length - 1) return samEnter(SAM.i + 1, t);
+    }
+  }
+  const racing = HB.bpm && (HB.bpm > 125 || (SAM.hr0 && HB.bpm > SAM.hr0 + 30));
+  SAM.pulseHigh = racing && ph === "seaLead" ? SAM.pulseHigh + dt : 0;
+  if (SAM.pulseHigh > 10) { samGuard("pulse", "Lass uns eine Pause machen. Atme einfach in deinem Tempo."); SAM.resumeAt = t + 60; SAM.pulseHigh = 0; samToFollow(t, true); }
+
+  // sound for this step
+  const expected = st.sekunden || (st.atemzüge ? st.atemzüge * (SP.P || 6) : 60);
+  const k = clamp(el / expected, 0, 1);
+  J.seaMul = toward(J.seaMul, SAM.ending ? 0 : st.meer === "aus" ? 0 : st.lautstärke, dt / 3);
+  if (st.frequenz && !SAM.ending) { J.beat = st.frequenz[0] + (st.frequenz[1] - st.frequenz[0]) * k; J.binMul = toward(J.binMul, st.frequenz_lautstärke, dt / 20); }
+  else J.binMul = toward(J.binMul, 0, dt / 10);
+  J.bowl = st.klangschale && !SAM.ending ? 0.02 : 0;
+  J.heartMul = (st.herz === "hören" || st.herz === "beides") && !SAM.ending ? 0.15 : 0;
+  setBinaural(J.beat, J.binMul);
+
+  // is the step done?
+  if (SAM.ending) { if (J.seaMul <= 0.01 && J.binMul <= 0.01) finish(true); return; }
+  if (SAM.paused) return;
+  let done = el >= (st.mindestens || 0);
+  const dur = st.atemzüge ? SAM.breaths >= st.atemzüge : st.sekunden ? el >= st.sekunden : true;
+  let cond = true;
+  if (st.bis) {
+    if (st.bis.gleichmäßig) cond = cond && btSteady();
+    if (st.bis.synchron != null) cond = cond && ph === "seaLead" && SP.sync >= st.bis.synchron;
+    if (st.bis.stille != null) cond = cond && !movedSince(st.bis.stille) && t - sess.start > st.bis.stille;
+    if (st.bis.puls_unter != null) cond = cond && !!HB.bpm && HB.bpm < st.bis.puls_unter;
+  }
+  done = done && dur && cond;
+  if (!done && el > Math.max(SAM_LIMIT.stepMax, st.sekunden || 0)) { done = true; logEvent("samTimeout", { i: SAM.i }); }
+  if (done) {
+    if (SAM.i < SAM.j.schritte.length - 1) samEnter(SAM.i + 1, t);
+    else if (SAM.j.ende === "ausklingen") { SAM.ending = true; logEvent("samEnd", {}); }
+  }
+}
+function samPause(on) {
+  if (!samOn() || sess.phase === "idle") return;
+  SAM.paused = on;
+  logEvent("samPause", { on });
+  $("#pauseBtn").textContent = on ? "Weiter" : "Pause";
+  setPrompt(on ? "Pause. Das Meer folgt dir. Tippe auf Weiter, wenn du magst." : SAM.st ? SAM.st.name : "");
+  if (on) SAM.pauseAt = now(); else if (SAM.pauseAt) { SAM.t0 += now() - SAM.pauseAt; SAM.pauseAt = 0; }
+}
+
+/* Vibration (Android): the phone lies on the chest, so you feel it. While it buzzes, the sensors
+   hold their last values, so the buzz is never mistaken for breath. */
+function haptic(pattern) {
+  if (!navigator.vibrate) return;
+  try { navigator.vibrate(pattern); } catch (e) { return; }
+  const ms = Array.isArray(pattern) ? pattern.reduce((a, b) => a + b, 0) : pattern;
+  sess.hapticUntil = now() + ms / 1000 + 0.15;
+}
+
+// my journeys, kept on this phone
+const SAM_KEY = "samsara-reisen";
+function samStore() { try { return JSON.parse(localStorage.getItem(SAM_KEY) || "[]"); } catch (e) { return []; } }
+function samStoreSave(list) { try { localStorage.setItem(SAM_KEY, JSON.stringify(list)); } catch (e) {} }
+function samAll() { return [...SAM_BUILTIN.map((x) => ({ ...x, builtin: true })), ...samStore()]; }
+function samFind(value) { const id = String(value).slice(2); return samAll().find((x) => x.id === id); }
+const b64u = { enc: (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+  dec: (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/")))) };
+
 /* ================= The Portal =================
    Every journey starts like Just Breathe: the sea follows you, then you follow the sea. On top,
    each journey turns its own dials, and only while the loop says you are with it (in sync, pulse
@@ -917,7 +1178,7 @@ const toward = (v, target, step) => (v < target ? Math.min(target, v + step) : M
 function jReset() {
   Object.assign(J, { stage: "follow", beat: S.journey === "tank" ? 6 : 10, seaMul: 1, binMul: 0, heartMul: 0, bowl: 0, hr0: null, t0: now(), cues: [], wake: 0,
     sweep: null, rsa: [], best: null, coh: 0, holdUntil: 0, nextCueAt: 0, cueVol: 1, baseRate: null, lastCycle: null });
-  SP.T = null; SP.faster = false;
+  SP.T = null; SP.faster = false; SP.D = null; SP.Dt = null;
 }
 const movedSince = (sec) => LOG.events.some((e) => e[1] === "moved" && +e[0] > now() - sess.start - sec);
 function J_stage(st, text, voice) {
@@ -1367,7 +1628,7 @@ const BOWL_HZ = 196; // G3
 // In Just Breathe the sea carries everything; drone and heartbeat join at a whisper (5 %) with the sea,
 // the sustained bowl only as it starts to lead.
 function mix(layer) {
-  if (S.mode === "portal" && layer === "heart") return S.journey === "tank" ? J.heartMul : 0;
+  if (S.mode === "portal" && layer === "heart") return S.journey === "tank" || samOn() ? J.heartMul : 0;
   if (!isJB()) return 1;
   if (sess.phase === "sea" || sess.phase === "seaLead" || sess.phase === "night" || (sess.phase === "sleep" && sess.flowEng)) return 0;
   if (layer === "bowl") return sess.phase === "blend" ? 0.3 * sess.alpha : ["jb", "sleep"].includes(sess.phase) ? 0.3 : 0;
@@ -1427,7 +1688,8 @@ function bowlLevel(v, k) {
   for (const p of A.bowlParts) if (p.ratio > 1) p.g.gain.setTargetAtTime(p.vol * (0.25 + 0.75 * v), t, k);
 }
 function heartSound() {
-  if (!A.ctx || !(S.heart || (S.mode === "portal" && S.journey === "tank"))) return;
+  if (samOn() && SAM.st && (SAM.st.herz === "spüren" || SAM.st.herz === "beides") && !SAM.ending) haptic(28);
+  if (!A.ctx || !(S.heart || (S.mode === "portal" && (S.journey === "tank" || (samOn() && J.heartMul > 0))))) return;
   // soft "lub-dub": two low, short thumps
   const ctx = A.ctx, t = ctx.currentTime;
   for (const [dt, f, v0] of [[0, 62, 0.22], [0.17, 52, 0.14]]) {
@@ -1558,14 +1820,14 @@ function jbIntroCues(t, el) {
 /* Breaths on the real-time flow: a change of direction counts once the air has gone the new way
    for 0.5 s, so a stumble does not split a breath (checked on a recorded session: 9.0–9.3/min
    steady, where counting every turn gave 0.8 s "breaths"). */
-const BT = { st: 0, cand: null, on: [], ins: [], lastOff: null };
-function btReset() { Object.assign(BT, { st: 0, cand: null, on: [], ins: [], lastOff: null }); }
+const BT = { st: 0, cand: null, on: [], ins: [], lastOff: null, n: 0 };
+function btReset() { Object.assign(BT, { st: 0, cand: null, on: [], ins: [], lastOff: null, n: 0 }); }
 function btStep(t, v) {
   const want = v > 0.2 ? 1 : v < -0.2 ? -1 : 0;
   if (want && want !== BT.st) {
     if (!BT.cand || BT.cand[0] !== want) BT.cand = [want, t];
     else if (t - BT.cand[1] >= 0.5) {
-      if (want === 1) { BT.on.push(BT.cand[1]); if (BT.on.length > 12) BT.on.shift(); }
+      if (want === 1) { BT.on.push(BT.cand[1]); if (BT.on.length > 12) BT.on.shift(); BT.n++; }
       else if (BT.on.length) { BT.ins.push(BT.cand[1] - BT.on[BT.on.length - 1]); if (BT.ins.length > 12) BT.ins.shift(); BT.lastOff = BT.cand[1]; }
       BT.st = want; BT.cand = null;
     }
@@ -1593,9 +1855,25 @@ const SP = { ph: 0, P: 6, rIn: 0.45, y: -1, flow: 0, ring: [], cab: 0, caa: 1e-9
 function spStep(dt) {
   SP.ph += dt / SP.P;
   if (SP.ph >= 1) { SP.ph -= 1; spCycle(); }
-  const f = SP.ph;
-  if (f < SP.rIn) { const x = f / SP.rIn; SP.y = -Math.cos(Math.PI * x); SP.flow = Math.sin(Math.PI * x); }
-  else { const x = (f - SP.rIn) / (1 - SP.rIn); SP.y = Math.cos(Math.PI * x); SP.flow = -Math.sin(Math.PI * x); }
+  let seg;
+  if (SP.D) {
+    // a written pattern: in, hold, out, hold (the sea is silent while held, no air flows)
+    const D = SP.D, P = D[0] + D[1] + D[2] + D[3];
+    SP.P = P; SP.rIn = D[0] / P;
+    let x = SP.ph * P;
+    if (x < D[0]) { seg = 0; const f = x / D[0]; SP.y = -Math.cos(Math.PI * f); SP.flow = Math.sin(Math.PI * f); }
+    else if ((x -= D[0]) < D[1]) { seg = 1; SP.y = 1; SP.flow = 0; }
+    else if ((x -= D[1]) < D[2]) { seg = 2; const f = x / D[2]; SP.y = Math.cos(Math.PI * f); SP.flow = -Math.sin(Math.PI * f); }
+    else { seg = 3; SP.y = -1; SP.flow = 0; }
+  } else {
+    const f = SP.ph;
+    if (f < SP.rIn) { seg = 0; const x = f / SP.rIn; SP.y = -Math.cos(Math.PI * x); SP.flow = Math.sin(Math.PI * x); }
+    else { seg = 2; const x = (f - SP.rIn) / (1 - SP.rIn); SP.y = Math.cos(Math.PI * x); SP.flow = -Math.sin(Math.PI * x); }
+  }
+  if (seg !== SP.seg) {
+    SP.seg = seg;
+    if (samOn() && SAM.st && SAM.st.vibration === "atem" && sess.phase === "seaLead" && (seg === 0 || seg === 2)) haptic(seg === 0 ? 35 : [15, 80, 15]);
+  }
   SP.aOut += (SP.a - SP.aOut) * Math.min(1, dt / 3);
   if (SP.a === 0 && SP.aOut < 0.02) SP.aOut = 0;
   // are you with it? your flow against the sea's, allowing half a second to follow
@@ -1608,6 +1886,7 @@ function spStep(dt) {
 }
 function spCycle() {
   if (sess.phase !== "seaLead") return;
+  if (samOn()) return samCycle();
   // five breaths in a row not with it: no pushing, the sea goes back to following you
   SP.bad = SP.sync < 0.3 ? SP.bad + 1 : SP.sync > 0.5 ? 0 : SP.bad;
   // falling asleep means no longer following: that is the point, not a reason to go back
@@ -1678,8 +1957,7 @@ function setPhase(p) {
     else SP.ph = 0;
     sess.naturalRate = 60 / P; sess.hrStart = HB.bpm;
     logEvent("seaLead", { P: +P.toFixed(2), rIn: +rIn.toFixed(2) });
-    setPrompt("Jetzt folge du dem Meer.");
-    say("Jetzt folge du dem Meer.");
+    if (!samOn() || !SAM.ledBefore) { setPrompt("Jetzt folge du dem Meer."); say("Jetzt folge du dem Meer."); }
   } else if (p === "sea" && prevPhase === "seaLead") {
     // quietly back to following; the even swell fades out over a few seconds
   } else if (p === "sea") {
@@ -1934,7 +2212,7 @@ function tick() {
     seaDirection(t, dt);
     if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
     const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
-    const handOver = !(S.mode === "portal" && S.journey === "tank");
+    const handOver = !(S.mode === "portal" && (S.journey === "tank" || samOn()));
     if (ph === "sea" && rested && handOver && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
     if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
     if (S.mode === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
@@ -2006,7 +2284,7 @@ function tick() {
   sess.history.push({ t, x: sess.hasSensor && sig.seen && ph !== "place" ? xNow : null, y: ph === "seaLead" ? SP.y : guided ? G.y : null });
   while (sess.history.length && sess.history[0].t < t - 40) sess.history.shift();
 
-  if (S.mode === "portal" && ph !== "place" && ph !== "idle") journeyUpdate(t, dt);
+  if (S.mode === "portal" && ph !== "place" && ph !== "idle") (samOn() ? samUpdate : journeyUpdate)(t, dt);
   if (!isJB() && S.minutes > 0 && ph !== "idle" && t - sess.start > S.minutes * 60) finish(true);
   updateReadouts();
 }
@@ -2042,7 +2320,11 @@ function updateReadouts() {
     if (S.mode === "portal") {
       $("#guideLabel").textContent = "Frequenz"; $("#guideNote").textContent = BAND(J.beat) + (J.binMul > 0.01 ? "" : " · leise");
       $("#guideRate").textContent = J.beat.toFixed(1).replace(".", ",") + " Hz";
-      const deepWave = S.journey === "deep" && J.stage === "resonance";
+      const deepWave = S.journey === "deep" && J.stage === "resonance" && !samOn();
+      if (samOn() && SAM.st) {
+        $("#guideLabel").textContent = "Schritt"; $("#guideNote").textContent = SAM.st.name;
+        $("#guideRate").textContent = (SAM.i + 1) + "/" + SAM.j.schritte.length;
+      }
       $("#syncLabel").textContent = deepWave ? "Herzwelle" : leading ? "Synchron" : "Puls";
       $("#syncNote").textContent = deepWave ? "Resonanz " + String(J.best).replace(".", ",") + "/min" : leading ? "mit dem Meer" : "Schläge/min";
       $("#sync").textContent = deepWave ? Math.round(J.coh * 100) + "%" : leading ? Math.round(Math.max(0, SP.sync) * 100) + "%" : HB.bpm ? "~" + Math.round(HB.bpm) : "–";
@@ -2115,7 +2397,7 @@ function draw() {
   if (!idle && (sess.phase === "box" || sess.phase === "jb" || sess.phase === "blend")) word = BOX_WORDS[B.i];
   else if (!idle && ["learn", "echo", "check", "flat", "flow"].includes(sess.phase) && TD.st) word = TD.st === 1 || TD.st === 2 ? "ein" : "aus";
   else if (!idle && sess.phase === "sleep") word = "";
-  else if (!idle && sess.phase === "seaLead") word = SP.ph < SP.rIn ? "ein" : "aus";
+  else if (!idle && sess.phase === "seaLead") word = ["ein", "halten", "aus", "halten"][SP.seg ?? 0];
   else if (!idle && gy != null && sess.phase !== "place") word = G.phase < G.rIn ? "ein" : "aus";
   else if (!idle && ux != null && det.dir) word = det.dir > 0 ? "ein" : "aus";
   if (word) {
@@ -2186,6 +2468,12 @@ async function start(ev) {
   sess.turns = []; sess.alpha = 0; sess.layersOn = false; sess.flowOut = 0; sess.fit = null;
   btReset(); SP.a = 0; SP.aOut = 0; sess.seaBackAt = null;
   jReset(); if (A.ctx) { initBinaural(); setBinaural(J.beat, 0); }
+  SAM.j = null;
+  if (S.mode === "portal" && S.journey.startsWith("s:")) {
+    const f = samFind(S.journey), v = f && samValidate(f.src);
+    if (v && v.ok) { samStart(v.journey); J.binMul = 0; J.seaMul = 1; logEvent("samStart", { titel: v.journey.titel, steps: v.journey.schritte.length }); }
+  }
+  $("#pauseBtn").hidden = !samOn(); $("#pauseBtn").textContent = "Pause";
   LEARN.on = false; LEARN.buf = []; LEARN.taps = []; turnReset();
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
@@ -2227,7 +2515,11 @@ function finish(natural) {
     rows.push(["Rhythmus zuletzt", sess.boxDur.map((v) => v.toFixed(1).replace(".0", "")).join(" · ") + " s"]);
     rows.push(["Viereck", "Höhe " + Math.round(sess.progH * 100) + " %, Breite " + Math.round(sess.progW * 100) + " %"]);
   }
-  if (S.mode === "portal") {
+  if (samOn()) {
+    rows.push(["Reise", SAM.j.titel + (SAM.j.von ? " von " + SAM.j.von : "")]);
+    rows.push(["Schritte", (SAM.ending ? SAM.j.schritte.length : Math.max(0, SAM.i)) + " von " + SAM.j.schritte.length + " ganz gegangen"]);
+    if (SAM.guards.length) rows.push(["Leitplanken", SAM.guards.map((g) => ({ rapid: "schnelles Atmen begrenzt", pulse: "Pause wegen Puls" })[g] || g).join(", ")]);
+  } else if (S.mode === "portal") {
     const name = { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank" }[S.journey];
     rows.push(["Reise", name + (J.stage === "night" ? ", bis in die Nacht" : "")]);
     rows.push(["Frequenz zuletzt", J.beat.toFixed(1).replace(".", ",") + " Hz (" + BAND(J.beat) + ")"]);
@@ -2275,7 +2567,9 @@ document.addEventListener("pointerdown", (e) => {
   if (!TAP_PHASES.includes(sess.phase) || e.target.closest("button")) return;
   onTap(now());
 });
-$("#dim").addEventListener("click", () => { if (!TAP_PHASES.includes(sess.phase)) $("#dim").hidden = true; });
+// a tap always means pause during a written journey
+$("#dim").addEventListener("click", () => { if (!TAP_PHASES.includes(sess.phase)) $("#dim").hidden = true; if (samOn() && !SAM.paused) samPause(true); });
+$("#pauseBtn").addEventListener("click", () => samPause(!SAM.paused));
 function fillVoices() {
   if (!("speechSynthesis" in window)) return;
   const sel = $("#voiceSel");
@@ -2285,6 +2579,72 @@ function fillVoices() {
   for (const v of voices) sel.add(new Option(v.name + (v.localService ? "" : " (online)"), v.name));
   if (voices.some((v) => v.name === S.voiceName)) sel.value = S.voiceName;
 }
+function samRender() {
+  const seg = document.querySelector("input[name=journey]").parentElement;
+  seg.querySelectorAll(".samJ").forEach((el) => el.remove());
+  for (const x of samAll()) {
+    const v = samValidate(x.src), id = "js_" + x.id;
+    const inp = Object.assign(document.createElement("input"), { type: "radio", name: "journey", id, value: "s:" + x.id, className: "samJ" });
+    const lab = Object.assign(document.createElement("label"), { htmlFor: id, className: "samJ", textContent: v.ok ? v.journey.titel : x.id });
+    inp.addEventListener("change", () => { updateFields(); samLoad(x); });
+    seg.append(inp, lab);
+  }
+  const cur = document.querySelector(`input[name=journey][value="${S.journey}"]`);
+  if (cur) cur.checked = true;
+  updateFields();
+}
+function samLoad(x) { $("#samSrc").value = JSON.stringify(x.src, null, 2); $("#samReport").textContent = ""; }
+function samReport(v, extra) {
+  const lines = [];
+  if (v.errors.length) lines.push("Fehler:", ...v.errors.map((e) => "· " + e));
+  if (v.warnings.length) lines.push("Angepasst:", ...v.warnings.map((e) => "· " + e));
+  if (v.ok) lines.push((lines.length ? "\n" : "") + "„" + v.journey.titel + "“ ist bereit:", samOutline(v.journey));
+  if (extra) lines.push("", extra);
+  $("#samReport").textContent = lines.join("\n");
+}
+$("#samTemplate").addEventListener("click", () => { $("#samSrc").value = SAM_TEMPLATE; samReport(samValidate(SAM_TEMPLATE), "Ändere Titel und Schritte, dann Prüfen und Speichern."); });
+$("#samCheck").addEventListener("click", () => samReport(samValidate($("#samSrc").value)));
+$("#samSave").addEventListener("click", () => {
+  const v = samValidate($("#samSrc").value);
+  if (!v.ok) return samReport(v);
+  const list = samStore();
+  let id = v.journey.titel.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "reise";
+  if (SAM_BUILTIN.some((b) => b.id === id)) id += "-eigene";
+  const i = list.findIndex((x) => x.id === id), item = { id, src: v.journey };
+  if (i >= 0) list[i] = item; else list.push(item);
+  samStoreSave(list);
+  S.journey = "s:" + id; samRender();
+  samReport(v, "Gespeichert und ausgewählt. Tippe oben auf Starten.");
+});
+$("#samShare").addEventListener("click", async () => {
+  const v = samValidate($("#samSrc").value);
+  if (!v.ok) return samReport(v);
+  const url = location.origin + location.pathname + "#reise=" + b64u.enc(JSON.stringify(v.journey));
+  try { if (navigator.share) { await navigator.share({ title: v.journey.titel, text: "Eine Reise für den Atemlotsen", url }); return samReport(v, "Geteilt."); } } catch (e) { if (e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); samReport(v, "Link kopiert:\n" + url); } catch (e) { samReport(v, "Link:\n" + url); }
+});
+$("#samDelete").addEventListener("click", () => {
+  const cur = document.querySelector("input[name=journey]:checked");
+  if (!cur || !cur.value.startsWith("s:")) return;
+  const id = cur.value.slice(2);
+  if (SAM_BUILTIN.some((b) => b.id === id)) return samReport({ errors: ["Mitgelieferte Reisen lassen sich nicht löschen."], warnings: [], ok: false });
+  samStoreSave(samStore().filter((x) => x.id !== id));
+  S.journey = "sleep"; samRender(); $("#samSrc").value = ""; $("#samReport").textContent = "Gelöscht.";
+});
+samRender();
+// a journey shared as a link: open it in the builder, ready to check and save
+function samImportFromHash() {
+  if (!location.hash.startsWith("#reise=")) return;
+  try {
+    const v = samValidate(b64u.dec(location.hash.slice(7)));
+    document.querySelector("input[name=mode][value=portal]").checked = true; updateFields();
+    $("#samBuilder").open = true; $("#samSrc").value = JSON.stringify(v.journey || {}, null, 2);
+    samReport(v, v.ok ? "Eine geteilte Reise. Lies sie durch und tippe auf Speichern." : "");
+    $("#samBuilder").scrollIntoView({ block: "start" });
+  } catch (e) { $("#samBuilder").open = true; $("#samReport").textContent = "Der geteilte Link ist beschädigt."; }
+}
+samImportFromHash();
+window.addEventListener("hashchange", samImportFromHash);
 if ("speechSynthesis" in window) { fillVoices(); speechSynthesis.addEventListener("voiceschanged", fillVoices); }
 $("#voiceTest").addEventListener("click", () => {
   const was = S.voice; S.voiceName = $("#voiceSel").value; S.voice = true;
