@@ -188,6 +188,38 @@ select {
 }
 .toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.92rem; }
 .toggles label { display: flex; align-items: center; gap: 8px; }
+.changes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.changes button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; padding: 12px 12px 13px; border-radius: 14px;
+  background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+}
+.changes button b { font: 600 0.98rem var(--display); color: var(--guide); }
+.changes button small { font: 400 0.78rem/1.3 var(--body); color: var(--muted); }
+.changes button[aria-pressed=true] { border-color: var(--guide); }
+.post { display: flex; flex-direction: column; padding: 4px 0 8px; }
+.card {
+  background: #f1e6cf; color: #2a2419; border-radius: 6px; padding: 12px 14px 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; gap: 6px;
+  position: relative;
+}
+.card + .card { margin-top: -6px; }
+.card:nth-child(odd) { transform: rotate(-0.7deg); }
+.card:nth-child(even) { transform: rotate(0.6deg); }
+.card .no { position: absolute; top: 8px; right: 12px; font: 600 0.72rem var(--display); color: #8b7a5c; letter-spacing: 0.08em; }
+.card input, .card textarea {
+  font: 1rem/1.4 var(--body); color: #2a2419; background: transparent; border: 0; padding: 2px 0; width: 100%; resize: vertical;
+}
+.card input { font-family: var(--display); font-weight: 600; border-bottom: 1px solid #c9b894; }
+.card textarea { background-image: repeating-linear-gradient(transparent 0 1.35rem, #d9cba9 1.35rem calc(1.4rem)); min-height: 4.2rem; }
+.card input::placeholder, .card textarea::placeholder { color: #9c8b6b; }
+.card .row { display: flex; gap: 8px; }
+.card .row button { padding: 7px 10px; font-size: 0.85rem; border-radius: 9px; background: #e3d4b3; color: #2a2419; flex: 0 0 auto; }
+.card.done { opacity: 0.55; }
+.card.done::after {
+  content: "gesagt ✓"; position: absolute; right: 14px; bottom: 12px; transform: rotate(-8deg);
+  font: 700 0.95rem var(--display); color: #a2452c; border: 2px solid #a2452c; border-radius: 6px; padding: 0 6px;
+}
 .toggles input { accent-color: var(--guide); width: 18px; height: 18px; }
 .hint { font-size: 0.85rem; color: var(--muted); margin: 0; }
 
@@ -254,7 +286,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     <dl id="sumList"></dl>
     <canvas id="nightChart" height="190" hidden aria-label="Die Nacht als Zeitleiste"></canvas>
     <div class="field" id="noteField" hidden>
-      <label for="dreamNote">Traumtagebuch</label>
+      <label for="dreamNote" id="noteLabel">Traumtagebuch</label>
       <textarea id="dreamNote" rows="3" placeholder="Was hast du geträumt? Warst du dir bewusst, dass du träumst?"></textarea>
       <button type="button" class="ghost" id="saveNote">Ins Tagebuch</button>
     </div>
@@ -265,6 +297,17 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
   </section>
 
   <form id="setup">
+    <div class="changes" id="changes">
+      <button type="button" data-change="s:nachsport"><b>After Work Breath-Out</b><small>Nach dem Sport in deinen Gleichatem</small></button>
+      <button type="button" data-change="s:morning"><b>Morning Changes</b><small>Wach werden und ein Change für heute</small></button>
+      <button type="button" data-change="post" aria-pressed="false"><b>Daily Changes</b><small>Correspondence: fünf Postkarten</small></button>
+      <button type="button" data-change="s:recap"><b>Recap</b><small>Abendbesinnung: was war, was bleibt, was geht</small></button>
+    </div>
+    <section class="post" id="post" hidden aria-label="Correspondence">
+      <p class="hint">Wem willst du heute etwas sagen? Ein Name, ein paar Sätze. Sagen, schreiben oder teilen, dann abstempeln.</p>
+      <div id="cards"></div>
+      <div class="actions"><button type="button" class="ghost" id="postClear">Gesagte abräumen</button></div>
+    </section>
     <div class="field">
       <label for="volume">Lautstärke <output id="volumeOut">35 %</output></label>
       <input type="range" id="volume" min="0.15" max="1" step="0.05" value="0.35">
@@ -409,7 +452,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     <p class="hint"><b>Just Breathe</b>: Handy auf die Brust, atme in deinem Tempo. Das Meer folgt dir in Echtzeit: Es rauscht, solange Luft fließt, und schweigt in jeder Pause. Sobald die App sicher weiß, wo bei dir „ein“ ist, steigt es beim Einatmen und sinkt beim Ausatmen. Wird dein Atem gleichmäßig, heißt es „Jetzt folge du dem Meer“: Aus den Böen wird ein ruhiges Auf und Ab in deinem Tempo, und wenn du mitgehst, wird es langsam ruhiger, bis zu deinem Ziel. Zum Einschlafen blendet es aus. Läuft, bis du am Morgen auf Beenden tippst. Handy dafür ans Ladekabel. <b>Viereck</b>: Kein Test vorweg. Die Klangschale steigt beim Einatmen, bleibt beim Halten stehen und sinkt beim Ausatmen, in einem festen Takt. Meer und Ton folgen nach etwa einer halben Minute leise deinem Brustkorb. <b>Tiefe</b>: Erst lernt die App deinen Atem, dann führt dich die Klangschale langsam in einen ruhigen Rhythmus. Ton und Meer folgen dabei weiter deinem Brustkorb. <b>Echtzeit</b>: Erst kurz Luft anhalten, dann folgt ein warmer Ton direkt deinem Brustkorb: hebt er sich, wird der Ton heller, senkt er sich, tiefer. Ton, Meer und Herzschlag kannst du einzeln zuschalten. <b>Führen</b>: Der Klang rastet erst auf deinen Atem ein und wird dann sanft langsamer bis zu deinem Ziel. Der Bildschirm bleibt an, sonst schläft der Sensor ein.</p>
     <div class="actions"><button type="submit" id="startBtn">Starten</button></div>
     <details id="diary">
-      <summary>Traumtagebuch und Nächte</summary>
+      <summary>Tagebuch: Nächte, Morgen, Recaps</summary>
       <pre class="hint" id="diaryList"></pre>
       <div class="actions"><button type="button" class="ghost" id="diaryExport">Als Text speichern</button></div>
     </details>
@@ -431,7 +474,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v19 · 23.10. 11:00 · Changes";
+const VERSION = "v20 · 23.10. 13:00 · Changes";
 const S = { markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
@@ -972,7 +1015,7 @@ const SAM_BUILTIN = [
   } },
 ];
 SAM_BUILTIN.unshift({ id: "nachsport", src: {
-  titel: "Nach dem Sport",
+  titel: "After Work Breath-Out",
   von: "Changes",
   über: "Nach Laufen, Rad oder Training: Das Meer holt dich in deinem Tempo ab und macht den Atem Atemzug für Atemzug etwas länger, aber nur, solange du mitgehst. Am Ende atmest du gleichmäßig, fünf ein, fünf aus.",
   ende: "ausklingen",
@@ -981,6 +1024,32 @@ SAM_BUILTIN.unshift({ id: "nachsport", src: {
     { name: "Länger werden", meer: "führen", muster: [4, 0, 4, 0], atemzüge: 6, übergang: 3, frequenz: [12, 10], sagen: "Jetzt führt das Meer. Es holt dich in deinem Tempo ab und wird mit dir langsamer." },
     { name: "Gleichatem", meer: "führen", muster: [5, 0, 5, 0], sekunden: 240, übergang: 2, frequenz: [10, 8], klangschale: true, sagen: "Ein und aus, gleich lang. Ganz weich." },
     { name: "Nachspüren", meer: "folgen", sekunden: 90, lautstärke: 0.6, frequenz: [8, 7], sagen: "Lass den Atem jetzt von selbst gehen. Spür nach." },
+  ],
+} });
+SAM_BUILTIN.push({ id: "morning", src: {
+  titel: "Morning Changes",
+  von: "Changes",
+  über: "Für den Morgen, noch im Bett: Das Meer holt dich ab, dann wird der Atem weit, mit einem kurzen Moment oben, und etwas frischer. Am Ende ein Satz für heute: Was willst du verändern?",
+  ende: "ausklingen",
+  schritte: [
+    { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 30, sagen: "Guten Morgen. Bleib noch liegen, Handy auf die Brust. Erst folgt das Meer dir." },
+    { name: "Weit werden", meer: "führen", muster: [5, 2, 4, 0], atemzüge: 5, übergang: 3, frequenz: [10, 12], sagen: "Jetzt führt das Meer. Tief ein, oben kurz bleiben, dann aus." },
+    { name: "Wach werden", meer: "führen", muster: [3, 1, 3, 0], atemzüge: 10, übergang: 2, frequenz: [12, 14], sagen: "Etwas frischer jetzt." },
+    { name: "Mein Change", meer: "folgen", sekunden: 50, lautstärke: 0.5, frequenz: [14, 14], sagen: "Was willst du heute verändern? Ein Satz genügt. Halt ihn fest." },
+    { name: "Aufstehen", meer: "folgen", sekunden: 15, klangschale: true, signal: true, sagen: "Gut. Nimm ihn mit in den Tag." },
+  ],
+} }, { id: "recap", src: {
+  titel: "Recap",
+  von: "Changes",
+  über: "Abendbesinnung: Das Meer wird ruhig, länger aus als ein. Dazwischen drei Fragen: Was war gut? Was nehme ich mit? Was darf gehen? Am Ende: Wem willst du noch etwas sagen?",
+  ende: "ausklingen",
+  schritte: [
+    { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 30, sagen: "Der Tag ist vorbei. Leg dich hin, Handy auf die Brust. Erst folgt das Meer dir." },
+    { name: "Ruhig werden", meer: "führen", muster: [4, 0, 6, 0], atemzüge: 6, übergang: 3, frequenz: [10, 8], sagen: "Jetzt führt das Meer. Länger aus als ein." },
+    { name: "Was war gut?", meer: "folgen", sekunden: 60, lautstärke: 0.5, frequenz: [8, 7], sagen: "Was war heute gut? Lass ein Bild kommen." },
+    { name: "Was nehme ich mit?", meer: "folgen", sekunden: 60, lautstärke: 0.5, frequenz: [7, 7], sagen: "Was hast du heute gelernt? Was nimmst du mit?" },
+    { name: "Was darf gehen?", meer: "führen", muster: [4, 0, 7, 0], atemzüge: 5, übergang: 2, frequenz: [7, 6], sagen: "Was darf gehen? Atme es aus." },
+    { name: "Wem sage ich etwas?", meer: "folgen", sekunden: 45, lautstärke: 0.5, frequenz: [6, 6], klangschale: true, sagen: "Wem möchtest du danken oder noch etwas sagen? Du kannst nachher eine Postkarte schreiben." },
   ],
 } });
 const SAM_TEMPLATE = JSON.stringify(SAM_BUILTIN[1].src, null, 2);
@@ -1525,11 +1594,11 @@ const DIARY_KEY = "atemlotse-tagebuch";
 function diaryLoad() { try { return JSON.parse(localStorage.getItem(DIARY_KEY) || "[]"); } catch (e) { return []; } }
 function diarySave(list) { try { localStorage.setItem(DIARY_KEY, JSON.stringify(list.slice(-120))); } catch (e) {} }
 function diaryText(e) {
-  return [new Date(e.start).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" }) + " · " + e.what + " · " + e.dur, ...e.rows.map(([a, b]) => a + ": " + b), e.note ? "Traum: " + e.note : ""].filter(Boolean).join("\n");
+  return [new Date(e.start).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" }) + " · " + e.what + " · " + e.dur, ...e.rows.map(([a, b]) => a + ": " + b), e.note ? (e.noteLabel || "Traum") + ": " + e.note : ""].filter(Boolean).join("\n");
 }
 function diaryRender() {
   const list = diaryLoad().slice().reverse();
-  $("#diaryList").textContent = list.length ? list.map(diaryText).join("\n\n") : "Noch keine Nacht eingetragen.";
+  $("#diaryList").textContent = list.length ? list.map(diaryText).join("\n\n") : "Noch nichts eingetragen.";
 }
 
 /* ---------------- Snoring (microphone, only once the sounds have faded) ----------------
@@ -2791,18 +2860,69 @@ function finish(natural) {
   rows.push(["Log", LOG.rows.length + " Messpunkte"]);
   // every night of ten minutes or more goes into the diary; a dream note can be added below
   sess.diaryId = null;
-  if (isJB() && dur >= 600) {
+  const note = NOTE[S.journey] || NOTE.night;
+  if (isJB() && (dur >= 600 || (NOTE[S.journey] && dur >= 120))) {
     const what = S.mode === "portal" ? (samOn() ? SAM.j.titel : { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank" }[S.journey]) : "Just Breathe";
-    const entry = { id: LOG.startedAt, start: LOG.startedAt, what, dur: Math.round(dur / 60) + " min", rows: rows.filter(([a]) => !["Log", "Dauer"].includes(a)), note: "" };
+    const entry = { id: LOG.startedAt, start: LOG.startedAt, what, dur: Math.round(dur / 60) + " min", rows: rows.filter(([a]) => !["Log", "Dauer"].includes(a)), note: "", noteLabel: note.short };
     const list = diaryLoad(); list.push(entry); diarySave(list); sess.diaryId = entry.id;
   }
   $("#sumList").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
   $("#summary").hidden = false;
   $("#noteField").hidden = !isJB();
   $("#dreamNote").value = "";
+  $("#noteLabel").textContent = note.label; $("#dreamNote").placeholder = note.ph;
   if (isJB()) requestAnimationFrame(drawNight); else $("#nightChart").hidden = true;
   updateReadouts();
 }
+
+// what the note under a round is called, per journey
+const NOTE = {
+  night: { label: "Traumtagebuch", short: "Traum", ph: "Was hast du geträumt? Warst du dir bewusst, dass du träumst?" },
+  "s:morning": { label: "Mein Change für heute", short: "Change", ph: "Heute will ich …" },
+  "s:recap": { label: "Recap", short: "Recap", ph: "Was war gut? Was nehme ich mit? Was darf gehen?" },
+  "s:nachsport": { label: "Wie geht es dir jetzt?", short: "Notiz", ph: "Puls, Kopf, Beine, Stimmung …" },
+};
+
+/* ---------------- Changes: the four doors, and the postcards ---------------- */
+document.querySelectorAll("#changes button").forEach((b) => b.addEventListener("click", () => {
+  const v = b.dataset.change;
+  if (v === "post") { const open = $("#post").hidden; $("#post").hidden = !open; b.setAttribute("aria-pressed", String(open)); if (open) postRender(); return; }
+  const j = document.querySelector(`input[name=journey][value="${v}"]`);
+  if (!j) return;
+  $("#mPortal").checked = true; j.checked = true; updateFields(); samLoad(samFind(v));
+  $("#setup").requestSubmit();
+}));
+const POST_KEY = "changes-postkarten";
+function postLoad() {
+  let l; try { l = JSON.parse(localStorage.getItem(POST_KEY) || "[]"); } catch (e) { l = []; }
+  while (l.length < 5) l.push({ to: "", text: "", done: false });
+  return l.slice(0, 5);
+}
+function postSave(l) { try { localStorage.setItem(POST_KEY, JSON.stringify(l)); } catch (e) {} }
+function postRender() {
+  const l = postLoad(), box = $("#cards");
+  box.textContent = "";
+  l.forEach((c, i) => {
+    const card = document.createElement("div");
+    card.className = "card" + (c.done ? " done" : "");
+    card.innerHTML = `<span class="no">${i + 1} / 5</span><input placeholder="An …" aria-label="Für wen"><textarea rows="3" placeholder="Was ich dir sagen will …" aria-label="Was ich sagen will"></textarea><div class="row"><button type="button" data-a="done"></button><button type="button" data-a="share">Teilen</button></div>`;
+    const [to, text] = [card.querySelector("input"), card.querySelector("textarea")];
+    to.value = c.to; text.value = c.text;
+    const keep = () => { const m = postLoad(); m[i] = { ...m[i], to: to.value, text: text.value }; postSave(m); };
+    to.addEventListener("input", keep); text.addEventListener("input", keep);
+    const doneBtn = card.querySelector("[data-a=done]");
+    doneBtn.textContent = c.done ? "Doch nicht" : "Gesagt";
+    doneBtn.addEventListener("click", () => { const m = postLoad(); m[i].done = !m[i].done; m[i].doneAt = m[i].done ? new Date().toISOString() : null; postSave(m); postRender(); });
+    card.querySelector("[data-a=share]").addEventListener("click", async () => {
+      const body = (to.value ? to.value.trim() + ",\n\n" : "") + text.value.trim();
+      if (!text.value.trim()) return text.focus();
+      try { if (navigator.share) { await navigator.share({ text: body }); return; } } catch (e) { if (e.name === "AbortError") return; }
+      try { await navigator.clipboard.writeText(body); card.querySelector("[data-a=share]").textContent = "Kopiert"; } catch (e) {}
+    });
+    box.append(card);
+  });
+}
+$("#postClear").addEventListener("click", () => { postSave(postLoad().map((c) => (c.done ? { to: "", text: "", done: false } : c))); postRender(); });
 
 $("#setup").addEventListener("submit", start);
 $("#stopBtn").addEventListener("click", () => finish(false));
