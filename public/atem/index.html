@@ -474,7 +474,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v20 · 23.10. 13:00 · Changes";
+const VERSION = "v21 · 23.10. 23:30 · Shepard";
 const S = { markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
@@ -1017,12 +1017,12 @@ const SAM_BUILTIN = [
 SAM_BUILTIN.unshift({ id: "nachsport", src: {
   titel: "After Work Breath-Out",
   von: "Changes",
-  über: "Nach Laufen, Rad oder Training: Das Meer holt dich in deinem Tempo ab und macht den Atem Atemzug für Atemzug etwas länger, aber nur, solange du mitgehst. Am Ende atmest du gleichmäßig, fünf ein, fünf aus.",
+  über: "Nach Laufen, Rad oder Training: Das Meer holt dich in deinem Tempo ab und macht den Atem Atemzug für Atemzug etwas länger, aber nur, solange du mitgehst. Ein Shepard-Ton sinkt mit jedem Ausatmen ein Stück tiefer, ohne je unten anzukommen. Am Ende atmest du gleichmäßig, fünf ein, fünf aus.",
   ende: "ausklingen",
   schritte: [
     { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 40, sagen: "Leg dich hin. Du darfst noch schnaufen. Erst folgt das Meer dir." },
-    { name: "Länger werden", meer: "führen", muster: [4, 0, 4, 0], atemzüge: 6, übergang: 3, frequenz: [12, 10], sagen: "Jetzt führt das Meer. Es holt dich in deinem Tempo ab und wird mit dir langsamer." },
-    { name: "Gleichatem", meer: "führen", muster: [5, 0, 5, 0], sekunden: 240, übergang: 2, frequenz: [10, 8], klangschale: true, sagen: "Ein und aus, gleich lang. Ganz weich." },
+    { name: "Länger werden", meer: "führen", muster: [4, 0, 4, 0], atemzüge: 6, übergang: 3, frequenz: [12, 10], shepard: "ab", sagen: "Jetzt führt das Meer. Es holt dich in deinem Tempo ab und wird mit dir langsamer." },
+    { name: "Gleichatem", meer: "führen", muster: [5, 0, 5, 0], sekunden: 240, übergang: 2, frequenz: [10, 8], klangschale: true, shepard: "ab", sagen: "Ein und aus, gleich lang. Ganz weich." },
     { name: "Nachspüren", meer: "folgen", sekunden: 90, lautstärke: 0.6, frequenz: [8, 7], sagen: "Lass den Atem jetzt von selbst gehen. Spür nach." },
   ],
 } });
@@ -1033,8 +1033,8 @@ SAM_BUILTIN.push({ id: "morning", src: {
   ende: "ausklingen",
   schritte: [
     { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 30, sagen: "Guten Morgen. Bleib noch liegen, Handy auf die Brust. Erst folgt das Meer dir." },
-    { name: "Weit werden", meer: "führen", muster: [5, 2, 4, 0], atemzüge: 5, übergang: 3, frequenz: [10, 12], sagen: "Jetzt führt das Meer. Tief ein, oben kurz bleiben, dann aus." },
-    { name: "Wach werden", meer: "führen", muster: [3, 1, 3, 0], atemzüge: 10, übergang: 2, frequenz: [12, 14], sagen: "Etwas frischer jetzt." },
+    { name: "Weit werden", meer: "führen", muster: [5, 2, 4, 0], atemzüge: 5, übergang: 3, frequenz: [10, 12], shepard: "auf", sagen: "Jetzt führt das Meer. Tief ein, oben kurz bleiben, dann aus." },
+    { name: "Wach werden", meer: "führen", muster: [3, 1, 3, 0], atemzüge: 10, übergang: 2, frequenz: [12, 14], shepard: "auf", sagen: "Etwas frischer jetzt." },
     { name: "Mein Change", meer: "folgen", sekunden: 50, lautstärke: 0.5, frequenz: [14, 14], sagen: "Was willst du heute verändern? Ein Satz genügt. Halt ihn fest." },
     { name: "Aufstehen", meer: "folgen", sekunden: 15, klangschale: true, signal: true, sagen: "Gut. Nimm ihn mit in den Tag." },
   ],
@@ -1045,10 +1045,10 @@ SAM_BUILTIN.push({ id: "morning", src: {
   ende: "ausklingen",
   schritte: [
     { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 30, sagen: "Der Tag ist vorbei. Leg dich hin, Handy auf die Brust. Erst folgt das Meer dir." },
-    { name: "Ruhig werden", meer: "führen", muster: [4, 0, 6, 0], atemzüge: 6, übergang: 3, frequenz: [10, 8], sagen: "Jetzt führt das Meer. Länger aus als ein." },
+    { name: "Ruhig werden", meer: "führen", muster: [4, 0, 6, 0], atemzüge: 6, übergang: 3, frequenz: [10, 8], shepard: "ab", sagen: "Jetzt führt das Meer. Länger aus als ein." },
     { name: "Was war gut?", meer: "folgen", sekunden: 60, lautstärke: 0.5, frequenz: [8, 7], sagen: "Was war heute gut? Lass ein Bild kommen." },
     { name: "Was nehme ich mit?", meer: "folgen", sekunden: 60, lautstärke: 0.5, frequenz: [7, 7], sagen: "Was hast du heute gelernt? Was nimmst du mit?" },
-    { name: "Was darf gehen?", meer: "führen", muster: [4, 0, 7, 0], atemzüge: 5, übergang: 2, frequenz: [7, 6], sagen: "Was darf gehen? Atme es aus." },
+    { name: "Was darf gehen?", meer: "führen", muster: [4, 0, 7, 0], atemzüge: 5, übergang: 2, frequenz: [7, 6], shepard: "ab", sagen: "Was darf gehen? Atme es aus." },
     { name: "Wem sage ich etwas?", meer: "folgen", sekunden: 45, lautstärke: 0.5, frequenz: [6, 6], klangschale: true, sagen: "Wem möchtest du danken oder noch etwas sagen? Du kannst nachher eine Postkarte schreiben." },
   ],
 } });
@@ -1107,6 +1107,8 @@ function samValidate(text) {
     st.übergang = s.übergang != null ? num(s.übergang, 0, 10, `${n} übergang`) : 2;
     if (["hören", "spüren", "beides"].includes(s.herz)) st.herz = s.herz;
     if (s.vibration === "atem") st.vibration = "atem";
+    if (s.shepard === "ab" || s.shepard === "auf") st.shepard = s.shepard;
+    else if (s.shepard != null) warnings.push(`${n}: shepard „${s.shepard}“ unbekannt, erlaubt sind „ab“ und „auf“.`);
     if (s.signal) st.signal = true;
     if (s.klangschale) st.klangschale = true;
     out.schritte.push(st);
@@ -1118,7 +1120,7 @@ function samOutline(j) {
   const lines = j.schritte.map((s, i) => {
     const how = s.meer === "führen" ? s.muster.map((v) => String(v).replace(".", ",")).join(" · ") + " s" : s.meer === "folgen" ? "Meer folgt dir" : "Meer ruht";
     const dur = s.atemzüge ? `${s.atemzüge} Atemzüge` : s.sekunden ? `${s.sekunden} s` : "bis es passt";
-    return `${i + 1}. ${s.name}: ${how}, ${dur}`;
+    return `${i + 1}. ${s.name}: ${how}, ${dur}` + (s.shepard ? `, Shepard-Ton ${s.shepard}` : "");
   });
   const fast = j.schritte.some((s) => s.muster && s.muster[0] + s.muster[2] < SAM_LIMIT.rapidPeriod);
   const holds = j.schritte.some((s) => s.muster && s.muster[1] + s.muster[3] > 0);
@@ -1129,7 +1131,7 @@ function samOutline(j) {
 const SAM = { j: null, i: -1, st: null, t0: 0, breaths: 0, n0: 0, notWith: 0, rapidStep: 0, rapidTotal: 0, pulseHigh: 0, resumeAt: 0, paused: false, ending: false, ledBefore: false, guards: [] };
 const samOn = () => S.mode === "portal" && !!SAM.j;
 function samStart(j) {
-  Object.assign(SAM, { j, i: -1, st: null, rapidTotal: 0, pulseHigh: 0, resumeAt: 0, paused: false, ending: false, ledBefore: false, guards: [], hr0: null });
+  Object.assign(SAM, { j, i: -1, st: null, shDir: 0, rapidTotal: 0, pulseHigh: 0, resumeAt: 0, paused: false, ending: false, ledBefore: false, guards: [], hr0: null });
   SP.D = null; SP.Dt = null;
 }
 function samEnter(i, t) {
@@ -1219,6 +1221,15 @@ function samUpdate(t, dt) {
   J.bowl = st.klangschale && !SAM.ending ? 0.02 : 0;
   J.heartMul = (st.herz === "hören" || st.herz === "beides") && !SAM.ending ? 0.15 : 0;
   setBinaural(J.beat, J.binMul);
+  // Shepard tone: glides only with the breath it belongs to (out for down, in for up)
+  const shDir = st.shepard === "ab" ? -1 : st.shepard === "auf" ? 1 : 0;
+  if (shDir) { SAM.shDir = shDir; if (!A.shGain) initShepard(); }
+  J.shMul = toward(J.shMul || 0, shDir && !SAM.ending && !SAM.paused ? 1 : 0, dt / 4);
+  if (A.shGain) {
+    const e = sess.flowEng, d = SAM.shDir || -1;
+    const moving = ph === "seaLead" ? SP.seg === (d < 0 ? 2 : 0) : !!e && d * e.flow > 0.15;
+    setShepard(d, moving, J.shMul, dt);
+  }
 
   // is the step done?
   if (SAM.ending) { if (J.seaMul <= 0.01 && J.binMul <= 0.01) finish(true); return; }
@@ -1287,6 +1298,42 @@ function setBinaural(beat, level) {
   A.binR.frequency.setTargetAtTime(c + beat / 2, t, 0.8);
   A.binGain.gain.setTargetAtTime(0.035 * level, t, 1.5);
 }
+/* Shepard tone: sines an octave apart under a fixed bell. All of them glide down (or up) together;
+   the one leaving the bell at the bottom comes back silently at the top, so it sinks (or rises)
+   forever. It only moves while you breathe out (down) or in (up): every breath out goes a little lower. */
+const SH = { p: 0, n: 8, lo: 30, centre: 220, width: 1.1 };
+function initShepard() {
+  if (A.shGain || !A.ctx) return;
+  const ctx = A.ctx;
+  A.shGain = ctx.createGain(); A.shGain.gain.value = 0;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2200; lp.Q.value = 0.5;
+  A.shGain.connect(lp).connect(A.master);
+  A.shParts = [];
+  for (let k = 0; k < SH.n; k++) {
+    const o = ctx.createOscillator(); o.type = "sine";
+    const g = ctx.createGain(); g.gain.value = 0;
+    o.connect(g).connect(A.shGain); o.start();
+    A.shParts.push({ o, g, f: 0 });
+  }
+}
+// dir: -1 down, 1 up; moving: whether the breath allows it to glide right now
+function setShepard(dir, moving, level, dt) {
+  if (!A.shGain) return;
+  const t = A.ctx.currentTime;
+  if (moving) SH.p += dir * dt * (SH.speed || 1.2) / 60;
+  SH.p -= Math.floor(SH.p);
+  for (let k = 0; k < SH.n; k++) {
+    const part = A.shParts[k], oct = k + SH.p, f = SH.lo * Math.pow(2, oct);
+    const d = Math.log2(f / SH.centre) / SH.width, amp = Math.exp(-0.5 * d * d);
+    // a partial wrapping round is silent at both ends, so it can jump
+    if (part.f && Math.abs(Math.log2(f / part.f)) > 0.5) { part.o.frequency.cancelScheduledValues(t); part.o.frequency.setValueAtTime(f, t); }
+    else part.o.frequency.setTargetAtTime(f, t, 0.06);
+    part.f = f;
+    part.g.gain.setTargetAtTime(amp * 0.22, t, 0.06);
+  }
+  A.shGain.gain.setTargetAtTime(0.06 * level, t, 1.2);
+}
+
 // the lucid signal: three soft rising glass tones
 function portalCue(vol) {
   if (!A.ctx) return;
@@ -2182,12 +2229,22 @@ function spStep(dt) {
   SP.aOut += (SP.a - SP.aOut) * Math.min(1, dt / 3);
   if (SP.a === 0 && SP.aOut < 0.02) SP.aOut = 0;
   // are you with it? your flow against the sea's, allowing half a second to follow
-  SP.ring.push(SP.flow); if (SP.ring.length > 10) SP.ring.shift();
+  // (iPhone log: following well, but half a second ahead of the sea, which used to count as not with it)
+  SP.ring.push(SP.flow); if (SP.ring.length > 21) SP.ring.shift();
   const e = sess.flowEng;
   if (!e || sig.disturbed) return;
-  const g = SP.ring[0], u = clamp(e.flow, -1.5, 1.5), al = dt / 12;
-  SP.cab += (u * g - SP.cab) * al; SP.caa += (u * u - SP.caa) * al; SP.cbb += (g * g - SP.cbb) * al;
-  SP.sync = SP.cab / Math.sqrt(SP.caa * SP.cbb);
+  const u = clamp(e.flow, -1.5, 1.5), al = dt / 12, n = SP.ring.length;
+  SP.uring = SP.uring || []; SP.uring.push(u); if (SP.uring.length > 11) SP.uring.shift();
+  // lags: you 1 s behind, 0.5 s behind, together, 0.5 s ahead
+  const pairs = [[u, SP.ring[0]], [u, SP.ring[Math.max(0, n - 11)]], [u, SP.ring[n - 1]], [SP.uring[0], SP.ring[n - 1]]];
+  if (!SP.c4) SP.c4 = pairs.map(() => ({ ab: 0, aa: 1e-9, bb: 1e-9 }));
+  let best = -1;
+  pairs.forEach(([x, y], k) => {
+    const c = SP.c4[k];
+    c.ab += (x * y - c.ab) * al; c.aa += (x * x - c.aa) * al; c.bb += (y * y - c.bb) * al;
+    best = Math.max(best, c.ab / Math.sqrt(c.aa * c.bb));
+  });
+  SP.sync = best;
 }
 function spCycle() {
   if (sess.phase !== "seaLead") return;
@@ -2255,7 +2312,7 @@ function setPhase(p) {
   } else if (p === "seaLead") {
     const P = clamp(median(btPeriods(6)), 2.5, 15);
     const rIn = clamp(BT.ins.length ? median(BT.ins.slice(-6)) / P : 0.45, 0.3, 0.6);
-    Object.assign(SP, { P, rIn, a: 0, aOut: SP.aOut, slowing: false, arrived: false, ring: [], cab: 0, caa: 1e-9, cbb: 1e-9, sync: 0, bad: 0 });
+    Object.assign(SP, { P, rIn, a: 0, aOut: SP.aOut, slowing: false, arrived: false, ring: [], uring: [], c4: null, sync: 0, bad: 0 });
     // join you where you are in your breath
     const t = now(), on = BT.on[BT.on.length - 1];
     if (BT.st === 1 && on) SP.ph = clamp((t - on) / P, 0, rIn * 0.95);
@@ -2815,6 +2872,7 @@ function finish(natural) {
   if (natural) { chime(BOWL_HZ); setTimeout(() => chime(BOWL_HZ * 1.5), 900); say("Schön. Du kannst langsam zurückkommen."); }
   audioFade(0, natural ? 6 : 1.2);
   setBinaural(J.beat, 0);
+  if (A.shGain) A.shGain.gain.setTargetAtTime(0, A.ctx.currentTime, 0.8);
   $("#saveNote").textContent = "Ins Tagebuch";
   try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
   $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false;
