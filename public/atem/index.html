@@ -287,6 +287,11 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     <canvas id="nightChart" height="190" hidden aria-label="Die Nacht als Zeitleiste"></canvas>
     <div class="field" id="noteField" hidden>
       <label for="dreamNote" id="noteLabel">Traumtagebuch</label>
+      <div class="toggles" id="lucidAsk" hidden>
+        <label><input type="checkbox" id="laHeard"> Ich habe das Signal im Traum gehört oder gespürt</label>
+        <label><input type="checkbox" id="laLucid"> Ich wusste im Traum, dass ich träume</label>
+        <label><input type="checkbox" id="laWoke"> Das Signal hat mich geweckt</label>
+      </div>
       <textarea id="dreamNote" rows="3" placeholder="Was hast du geträumt? Warst du dir bewusst, dass du träumst?"></textarea>
       <button type="button" class="ghost" id="saveNote">Ins Tagebuch</button>
     </div>
@@ -377,6 +382,13 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <input type="radio" name="snoreCue" id="sc3" value="beides"><label for="sc3">beides</label>
       </div>
       <div id="lucidField">
+        <span>Signal</span>
+        <div class="seg">
+          <input type="radio" name="lucidCue" id="lc1" value="Ton" checked><label for="lc1">Ton</label>
+          <input type="radio" name="lucidCue" id="lc2" value="Vibration"><label for="lc2">Vibration</label>
+          <input type="radio" name="lucidCue" id="lc3" value="beides"><label for="lc3">beides</label>
+        </div>
+        <div class="toggles"><label><input type="checkbox" id="wbtb"> Zur zweiten Nachthälfte kurz wecken und noch einmal üben (WBTB)</label></div>
         <span>Signale im Schlaf ab</span>
         <div class="seg">
           <input type="radio" name="lucidH" id="l4" value="4"><label for="l4">4 Std.</label>
@@ -474,8 +486,8 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v22 · 24.10. 01:00 · Einschlafen";
-const S = { markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
+const VERSION = "v23 · 24.10. 02:00 · Luzid TLR";
+const S = { lucidCue: "Ton", wbtb: false, markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
 // the Portal journeys ride on Just Breathe: same start, same sea, then their own way
@@ -489,7 +501,7 @@ function readBox(ids = BOX_IDS) {
 }
 const JOURNEY_HINT = {
   sleep: "Genau so, wie es dich zum ersten Mal schlafen ließ, bleibt es eingefroren unter /atem/klassik/. Das Meer folgt dir, dann führt es dich langsamer. Binaurale Beats gleiten von Alpha über Theta Richtung Delta, nur solange du mitgehst und dein Puls nicht steigt. Dann wird alles still, die Aufzeichnung läuft weiter.",
-  lucid: "Wie Einschlafen, dazu prägst du dir ein leises Glas-Signal ein: Hörst du es, weißt du, ich träume. In der zweiten Nachthälfte achtet die App auf traumtypisch unruhigen Atem bei ruhigem Körper und spielt dann das Signal, ganz leise. Ein Experiment, kein Versprechen.",
+  lucid: "Nach der Methode „Targeted Lucidity Reactivation“ (TLR) aus dem Schlaflabor der Northwestern University. Vor dem Einschlafen übst du etwa acht Minuten: Immer wenn das Signal kommt, fragst du dich „Träume ich?“, schaust auf Atem, Körper und Gedanken und klopfst zweimal leise aufs Handy. In der zweiten Nachthälfte achtet die App auf traumtypisch unruhigen Atem bei ruhigem Körper und spielt dann dasselbe Signal, ganz leise. Mit WBTB weckt sie dich vorher kurz für eine zweite Übungsrunde. Morgens fragt sie, ob du das Signal im Traum gehört hast und luzid wurdest. Ein Experiment, kein Versprechen.",
   deep: "Resonanzatmung: Das Meer probiert ruhige Tempi von 6,5 bis 4,5 Atemzügen pro Minute und misst, wo dein Herzschlag am stärksten mitschwingt. Dort bleibt es, und ein heller Klang wächst mit der Welle.",
   tank: "Schwarz und fast still. Nur dein Atem als Meer und ganz leise dein eigener Herzschlag. Alles wird langsam immer weniger. Schweben.",
 };
@@ -521,7 +533,8 @@ function applySettingsToForm() {
     if (el) el.checked = true;
   }
   $("#snoreP").checked = S.snore; $("#markOnset").checked = S.markOnset;
-  for (const name of ["journey", "carrier", "lucidH", "snoreCue"]) {
+  $("#wbtb").checked = S.wbtb;
+  for (const name of ["journey", "carrier", "lucidH", "snoreCue", "lucidCue"]) {
     const el = document.querySelector(`input[name=${name}][value="${S[name]}"]`);
     if (el) el.checked = true;
   }
@@ -545,6 +558,7 @@ function readForm() {
   S.journey = jEl ? jEl.value : "sleep";
   S.carrier = parseFloat(document.querySelector("input[name=carrier]:checked").value);
   S.lucidH = parseFloat(document.querySelector("input[name=lucidH]:checked").value);
+  S.lucidCue = document.querySelector("input[name=lucidCue]:checked").value; S.wbtb = $("#wbtb").checked;
   S.voice = $("#voice").checked; S.chimes = $("#chimes").checked; S.autodim = $("#autodim").checked;
   try { localStorage.setItem("atemlotse8", JSON.stringify(S)); } catch (e) {}
 }
@@ -607,7 +621,10 @@ function onMotion(e) {
     if (Math.hypot(g[0] - sig.g1[0], g[1] - sig.g1[1], g[2] - sig.g1[2]) > 0.5) {
       if (!sig.spiking) { sig.spiking = true; sig.spikeStart = t; }
       if (t - sig.spikeStart < 0.4) g = sig.g1.slice();
-    } else sig.spiking = false;
+    } else {
+      if (sig.spiking && t - sig.spikeStart < 0.4) { sig.knocks = sig.knocks || []; sig.knocks.push(sig.spikeStart); if (sig.knocks.length > 20) sig.knocks.shift(); }
+      sig.spiking = false;
+    }
   }
   if (!sig.init) {
     sig.slow = g.slice(); sig.lp = [0, 0, 0]; sig.lp2 = [0, 0, 0];
@@ -1334,6 +1351,59 @@ function setShepard(dir, moving, level, dt) {
   A.shGain.gain.setTargetAtTime(0.06 * level, t, 1.2);
 }
 
+// the lucid signal as chosen: glass tones, a buzz on the chest, or both
+function lucidSignal(vol) {
+  if (S.lucidCue !== "Vibration") portalCue(vol);
+  if (S.lucidCue !== "Ton") haptic([70, 90, 70, 90, 70]);
+}
+// two knocks (or taps) 0.15 to 1.5 s apart, after a given moment: "I checked"
+function doubleKnockSince(since) {
+  const k = (sig.knocks || []).filter((x) => x > since);
+  for (let i = 1; i < k.length; i++) if (k[i] - k[i - 1] > 0.15 && k[i] - k[i - 1] < 1.5) return k[i];
+  return null;
+}
+/* Targeted Lucidity Reactivation, the training before sleep: the signal comes about once a minute;
+   each time you ask yourself whether you are dreaming, look at your breath, body and thoughts,
+   and knock twice. The first three times the voice walks you through it, then only the signal. */
+const TLR_SAY = [
+  "Das ist dein Signal. Frag dich jetzt: Träume ich? Spür deinen Atem, deinen Körper, deine Gedanken. Dann klopf zweimal leise aufs Handy.",
+  "Wieder das Signal. Träume ich? Schau genau hin. Zweimal klopfen.",
+  "Träume ich? Prüf es, ganz ruhig. Klopfen.",
+];
+function tlrTrain(t, n, done) {
+  const T = J.tlr;
+  if (T.cueAt && !T.acked && t - T.cueAt < 12) {
+    const k = doubleKnockSince(T.cueAt);
+    if (k) { T.acked = true; T.rts.push(k - T.cueAt); logEvent("tlrAck", { n: T.trial, rt: +(k - T.cueAt).toFixed(1) }); setPrompt(`Signal ${T.trial}: geprüft ✓`); }
+  }
+  if (t < T.next) return false;
+  if (T.trial >= n) { done(); return true; }
+  T.trial++; T.cueAt = t; T.acked = false;
+  lucidSignal(0.05);
+  logEvent("tlrCue", { n: T.trial });
+  setPrompt(`Signal ${T.trial} von ${n}: Träume ich? Dann zweimal aufs Handy klopfen.`);
+  if (T.voice && T.trial <= TLR_SAY.length) setTimeout(() => say(TLR_SAY[T.trial - 1]), 3000);
+  T.next = t + 50 + Math.random() * 25;
+  return false;
+}
+function wbtbWatch(t) {
+  const W = J.wbtb;
+  if (W.step === "wake") {
+    if (t - W.start > 20 && !W.spoke) { W.spoke = true; say("Kurz aufwachen. Bleib liegen, die Augen zu. Klopf zweimal, wenn du da bist."); }
+    if (doubleKnockSince(W.start) || movedSince(Math.min(60, t - W.start))) {
+      W.step = "train"; logEvent("wbtb", { step: "train" });
+      say("Gut. Wir üben das Signal noch ein paar Mal. Träume ich? Dann zweimal klopfen.");
+      J.tlr = { trial: 0, next: t + 12, rts: J.tlr ? J.tlr.rts : [], voice: false, cueAt: 0 };
+    } else if (t - W.start > 180) { W.step = "done"; logEvent("wbtb", { step: "slept" }); }
+  } else if (W.step === "train") {
+    tlrTrain(t, 4, () => {
+      W.step = "done"; logEvent("wbtb", { step: "done" });
+      say("Schlaf weiter. Wenn das Signal kommt, träumst du.");
+      J.nextCueAt = t + 900;
+    });
+  }
+}
+
 // the lucid signal: three soft rising glass tones
 function portalCue(vol) {
   if (!A.ctx) return;
@@ -1350,7 +1420,7 @@ function portalCue(vol) {
 const toward = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
 function jReset() {
   Object.assign(J, { stage: "follow", beat: S.journey === "tank" ? 6 : 10, seaMul: 1, binMul: 0, heartMul: 0, bowl: 0, hr0: null, t0: now(), cues: [], wake: 0,
-    sweep: null, rsa: [], best: null, coh: 0, holdUntil: 0, nextCueAt: 0, cueVol: 1, baseRate: null, lastCycle: null });
+    sweep: null, rsa: [], best: null, coh: 0, holdUntil: 0, nextCueAt: 0, cueVol: 1, baseRate: null, lastCycle: null, tlr: null, wbtb: null, lastNightCue: null, nightAcks: 0 });
   SP.T = null; SP.faster = false; SP.D = null; SP.Dt = null;
 }
 const movedSince = (sec) => LOG.events.some((e) => e[1] === "moved" && +e[0] > now() - sess.start - sec);
@@ -1374,10 +1444,6 @@ J.onCycle = () => {
   if (S.journey === "deep" && J.sweep && c0 && SP.sync > 0.5 && Math.abs(SP.P - SP.T) < 0.08) {
     const w = heartWave(c0, t);
     if (w != null) J.sweep.data[J.sweep.i].push(w);
-  }
-  if (S.journey === "lucid" && J.stage === "imprint") {
-    J.imprintN = (J.imprintN || 0) + 1;
-    if (J.imprintN % 3 === 0) portalCue(0.05);
   }
 };
 function journeyUpdate(t, dt) {
@@ -1426,15 +1492,15 @@ function journeyUpdate(t, dt) {
     // sleep and lucid: descend while with it, then let go into the night
     if (J.stage === "follow" && ph === "seaLead" && SP.slowing) {
       if (jn === "lucid") {
-        J_stage("imprint", "Präge dir das Signal ein. Hörst du es, weißt du: Ich träume.",
-          "Gleich hörst du ab und zu ein leises Signal. Wenn du es hörst, weißt du: Ich träume.");
-        J.imprintN = 0; setTimeout(() => portalCue(0.06), 5000);
+        J_stage("imprint", "Training: Kommt das Signal, frag dich „Träume ich?“ und klopf zweimal aufs Handy.",
+          "Wir üben jetzt dein Traumsignal. Immer wenn es kommt, fragst du dich: Träume ich? Und klopfst zweimal leise aufs Handy.");
+        J.tlr = { trial: 0, next: t + 8, rts: [], voice: true, cueAt: 0 };
       } else J_stage("descend", "Das Meer wird ruhiger. Lass dich sinken.");
     }
-    if (J.stage === "imprint" && t - J.t0 > 300) {
-      say("Ich erkenne, dass ich träume.");
+    if (J.stage === "imprint") tlrTrain(t, 8, () => {
+      say("Wenn das Signal heute Nacht kommt, erkenne ich: Ich träume.");
       J_stage("descend", "Lass dich sinken. Das Signal begleitet dich in den Traum.");
-    }
+    });
     if (withIt) J.beat = toward(J.beat, J.stage === "descend" ? 4 : 7, dt * 0.02);
     if (J.stage === "descend" && (SP.arrived || t - J.t0 > 600)) J_stage("fade", "Alles wird still. Schlaf gut.");
     // asleep already: no more leading, the sounds just go
@@ -1456,6 +1522,12 @@ function journeyUpdate(t, dt) {
 // held still and breathing becomes irregular). Then the signal, quietly, three times; if you move
 // right after, it probably woke you: wait longer and play softer next time.
 function lucidWatch(t) {
+  if (S.wbtb && !J.wbtb && t >= J.lucidAt) { J.wbtb = { step: "wake", start: t }; logEvent("wbtb", { step: "wake" }); lucidSignal(0.07); }
+  if (J.wbtb && J.wbtb.step !== "done") return wbtbWatch(t);
+  if (J.lastNightCue && !J.lastNightCue.acked && t - J.lastNightCue.t < 90) {
+    const k = doubleKnockSince(J.lastNightCue.t);
+    if (k) { J.lastNightCue.acked = true; J.nightAcks = (J.nightAcks || 0) + 1; logEvent("cueAck", { rt: +(k - J.lastNightCue.t).toFixed(1) }); }
+  }
   const p = btPeriods(10);
   if (!J.baseRate && t - J.nightAt > 1800 && p.length >= 8) J.baseRate = 60 / median(p);
   if (J.cueSeq) {
@@ -1463,7 +1535,7 @@ function lucidWatch(t) {
     if (movedSince(30) && t - s.start < 90) {
       logEvent("cueWake", {}); J.cueSeq = null; J.cueVol *= 0.7; J.nextCueAt = t + 1800; J.wake++;
     } else if (t >= s.next) {
-      portalCue(0.012 * (1 + s.n) * J.cueVol);
+      lucidSignal(0.012 * (1 + s.n) * J.cueVol); J.lastNightCue = { t, acked: false };
       J.cues.push(t - sess.start); logEvent("cue", { n: s.n + 1, vol: +J.cueVol.toFixed(2) });
       s.n++; s.next = t + 20;
       if (s.n >= 3) { J.cueSeq = null; J.nextCueAt = t + 1200; }
@@ -2911,6 +2983,11 @@ function finish(natural) {
       const clock = (sec) => { const d = new Date(Date.parse(LOG.startedAt) + sec * 1000); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
       rows.push(["Signale im Schlaf", J.cues.length ? J.cues.length + " (" + J.cues.filter((_, i) => i % 3 === 0).map(clock).join(", ") + ")" : "keine"]);
       if (J.wake) rows.push(["Davon aufgewacht", J.wake + " Mal, danach leiser"]);
+      if (J.tlr) rows.push(["Training", J.tlr.trial + " Signale, " + J.tlr.rts.length + " Mal geklopft" + (J.tlr.rts.length ? " (Ø " + (J.tlr.rts.reduce((a, b) => a + b, 0) / J.tlr.rts.length).toFixed(1).replace(".", ",") + " s)" : "")]);
+      if (J.wbtb) rows.push(["Kurz geweckt", { wake: "keine Antwort", train: "mittendrin beendet", done: "ja, geübt", slept: "weitergeschlafen" }[J.wbtb.step]]);
+      if (J.nightAcks) rows.push(["Geklopft nach Signal im Schlaf", J.nightAcks + " Mal"]);
+      const ln = diaryLoad().filter((e) => e.what === "Luzid"), lucidN = ln.filter((e) => e.lucid).length;
+      if (ln.length) rows.push(["Luzide Nächte bisher", lucidN + " von " + ln.length]);
     }
   }
   if (isJB() && SP.a > 0) {
@@ -2941,6 +3018,8 @@ function finish(natural) {
   $("#noteField").hidden = !isJB();
   $("#dreamNote").value = "";
   $("#noteLabel").textContent = note.label; $("#dreamNote").placeholder = note.ph;
+  $("#lucidAsk").hidden = !(S.mode === "portal" && S.journey === "lucid");
+  for (const id of ["laHeard", "laLucid", "laWoke"]) $("#" + id).checked = false;
   if (isJB()) requestAnimationFrame(drawNight); else $("#nightChart").hidden = true;
   updateReadouts();
 }
@@ -2999,10 +3078,16 @@ $("#stopBtn").addEventListener("click", () => finish(false));
 $("#saveLog").addEventListener("click", saveLog);
 $("#saveNote").addEventListener("click", () => {
   const text = $("#dreamNote").value.trim();
-  if (!text) return;
-  logEvent("note", { text });
+  const ask = !$("#lucidAsk").hidden, heard = ask && $("#laHeard").checked, lucid = ask && $("#laLucid").checked, woke = ask && $("#laWoke").checked;
+  if (!text && !heard && !lucid && !woke) return;
+  logEvent("note", { text, heard, lucid, woke });
   const list = diaryLoad(), e = list.find((x) => x.id === sess.diaryId);
-  if (e) { e.note = text; diarySave(list); diaryRender(); }
+  if (e) {
+    e.note = text;
+    if (ask) { e.heard = heard; e.lucid = lucid; e.woke = woke; e.rows = e.rows.filter(([a]) => a !== "Morgens");
+      e.rows.push(["Morgens", [lucid ? "luzid!" : "nicht luzid", heard ? "Signal im Traum" : "Signal nicht bemerkt", woke ? "davon aufgewacht" : ""].filter(Boolean).join(", ")]); }
+    diarySave(list); diaryRender();
+  }
   $("#saveNote").textContent = e ? "Im Tagebuch und im Log" : "Im Log gespeichert";
 });
 $("#shareLog").addEventListener("click", shareLog);
