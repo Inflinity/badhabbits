@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a1214">
-<title>Atemlotse</title>
+<title>Changes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&family=Figtree:wght@400;500;600&display=swap">
@@ -236,7 +236,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
 <body>
 <main>
   <header>
-    <h1><a class="back" href="/" aria-label="Zurück zu Bad Habbit">‹</a>Atem<span>lotse</span></h1>
+    <h1><a class="back" href="/" aria-label="Zurück zu Bad Habbit">‹</a>Chan<span>ges</span></h1>
     <div class="status" id="status">Sensor: <b>bereit</b></div>
   </header>
 
@@ -431,7 +431,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v18 · 24.10. 00:30 · Nacht";
+const VERSION = "v19 · 23.10. 11:00 · Changes";
 const S = { markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
@@ -956,7 +956,7 @@ const SAM_LIMIT = { phase: [1, 20], holdTop: 20, holdBottom: 15, rapidPeriod: 4,
 const SAM_BUILTIN = [
   { id: "vortex", src: {
     titel: "Vortex im Regelkreis",
-    von: "Atemlotse",
+    von: "Changes",
     über: "Die Vortex-Folge von 13 · 13 bis 1 · 1, aber im Regelkreis: jede Stufe zählt nur Atemzüge, die du wirklich mit dem Meer gehst. Im Liegen, nicht im Wasser, nicht beim Fahren.",
     ende: "ausklingen",
     schritte: [
@@ -971,7 +971,19 @@ const SAM_BUILTIN = [
     ],
   } },
 ];
-const SAM_TEMPLATE = JSON.stringify(SAM_BUILTIN[0].src, null, 2);
+SAM_BUILTIN.unshift({ id: "nachsport", src: {
+  titel: "Nach dem Sport",
+  von: "Changes",
+  über: "Nach Laufen, Rad oder Training: Das Meer holt dich in deinem Tempo ab und macht den Atem Atemzug für Atemzug etwas länger, aber nur, solange du mitgehst. Am Ende atmest du gleichmäßig, fünf ein, fünf aus.",
+  ende: "ausklingen",
+  schritte: [
+    { name: "Ankommen", meer: "folgen", bis: { gleichmäßig: true }, mindestens: 40, sagen: "Leg dich hin. Du darfst noch schnaufen. Erst folgt das Meer dir." },
+    { name: "Länger werden", meer: "führen", muster: [4, 0, 4, 0], atemzüge: 6, übergang: 3, frequenz: [12, 10], sagen: "Jetzt führt das Meer. Es holt dich in deinem Tempo ab und wird mit dir langsamer." },
+    { name: "Gleichatem", meer: "führen", muster: [5, 0, 5, 0], sekunden: 240, übergang: 2, frequenz: [10, 8], klangschale: true, sagen: "Ein und aus, gleich lang. Ganz weich." },
+    { name: "Nachspüren", meer: "folgen", sekunden: 90, lautstärke: 0.6, frequenz: [8, 7], sagen: "Lass den Atem jetzt von selbst gehen. Spür nach." },
+  ],
+} });
+const SAM_TEMPLATE = JSON.stringify(SAM_BUILTIN[1].src, null, 2);
 
 // Reads a journey, fixes what it can (and says so), refuses what it cannot.
 function samValidate(text) {
@@ -1079,7 +1091,14 @@ function samCycle() {
   SP.a = Math.min(1, SP.a + 1 / 3);
   if (SP.Dt) {
     if (!SP.D) SP.D = [SP.P * SP.rIn, 0, SP.P * (1 - SP.rIn), 0];
-    SP.D = SP.glideLeft > 1 ? SP.D.map((v, k) => v + (SP.Dt[k] - v) / SP.glideLeft) : SP.Dt.slice();
+    let next = SP.glideLeft > 1 ? SP.D.map((v, k) => v + (SP.Dt[k] - v) / SP.glideLeft) : SP.Dt.slice();
+    // each breath at most 12 % longer (15 % shorter) than the one before, and longer only while
+    // you go along; otherwise the sea keeps your current breath and waits
+    const sum = (d) => d[0] + d[1] + d[2] + d[3], p0 = sum(SP.D), p1 = sum(next);
+    const hi = p0 * (SP.sync > 0.5 ? 1.12 : 1.02), lo = p0 / 1.15;
+    const lim = p1 > hi ? hi : p1 < lo ? lo : p1;
+    if (lim !== p1) next = SP.D.map((v, k) => v + (next[k] - v) * (lim - p0) / (p1 - p0));
+    SP.D = next;
     SP.glideLeft = Math.max(1, SP.glideLeft - 1);
   }
   const with_ = SP.sync > 0.5;
@@ -1110,7 +1129,7 @@ function samUpdate(t, dt) {
   if (st.meer !== "führen") SAM.breaths = BT.n - SAM.n0;
 
   // guardrails
-  if (ph === "seaLead" && SP.P < SAM_LIMIT.rapidPeriod) {
+  if (ph === "seaLead" && SP.P < SAM_LIMIT.rapidPeriod && st.muster && st.muster[0] + st.muster[2] < SAM_LIMIT.rapidPeriod) {
     SAM.rapidStep += dt; SAM.rapidTotal += dt;
     if (SAM.rapidStep > SAM_LIMIT.rapidStep || SAM.rapidTotal > SAM_LIMIT.rapidTotal) {
       samGuard("rapid", "Genug schnell geatmet. Wir werden wieder ruhiger.");
@@ -1585,7 +1604,7 @@ function logSample(t, gAvg, rAvg) {
 }
 function buildLog() {
   const head = [
-    "# Atemlotse log",
+    "# Changes log",
     "# version: " + VERSION,
     "# started: " + LOG.startedAt,
     "# settings: " + JSON.stringify(S),
@@ -1605,7 +1624,7 @@ function buildLog() {
 }
 function logFile() {
   const d = new Date(LOG.startedAt), pad = (n) => String(n).padStart(2, "0");
-  const name = `atemlotse-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.csv`;
+  const name = `changes-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.csv`;
   return new File([buildLog()], name, { type: "text/csv" });
 }
 function saveLog() {
@@ -1707,7 +1726,10 @@ function shape(ph, rIn) {
 const A = { ctx: null };
 function initAudio() {
   if (A.ctx) { A.ctx.resume(); return; }
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // bigger audio buffers: a little more latency, but no crackle when the phone is busy
+  let ctx;
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "playback" }); }
+  catch (e) { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
   A.ctx = ctx;
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -18; comp.ratio.value = 3;
@@ -1751,7 +1773,7 @@ function initAudio() {
   A.voice.start(); A.voice2.start();
 
   // Pad for Echtzeit: detuned saws and a sub through a soft low-pass, with a little room
-  const ir = ctx.createBuffer(2, ctx.sampleRate * 2.8, ctx.sampleRate);
+  const ir = ctx.createBuffer(2, ctx.sampleRate * 1.6, ctx.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
     const d = ir.getChannelData(ch);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
@@ -1856,15 +1878,17 @@ function audioSea(dt) {
   const t = A.ctx.currentTime, e = sess.flowEng;
   const ok = e && sig.seen && !sig.disturbed;
   const fl = ok ? clamp((Math.abs(e.flow) - 0.12) / 0.88, 0, 1) : 0;
-  sess.flowOut += (fl - sess.flowOut) * Math.min(1, dt / 0.06);
+  // smoothed and rate-limited, so a shaky signal (after sport, a pounding heart) cannot crackle
+  const fo = sess.flowOut + (fl - sess.flowOut) * Math.min(1, dt / 0.1);
+  sess.flowOut += clamp(fo - sess.flowOut, -4 * dt, 5 * dt);
   const mix = sess.dir ? sess.dir.mix : 0, puYou = 0.45 + ((ok ? e.u : 0.45) - 0.45) * mix;
   // once the sea leads, your gusts cross over into its even swell
   const a = SP.aOut;
   const level = (1 - a) * sess.flowOut + a * (0.08 + 0.92 * Math.abs(SP.flow));
   const pu = (1 - a) * puYou + a * (SP.y + 1) / 2;
-  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 0.05);
+  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 0.12);
   // the sea is the whole of Just Breathe, so it plays regardless of the sound chips
-  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2) * (S.mode === "portal" ? J.seaMul : 1), t, 0.04);
+  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2) * (S.mode === "portal" ? J.seaMul : 1), t, 0.07);
   A.padGain.gain.setTargetAtTime(0, t, 0.5);
   if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(S.mode === "portal" ? J.bowl : 0, t, 0.8);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
@@ -2389,6 +2413,7 @@ function guideStep(dt, adapt) {
 
 function tick() {
   const t = now();
+  if (sess.lastTick && t - sess.lastTick > 0.3 && sess.phase !== "idle" && (sess.janks = (sess.janks || 0) + 1) <= 50) logEvent("jank", { ms: Math.round((t - sess.lastTick) * 1000) });
   const dt = clamp(t - sess.lastTick, 0, 0.2); sess.lastTick = t;
   const el = t - sess.phaseStart;
   const ph = sess.phase;
@@ -2694,6 +2719,8 @@ async function start(ev) {
   sess.match = 0; sess.matchSum = 0; sess.matchN = 0; sess.naturalRate = null; sess.flipBad = 0;
   $("#setup").hidden = true; $("#summary").hidden = true; $("#running").hidden = false;
   setPhase("place");
+  sess.janks = 0;
+  if (A.ctx) logEvent("audio", { rate: A.ctx.sampleRate, base: +(A.ctx.baseLatency || 0).toFixed(3), out: +(A.ctx.outputLatency || 0).toFixed(3) });
   sess.timer = setInterval(tick, 50);
   // check a moment later whether the sensor actually delivers data
   setTimeout(() => {
@@ -2848,7 +2875,7 @@ $("#samShare").addEventListener("click", async () => {
   const v = samValidate($("#samSrc").value);
   if (!v.ok) return samReport(v);
   const url = location.origin + location.pathname + "#reise=" + b64u.enc(JSON.stringify(v.journey));
-  try { if (navigator.share) { await navigator.share({ title: v.journey.titel, text: "Eine Reise für den Atemlotsen", url }); return samReport(v, "Geteilt."); } } catch (e) { if (e.name === "AbortError") return; }
+  try { if (navigator.share) { await navigator.share({ title: v.journey.titel, text: "Eine Reise für Changes", url }); return samReport(v, "Geteilt."); } } catch (e) { if (e.name === "AbortError") return; }
   try { await navigator.clipboard.writeText(url); samReport(v, "Link kopiert:\n" + url); } catch (e) { samReport(v, "Link:\n" + url); }
 });
 $("#samDelete").addEventListener("click", () => {
