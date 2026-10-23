@@ -474,7 +474,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v21 · 23.10. 23:30 · Shepard";
+const VERSION = "v22 · 24.10. 01:00 · Einschlafen";
 const S = { markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
@@ -1431,12 +1431,14 @@ function journeyUpdate(t, dt) {
         J.imprintN = 0; setTimeout(() => portalCue(0.06), 5000);
       } else J_stage("descend", "Das Meer wird ruhiger. Lass dich sinken.");
     }
-    if (J.stage === "imprint" && el > 300) {
+    if (J.stage === "imprint" && t - J.t0 > 300) {
       say("Ich erkenne, dass ich träume.");
       J_stage("descend", "Lass dich sinken. Das Signal begleitet dich in den Traum.");
     }
     if (withIt) J.beat = toward(J.beat, J.stage === "descend" ? 4 : 7, dt * 0.02);
-    if (J.stage === "descend" && (SP.arrived || el > 600)) J_stage("fade", "Alles wird still. Schlaf gut.");
+    if (J.stage === "descend" && (SP.arrived || t - J.t0 > 600)) J_stage("fade", "Alles wird still. Schlaf gut.");
+    // asleep already: no more leading, the sounds just go
+    if (NIGHT.asleep && ["follow", "imprint", "descend"].includes(J.stage)) { logEvent("fadeOnSleep", {}); J_stage("fade"); }
     if (J.stage === "fade") {
       if (movedSince(60)) J.holdUntil = t + 60;               // you moved: no hurry
       if (t >= J.holdUntil) {
@@ -1547,8 +1549,11 @@ function nightTick(t, dt) {
     const hrDown = HB.bpm && NIGHT.so.baseHr && HB.bpm <= NIGHT.so.baseHr - 2;
     const letGo = (ph === "seaLead" && SP.sync < 0.3) || ["fade", "night"].includes(J.stage) || ph === "night";
     const score = (still ? 2 : 0) + (regular ? 2 : 0) + (slower ? 1 : 0) + (hrDown ? 1 : 0) + (letGo ? 1 : 0);
+    // still and regular is also just lying awake: two more signs are needed, and whoever followed
+    // the sea in the last two minutes was awake (log 23.10.: onset at 8 min, in sync with the sea at 12)
+    const awake = sess.lastWithAt && t - sess.lastWithAt < 120;
     if (!NIGHT.asleep) {
-      NIGHT.so.hits = score >= 5 ? NIGHT.so.hits + 1 : 0;
+      NIGHT.so.hits = score >= 6 && !awake ? NIGHT.so.hits + 1 : 0;
       if (NIGHT.so.hits >= 4) {
         NIGHT.asleep = true; const at = t - 120 - sess.start;
         NIGHT.onsets.push(at); logEvent("sleepOnset", { at: +at.toFixed(0), score, rate: rate && +rate.toFixed(1), hr: HB.bpm && Math.round(HB.bpm) });
@@ -2245,6 +2250,7 @@ function spStep(dt) {
     best = Math.max(best, c.ab / Math.sqrt(c.aa * c.bb));
   });
   SP.sync = best;
+  if (sess.phase === "seaLead" && SP.a >= 0.6 && best > 0.6) sess.lastWithAt = now();
 }
 function spCycle() {
   if (sess.phase !== "seaLead") return;
@@ -2292,14 +2298,20 @@ function seaDirection(t, dt) {
   e.dIn = sig.u.map((v) => v * al);
   const v = e.vote(); if (!v) return;
   d.votes.push(v); if (d.votes.length > 12) d.votes.shift();
+  // the votes overlap (30 s windows every 5 s); for a later flip keep one per 30 s, over 5 min
+  d.n = (d.n || 0) + 1;
+  if (d.n % 6 === 0) { d.slow = d.slow || []; d.slow.push(v); if (d.slow.length > 10) d.slow.shift(); }
   const net = d.votes.reduce((a, b) => a + b, 0);
   if (!d.sure && d.votes.length >= 5 && Math.abs(net) >= 4) {
     if (net < 0) { e.flip(); d.votes = d.votes.map((x) => -x); }
     d.sure = true;
     logEvent("direction", { decided: true, flipped: net < 0, votes: d.votes.length });
-  } else if (d.sure && d.votes.length >= 10 && net <= -8 && t - (d.flippedAt || 0) > 180) {
+  } else if (d.sure && d.slow && d.slow.length >= 10 && d.slow.reduce((a, b) => a + b, 0) <= -8 && net <= -8
+    && t - (d.flippedAt || 0) > 300 && !NIGHT.asleep && !["fade", "night"].includes(J.stage)
+    && !(sess.lastWithAt && t - sess.lastWithAt < 120)) {
+    // (log 23.10.: three later flips in 7 minutes while falling asleep, each one sent the sea back)
     d.flippedAt = t;
-    e.flip(); d.votes = d.votes.map((x) => -x); d.mix = 0;
+    e.flip(); d.votes = d.votes.map((x) => -x); d.slow = d.slow.map((x) => -x); d.mix = 0;
     logEvent("direction", { decided: true, flipped: true, later: true });
   }
 }
@@ -2320,7 +2332,7 @@ function setPhase(p) {
     else SP.ph = 0;
     sess.naturalRate = 60 / P; sess.hrStart = HB.bpm;
     logEvent("seaLead", { P: +P.toFixed(2), rIn: +rIn.toFixed(2) });
-    if (!samOn() || !SAM.ledBefore) { setPrompt("Jetzt folge du dem Meer."); say("Jetzt folge du dem Meer."); }
+    if (!samOn() || !SAM.ledBefore) { setPrompt("Jetzt folge du dem Meer."); if (!sess.saidFollow) say("Jetzt folge du dem Meer."); sess.saidFollow = true; }
   } else if (p === "sea" && prevPhase === "seaLead") {
     // quietly back to following; the even swell fades out over a few seconds
   } else if (p === "sea") {
@@ -2576,7 +2588,7 @@ function tick() {
     seaDirection(t, dt);
     if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
     const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
-    const handOver = !(S.mode === "portal" && (S.journey === "tank" || samOn()));
+    const handOver = !(S.mode === "portal" && (S.journey === "tank" || samOn())) && !NIGHT.asleep;
     if (ph === "sea" && rested && handOver && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
     if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
     if (S.mode === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
@@ -2830,7 +2842,7 @@ async function start(ev) {
   window.addEventListener("devicemotion", onMotion);
   keepAwake();
   sess.hasSensor = "DeviceMotionEvent" in window;
-  sess.start = now(); sess.lastTick = now(); sess.history = [];
+  sess.start = now(); sess.lastTick = now(); sess.history = []; sess.lastWithAt = 0; sess.saidFollow = false;
   sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0; sess.qOut = 0.3; sess.boxDur = S.box.slice(); sess.jbStart = null; sess.polPrior = false;
   sess.turns = []; sess.alpha = 0; sess.layersOn = false; sess.flowOut = 0; sess.fit = null;
   btReset(); SP.a = 0; SP.aOut = 0; sess.seaBackAt = null;
