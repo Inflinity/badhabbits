@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5068">
+<title>Figur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #2f5068;
+  --panel: #f6efe2;
+  --ink: #2b2118;
+  --muted: #7a6a58;
+  --accent: #d2452b;
+  --line: #e2d6c2;
+  --good: #3f8f5a;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.4 "Figtree", system-ui, sans-serif; }
+body { display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); color: #fff; }
+header a { color: #fff; text-decoration: none; font-size: 26px; line-height: 1; padding: 2px 6px 4px 0; }
+header h1 { margin: 0; font: 400 20px "Alfa Slab One", Georgia, serif; letter-spacing: 0.03em; }
+header small { margin-left: auto; opacity: 0.75; font-size: 12px; }
+#stage { position: relative; flex: 0 0 46vh; min-height: 280px; touch-action: none; }
+#stage canvas { width: 100%; height: 100%; display: block; }
+#kcalBadge {
+  position: absolute; left: 12px; top: 8px; color: #fff; font: 400 15px "Alfa Slab One", Georgia, serif;
+  background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 10px;
+}
+#hint { position: absolute; right: 12px; bottom: 8px; color: #fff; opacity: 0.7; font-size: 12px; }
+.tabs { display: flex; gap: 6px; padding: 0 12px; }
+.tabs button {
+  flex: 1; border: 0; border-radius: 12px 12px 0 0; padding: 11px 8px; font: 700 15px "Figtree", sans-serif;
+  background: rgba(255,255,255,0.18); color: #fff; cursor: pointer;
+}
+.tabs button[aria-selected=true] { background: var(--panel); color: var(--ink); }
+.panel { flex: 1; overflow-y: auto; background: var(--panel); padding: 14px 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.field output { color: var(--accent); font-weight: 700; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button {
+  border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 10px; padding: 8px 11px;
+  font: 600 14px "Figtree", sans-serif; cursor: pointer;
+}
+.chips button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.swatches button[aria-pressed=true] { box-shadow: 0 0 0 3px var(--accent); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.big { font: 400 30px "Alfa Slab One", Georgia, serif; }
+.bar { height: 12px; background: #eadfcb; border-radius: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--good); width: 0; transition: width 0.6s; }
+.bar i.over { background: var(--accent); }
+.tray { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; }
+.slot {
+  flex: 0 0 104px; height: 118px; border-radius: 16px; background: #fff; border: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: grab;
+  touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.slot b { font-size: 14px; }
+.slot small { color: var(--muted); font-size: 12px; }
+.slot.empty { background: transparent; border-style: dashed; color: var(--muted); cursor: default; font-size: 12px; text-align: center; padding: 8px; }
+#drag { position: fixed; pointer-events: none; z-index: 20; width: 64px; height: 64px; margin: -32px 0 0 -32px; }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.log li { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 5px 0; font-size: 14px; }
+.week { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.week div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); height: 100%; justify-content: flex-end; }
+.week div i { width: 100%; background: var(--good); border-radius: 4px 4px 0 0; min-height: 2px; }
+.actions { display: flex; gap: 8px; }
+.actions button { flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 11px; font: 600 14px "Figtree", sans-serif; cursor: pointer; color: var(--ink); }
+.hintp { margin: 0; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <a href="/" aria-label="Zurück">‹</a>
+  <h1>Figur</h1>
+  <small>v1</small>
+</header>
+<div id="stage">
+  <div id="kcalBadge">0 kcal</div>
+  <div id="hint">Ziehen zum Drehen</div>
+</div>
+<div class="tabs" role="tablist">
+  <button role="tab" id="tabEdit" aria-selected="true">Figur</button>
+  <button role="tab" id="tabFood" aria-selected="false">Essen</button>
+</div>
+<section class="panel" id="panelEdit"></section>
+<section class="panel" id="panelFood" hidden>
+  <div>
+    <div class="big" id="kcalBig">0 kcal</div>
+    <p class="hintp" id="kcalSub">heute, Ziel 2200 kcal</p>
+  </div>
+  <div class="bar"><i id="kcalBar"></i></div>
+  <div class="field">
+    <span>Essen: antippen oder auf die Figur ziehen</span>
+    <div class="tray" id="tray"></div>
+  </div>
+  <div class="field">
+    <span>Heute</span>
+    <ul class="log" id="log"></ul>
+  </div>
+  <div class="actions">
+    <button type="button" id="undo">Letztes zurück</button>
+  </div>
+  <div class="field">
+    <span>Die letzten 7 Tage</span>
+    <div class="week" id="week"></div>
+  </div>
+  <div class="field">
+    <span>Tagesziel <output id="goalOut">2200</output> kcal</span>
+    <input type="range" id="goal" min="1200" max="4000" step="50" value="2200">
+  </div>
+</section>
+<canvas id="drag" width="128" height="128" hidden></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/* ---------------- Settings for the figure ---------------- */
+const SKIN = ["#f3d2b8", "#e8b896", "#d99a78", "#b97a57", "#8d5a3c", "#5e3a25"];
+const HAIRC = ["#1d1611", "#4a3121", "#8a5a33", "#c9a063", "#b8b2a8", "#a3341f"];
+const CLOTH = ["#eef3f5", "#2b2b2b", "#4b5a3c", "#5b4636", "#2f5b8f", "#c0392b", "#e2b13c", "#7d4f8f"];
+const FIG0 = { height: 180, weight: 0.35, muscle: 0.45, skin: 1, hair: "kurz", hairC: 0, beard: "voll", glasses: "eckig", hat: "kappe",
+  shirt: 0, pants: "shorts", pantsC: 3, shoes: 1, pack: true };
+const KEY = "figur-v1";
+let F = { ...FIG0 };
+try { Object.assign(F, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(F)); } catch (e) {} };
+
+/* ---------------- Scene ---------------- */
+const stage = $("#stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#2f5068");
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+camera.position.set(0, 1.12, 3.5); camera.lookAt(0, 0.98, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x4a5f70, 0.55));
+const sun = new THREE.DirectionalLight(0xfff4e6, 0.95); sun.position.set(-2.5, 3.5, 3); scene.add(sun);
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), new THREE.MeshBasicMaterial({ color: 0x223a4c, transparent: true, opacity: 0.6 }));
+shadow.rotation.x = -Math.PI / 2; shadow.scale.set(1.2, 0.8, 1); shadow.position.set(-0.15, 0.001, -0.1); scene.add(shadow);
+function resize() { const r = stage.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+window.addEventListener("resize", resize);
+
+/* ---------------- Low-poly parts ----------------
+   Every part is a few flat-shaded facets with a thin dark outline (its back faces, a little larger). */
+const mats = {};
+const mat = (c) => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
+const OUT = new THREE.MeshBasicMaterial({ color: 0x14100c, side: THREE.BackSide });
+function part(geo, color, parent, opts = {}) {
+  const m = new THREE.Mesh(geo, mat(color));
+  if (opts.outline !== false) {
+    // about 6 mm of outline whatever the size of the part
+    geo.computeBoundingBox();
+    const sz = new THREE.Vector3(); geo.boundingBox.getSize(sz);
+    const o = new THREE.Mesh(geo, OUT);
+    if (opts.ow) o.scale.setScalar(opts.ow);
+    else o.scale.set(1 + clamp(0.014 / sz.x, 0.02, 0.4), 1 + clamp(0.014 / sz.y, 0.02, 0.4), 1 + clamp(0.014 / sz.z, 0.02, 0.4));
+    m.add(o);
+  }
+  if (parent) parent.add(m);
+  return m;
+}
+// a limb segment hanging down from its joint: radius at the joint r1, at the end r2
+function limb(r1, r2, len, color, parent, seg = 6) {
+  const g = new THREE.CylinderGeometry(r1, r2, len, seg, 1); g.translate(0, -len / 2, 0);
+  return part(g, color, parent);
+}
+const ico = (r, d = 1) => new THREE.IcosahedronGeometry(r, d);
+
+let FIG = null;   // the built figure: its group and the joints the animation moves
+function build() {
+  if (FIG) { scene.remove(FIG.root); }
+  const skin = SKIN[F.skin], hairC = HAIRC[F.hairC], shirt = CLOTH[F.shirt], pants = CLOTH[F.pantsC], shoes = CLOTH[F.shoes];
+  const fat = F.weight, mus = F.muscle;
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const J = { root, body };
+  // legs
+  for (const side of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(side * 0.095 * (1 + fat * 0.25), 0.93, 0); body.add(hip);
+    const thighR = 0.088 * (1 + fat * 0.45 + mus * 0.15);
+    if (F.pants === "shorts") {
+      limb(thighR * 1.12, thighR * 0.98, 0.26, pants, hip);
+      const low = new THREE.Group(); low.position.y = -0.26; hip.add(low);
+      limb(thighR * 0.9, 0.066, 0.17, skin, low);
+    } else limb(thighR * 1.08, 0.06, 0.43, pants, hip);
+    const knee = new THREE.Group(); knee.position.y = -0.43; hip.add(knee);
+    const calf = 0.06 * (1 + fat * 0.25 + mus * 0.2);
+    if (F.pants === "shorts") {
+      limb(calf, 0.045, 0.33, skin, knee);
+      const sock = new THREE.Group(); sock.position.y = -0.33; knee.add(sock);
+      limb(0.049, 0.047, 0.1, "#f4f4f2", sock);
+    } else limb(calf * 1.1, 0.05, 0.43, pants, knee);
+    const foot = part(new THREE.BoxGeometry(0.11, 0.075, 0.27), shoes, knee); foot.position.set(0, -0.462, 0.055);
+    J[side < 0 ? "hipR" : "hipL"] = hip; J[side < 0 ? "kneeR" : "kneeL"] = knee;
+  }
+  // pelvis and torso
+  const pelvis = part(new THREE.CylinderGeometry(0.155 * (1 + fat * 0.3), 0.145 * (1 + fat * 0.25), 0.17, 7), pants, body);
+  pelvis.position.y = 0.99; pelvis.scale.z = 0.72;
+  const belt = part(new THREE.CylinderGeometry(0.158 * (1 + fat * 0.3), 0.158 * (1 + fat * 0.3), 0.035, 7), "#2a201a", body, { outline: false });
+  belt.position.y = 1.07; belt.scale.z = 0.74;
+  const chest = new THREE.Group(); chest.position.y = 1.08; body.add(chest); J.chest = chest;
+  const torso = part(new THREE.CylinderGeometry(0.2 * (1 + mus * 0.18 + fat * 0.12), 0.15 * (1 + fat * 0.45), 0.46, 7), shirt, chest);
+  torso.position.y = 0.23; torso.scale.z = 0.62;
+  const belly = part(ico(0.15, 1), shirt, chest, { outline: false }); belly.position.set(0, 0.08, 0.02 + 0.03 * fat);
+  J.belly = belly; J.bellyBase = 0.3 + fat * 0.6;
+  belly.scale.set(1 + fat * 0.3, 0.85, J.bellyBase);
+  // neck and head
+  const neck = new THREE.Group(); neck.position.y = 0.47; chest.add(neck); J.neck = neck;
+  limb(0.055 * (1 + mus * 0.2), 0.06, 0.1, skin, neck).rotation.x = Math.PI; // pointing up
+  const head = new THREE.Group(); head.position.y = 0.17; neck.add(head); J.head = head;
+  const skull = part(ico(0.112, 1), skin, head); skull.scale.set(0.92, 1.12, 1.0);
+  const nose = part(new THREE.ConeGeometry(0.022, 0.05, 4), skin, head, { ow: 1.1 }); nose.rotation.x = Math.PI / 2; nose.position.set(0, -0.005, 0.112);
+  for (const s of [-1, 1]) {
+    const eye = part(new THREE.BoxGeometry(0.022, 0.014, 0.01), "#1a1410", head, { outline: false }); eye.position.set(s * 0.04, 0.02, 0.102);
+    const brow = part(new THREE.BoxGeometry(0.038, 0.01, 0.012), hairC, head, { outline: false }); brow.position.set(s * 0.04, 0.045, 0.1);
+    const ear = part(new THREE.BoxGeometry(0.02, 0.05, 0.035), skin, head); ear.position.set(s * 0.104, 0.0, 0);
+    const cheek = part(ico(0.035, 0), skin, head, { ow: 1.08 }); cheek.position.set(s * 0.06, -0.04, 0.07); cheek.scale.setScalar(0.01);
+    J[s < 0 ? "cheekR" : "cheekL"] = cheek;
+  }
+  const mouth = part(new THREE.BoxGeometry(0.045, 0.008, 0.01), "#6b2f22", head, { outline: false }); mouth.position.set(0, -0.055, 0.1); J.mouth = mouth;
+  // hair
+  if (F.hair !== "glatze") {
+    const cap = part(new THREE.SphereGeometry(0.118, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.52), hairC, head, { ow: 1.04 });
+    cap.scale.set(0.95, 1.12, 1.04); cap.position.set(0, 0.012, -0.008);
+    if (F.hair === "lang") { const back = part(new THREE.BoxGeometry(0.2, 0.22, 0.06), hairC, head); back.position.set(0, -0.07, -0.08); }
+    if (F.hair === "locken") for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2, c = part(ico(0.04, 0), hairC, head, { ow: 1.08 });
+      c.position.set(Math.cos(a) * 0.1, 0.07 + Math.sin(i * 1.7) * 0.02, Math.sin(a) * 0.1 - 0.01);
+    }
+  }
+  // beard
+  if (F.beard === "voll" || F.beard === "stoppeln") {
+    // jaw and chin only: the lower front of the head (phi π/2 is straight ahead)
+    const b = part(new THREE.SphereGeometry(0.118, 8, 3, Math.PI / 2 - 1.85, 3.7, Math.PI * 0.6, Math.PI * 0.3), hairC, head, { ow: 1.03 });
+    b.scale.set(0.95, F.beard === "voll" ? 1.3 : 1.12, 1.05);
+    if (F.beard === "stoppeln") { b.material = b.material.clone(); b.material.transparent = true; b.material.opacity = 0.55; b.children[0].visible = false; }
+    J.beard = b;
+  }
+  if (F.beard === "voll" || F.beard === "schnauzer") { const m = part(new THREE.BoxGeometry(0.08, 0.02, 0.025), hairC, head); m.position.set(0, -0.035, 0.105); }
+  // glasses
+  if (F.glasses !== "keine") {
+    const frame = F.glasses === "sonne" ? "#111" : "#16110d";
+    for (const s of [-1, 1]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.005, 3, F.glasses === "rund" ? 12 : 4), mat(frame));
+      if (F.glasses !== "rund") ring.rotation.z = Math.PI / 4;
+      ring.scale.set(F.glasses === "rund" ? 1 : 1.25, 1, 1); ring.position.set(s * 0.042, 0.02, 0.112); head.add(ring);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.024, F.glasses === "rund" ? 12 : 4), new THREE.MeshLambertMaterial({ color: F.glasses === "sonne" ? 0x101418 : 0xcfe0e6, transparent: true, opacity: F.glasses === "sonne" ? 0.92 : 0.5 }));
+      if (F.glasses !== "rund") lens.rotation.z = Math.PI / 4;
+      lens.scale.copy(ring.scale); lens.position.set(s * 0.042, 0.02, 0.111); head.add(lens);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.006), mat(frame)); bridge.position.set(0, 0.024, 0.114); head.add(bridge);
+  }
+  // hats
+  if (F.hat === "kappe") {
+    const crown = part(new THREE.SphereGeometry(0.122, 7, 3, 0, Math.PI * 2, 0, Math.PI * 0.5), "#4a3a30", head); crown.scale.set(0.98, 0.95, 1.05); crown.position.y = 0.035;
+    const brim = part(new THREE.BoxGeometry(0.17, 0.012, 0.11), "#4a3a30", head); brim.position.set(0, 0.045, 0.14); brim.rotation.x = 0.12;
+  } else if (F.hat === "sonnenhut") {
+    const brim = part(new THREE.CylinderGeometry(0.25, 0.25, 0.012, 10), "#e4cf98", head); brim.position.y = 0.065;
+    const crown = part(new THREE.CylinderGeometry(0.1, 0.12, 0.1, 8), "#e4cf98", head); crown.position.y = 0.115;
+    const band = part(new THREE.CylinderGeometry(0.121, 0.121, 0.02, 8), "#8a3b2a", head, { outline: false }); band.position.y = 0.08;
+  }
+  // arms
+  for (const side of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(side * (0.2 + mus * 0.035 + fat * 0.02), 0.42, 0); chest.add(sh);
+    sh.rotation.z = side * 0.08;
+    const ur = 0.048 * (1 + mus * 0.55 + fat * 0.2);
+    limb(ur * 1.25, ur * 1.12, 0.15, shirt, sh);                 // sleeve
+    limb(ur, ur * 0.8, 0.29, skin, sh);
+    const el = new THREE.Group(); el.position.y = -0.29; sh.add(el);
+    limb(ur * 0.82, 0.034, 0.25, skin, el);
+    const hand = new THREE.Group(); hand.position.y = -0.25; el.add(hand);
+    part(new THREE.BoxGeometry(0.07, 0.09, 0.035), F.pack ? "#2e2622" : skin, hand).position.y = -0.045;
+    J[side < 0 ? "shR" : "shL"] = sh; J[side < 0 ? "elR" : "elL"] = el; J[side < 0 ? "handR" : "handL"] = hand;
+    if (side > 0) { const watch = part(new THREE.CylinderGeometry(0.038, 0.038, 0.025, 8), "#cfcfcf", el); watch.position.y = -0.22; }
+  }
+  // backpack straps and pack
+  if (F.pack) {
+    for (const s of [-1, 1]) {
+      const st = part(new THREE.BoxGeometry(0.045, 0.42, 0.02), "#4a3a30", chest); st.position.set(s * 0.1, 0.25, 0.13 + fat * 0.02); st.rotation.x = -0.12;
+      const back = part(new THREE.BoxGeometry(0.045, 0.3, 0.02), "#4a3a30", chest); back.position.set(s * 0.1, 0.32, -0.13);
+    }
+    const bag = part(new THREE.BoxGeometry(0.3, 0.36, 0.13), "#5a4334", chest); bag.position.set(0, 0.24, -0.19);
+  }
+  const s = F.height / 180; root.scale.setScalar(s);
+  scene.add(root);
+  FIG = J;
+  updateBelly();
+}
+
+/* ---------------- Turning the figure with a finger ---------------- */
+let yaw = 0.35, drag = null;
+stage.addEventListener("pointerdown", (e) => { drag = e.clientX; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener("pointermove", (e) => { if (drag == null) return; yaw += (e.clientX - drag) * 0.01; drag = e.clientX; });
+stage.addEventListener("pointerup", () => { drag = null; });
+
+/* ---------------- Eating ----------------
+   The baklava appears in the right hand, the hand comes up, and he crams it in: three big bites,
+   cheeks puffed, crumbs flying, a gulp, the belly rounds out a little. */
+const crumbs = [];
+let eat = null;
+function startEat(food) {
+  if (!FIG || eat) { queue.push(food); return; }
+  const piece = food.mesh(); piece.scale.setScalar(1.3); piece.position.set(0, -0.11, 0.05); FIG.handR.add(piece);
+  eat = { t: 0, piece, food, bites: 0 };
+}
+const queue = [];
+const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+function eatStep(dt) {
+  const J = FIG; if (!J) return;
+  // rest pose with a breath
+  const tt = performance.now() / 1000;
+  let shR = 0, shRy = 0, elR = 0, shRz = 0, shL = 0, elL = 0, lean = 0, nod = 0, cheeks = J.cheekLevel || 0;
+  if (eat) {
+    eat.t += dt; const t = eat.t;
+    const up = ease(t / 0.45) * (1 - ease((t - 2.1) / 0.4));
+    shR = -1.36 * up; shRy = 0.8 * up; elR = -1.98 * up; shRz = 0.2 * up;   // found by search: the hand at the mouth
+    shL = -0.7 * up; elL = -1.3 * up;                 // the other hand helps push
+    lean = 0.12 * up;
+    // three greedy bites
+    for (let k = 0; k < 3; k++) {
+      const b = t - 0.55 - k * 0.42;
+      if (b > 0 && b < 0.32) { nod = Math.sin((b / 0.32) * Math.PI) * 0.25; }
+      if (b > 0.12 && eat.bites === k) {
+        eat.bites++; eat.piece.scale.multiplyScalar(0.62); cheeks = Math.min(1, cheeks + 0.45);
+        for (let i = 0; i < 7; i++) spawnCrumb(eat.food.crumb);
+      }
+    }
+    if (t > 1.9 && eat.piece.parent) eat.piece.parent.remove(eat.piece);
+    if (t > 2.6) { eat = null; J.chew = 2.2; }
+  }
+  if (J.chew > 0) {
+    J.chew -= dt;
+    cheeks = Math.max(0.15, cheeks - dt * 0.25) * (0.85 + 0.15 * Math.sin(tt * 18));
+    J.mouth.scale.y = 1 + 2.5 * Math.abs(Math.sin(tt * 9));
+    if (J.chew <= 0) { cheeks = 0; J.mouth.scale.y = 1; gulp = 1; }
+  }
+  J.cheekLevel = cheeks;
+  for (const c of [J.cheekR, J.cheekL]) c.scale.setScalar(0.01 + cheeks * 1.0);
+  J.shR.rotation.set(shR, shRy, -0.08 + shRz); J.elR.rotation.x = elR;
+  J.shL.rotation.x = shL + Math.sin(tt * 1.2) * 0.03; J.elL.rotation.x = elL;
+  J.chest.rotation.x = lean; J.head.rotation.x = nod - lean * 0.6;
+  const br = Math.sin(tt * 1.6) * 0.012;
+  J.chest.scale.set(1 + br, 1 + br * 0.5, 1 + br);
+  if (gulp > 0) { gulp = Math.max(0, gulp - dt * 1.5); J.neck.scale.set(1 + 0.15 * Math.sin(gulp * Math.PI), 1, 1 + 0.15 * Math.sin(gulp * Math.PI)); }
+  if (!eat && queue.length) startEat(queue.shift());
+}
+let gulp = 0;
+function spawnCrumb(color) {
+  const m = new THREE.Mesh(new THREE.TetrahedronGeometry(0.012 + Math.random() * 0.01), mat(color));
+  const head = new THREE.Vector3(); FIG.mouth.getWorldPosition(head);
+  m.position.copy(head);
+  scene.add(m);
+  crumbs.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 0.9, 0.4 + Math.random() * 0.8, 0.3 + Math.random() * 0.6), life: 1.6 });
+}
+function crumbStep(dt) {
+  for (let i = crumbs.length - 1; i >= 0; i--) {
+    const c = crumbs[i]; c.life -= dt; c.v.y -= 3.2 * dt; c.m.position.addScaledVector(c.v, dt); c.m.rotation.x += dt * 8;
+    if (c.m.position.y < 0.01) { c.m.position.y = 0.01; c.v.set(0, 0, 0); }
+    if (c.life <= 0) { scene.remove(c.m); crumbs.splice(i, 1); }
+  }
+}
+
+/* ---------------- Food ---------------- */
+// Baklava: a diamond of golden layers with chopped pistachio on top
+function baklavaMesh() {
+  const g = new THREE.Group();
+  const shape = new THREE.Shape(); shape.moveTo(0, 0.055); shape.lineTo(0.04, 0); shape.lineTo(0, -0.055); shape.lineTo(-0.04, 0); shape.closePath();
+  const layers = ["#c98a2e", "#e9c27a", "#c98a2e", "#e9c27a", "#b5761f"];
+  layers.forEach((c, i) => {
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.008, bevelEnabled: false }); geo.rotateX(Math.PI / 2);
+    const m = part(geo, c, g, { ow: 1.08 }); m.position.y = 0.008 * (layers.length - i);
+  });
+  for (let i = 0; i < 9; i++) {
+    const p = part(new THREE.TetrahedronGeometry(0.008), "#7fa04a", g, { outline: false });
+    p.position.set((Math.random() - 0.5) * 0.035, 0.05, (Math.random() - 0.5) * 0.05); p.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+  }
+  return g;
+}
+const FOODS = [{ id: "baklava", name: "Baklava", kcal: 200, note: "1 Stück, ~40 g", mesh: baklavaMesh, crumb: "#d9a24a" }];
+
+/* ---------------- Calories ---------------- */
+const KC_KEY = "figur-kcal";
+let KC = { goal: 2200, days: {} };
+try { Object.assign(KC, JSON.parse(localStorage.getItem(KC_KEY) || "{}")); } catch (e) {}
+const kcSave = () => { try { localStorage.setItem(KC_KEY, JSON.stringify(KC)); } catch (e) {} };
+const dayKey = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const today = () => (KC.days[dayKey()] = KC.days[dayKey()] || []);
+const sum = (l) => l.reduce((a, e) => a + e.kcal, 0);
+function updateBelly() {
+  if (!FIG) return;
+  const k = clamp(sum(today()) / KC.goal, 0, 1.6);
+  FIG.bellyTarget = FIG.bellyBase + k * 0.35;
+}
+function renderFood() {
+  const l = today(), s = sum(l);
+  $("#kcalBadge").textContent = s + " kcal";
+  $("#kcalBig").textContent = s + " kcal";
+  $("#kcalSub").textContent = `heute, Ziel ${KC.goal} kcal · ${s <= KC.goal ? "noch " + (KC.goal - s) : (s - KC.goal) + " drüber"}`;
+  const bar = $("#kcalBar"); bar.style.width = Math.min(100, (s / KC.goal) * 100) + "%"; bar.classList.toggle("over", s > KC.goal);
+  $("#log").innerHTML = l.length ? l.slice().reverse().map((e) => `<li><span>${e.time} · ${e.name}</span><b>${e.kcal} kcal</b></li>`).join("") : '<li><span>Noch nichts gegessen.</span></li>';
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push([d, sum(KC.days[dayKey(d)] || [])]); }
+  const mx = Math.max(KC.goal, ...days.map((x) => x[1]));
+  $("#week").innerHTML = days.map(([d, v]) => `<div><i style="height:${(v / mx) * 60}px;${v > KC.goal ? "background:var(--accent)" : ""}"></i>${["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"][d.getDay()]}</div>`).join("");
+  $("#goal").value = KC.goal; $("#goalOut").textContent = KC.goal;
+  updateBelly();
+}
+function feed(food) {
+  const d = new Date();
+  today().push({ id: food.id, name: food.name, kcal: food.kcal, time: String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") });
+  kcSave(); startEat(food);
+  setTimeout(renderFood, 2300);
+  $("#kcalBadge").textContent = sum(today()) + " kcal";
+}
+$("#undo").onclick = () => { today().pop(); kcSave(); renderFood(); };
+$("#goal").oninput = (e) => { KC.goal = +e.target.value; kcSave(); renderFood(); };
+
+// tray: tap to feed, or drag onto the figure
+function slotIcon(food) {
+  // a small rendered picture of the food, from the same low-poly model
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); r.setSize(128, 128);
+  const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.01, 5);
+  cam.position.set(0, 0.17, 0.2); cam.lookAt(0, 0.02, 0);
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x886644, 0.9)); const dl = new THREE.DirectionalLight(0xffffff, 0.6); dl.position.set(1, 2, 1); sc.add(dl);
+  const m = food.mesh(); m.rotation.y = 0.5; sc.add(m); r.render(sc, cam);
+  const url = r.domElement.toDataURL(); r.dispose(); return url;
+}
+function renderTray() {
+  const tray = $("#tray"); tray.innerHTML = "";
+  for (const f of FOODS) {
+    const s = document.createElement("div"); s.className = "slot";
+    const img = new Image(); img.src = slotIcon(f); img.width = 64; img.height = 64; img.alt = "";
+    s.append(img); s.insertAdjacentHTML("beforeend", `<b>${f.name}</b><small>${f.kcal} kcal</small>`);
+    let start = null, moved = false;
+    s.addEventListener("pointerdown", (e) => { start = [e.clientX, e.clientY]; moved = false; s.setPointerCapture(e.pointerId); });
+    s.addEventListener("pointermove", (e) => {
+      if (!start) return;
+      if (!moved && Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 10) { moved = true; const dg = $("#drag"); dg.hidden = false; dg.getContext("2d").clearRect(0, 0, 128, 128); dg.getContext("2d").drawImage(img, 0, 0, 128, 128); }
+      if (moved) { const dg = $("#drag"); dg.style.left = e.clientX + "px"; dg.style.top = e.clientY + "px"; }
+    });
+    s.addEventListener("pointerup", (e) => {
+      $("#drag").hidden = true;
+      if (!start) return;
+      const r = stage.getBoundingClientRect(), onFig = e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom;
+      if (!moved || onFig) feed(f);
+      start = null;
+    });
+    tray.append(s);
+  }
+  for (const n of ["Bald mehr", "Bald mehr"]) { const s = document.createElement("div"); s.className = "slot empty"; s.textContent = n; tray.append(s); }
+}
+
+/* ---------------- Editor ---------------- */
+function chips(label, key, options) {
+  return `<div class="field"><span>${label}</span><div class="chips">${options.map(([v, t]) => `<button type="button" data-k="${key}" data-v="${v}" aria-pressed="${String(F[key]) === String(v)}">${t}</button>`).join("")}</div></div>`;
+}
+function swatches(label, key, list) {
+  return `<div class="field"><span>${label}</span><div class="swatches">${list.map((c, i) => `<button type="button" data-k="${key}" data-v="${i}" data-num="1" style="background:${c}" aria-label="Farbe ${i + 1}" aria-pressed="${F[key] === i}"></button>`).join("")}</div></div>`;
+}
+function slider(label, key, min, max, step, fmt) {
+  return `<div class="field"><span>${label} <output id="o_${key}">${fmt(F[key])}</output></span><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${F[key]}"></div>`;
+}
+const FMT = { height: (v) => v + " cm", weight: (v) => ["schlank", "normal", "kräftig", "rund"][Math.min(3, Math.floor(v * 4))], muscle: (v) => ["wenig", "etwas", "trainiert", "sehr"][Math.min(3, Math.floor(v * 4))] };
+function renderEditor() {
+  $("#panelEdit").innerHTML =
+    slider("Größe", "height", 150, 205, 1, FMT.height) +
+    `<div class="row2">${slider("Körper", "weight", 0, 1, 0.01, FMT.weight)}${slider("Muskeln", "muscle", 0, 1, 0.01, FMT.muscle)}</div>` +
+    swatches("Haut", "skin", SKIN) +
+    chips("Haare", "hair", [["kurz", "kurz"], ["glatze", "Glatze"], ["lang", "lang"], ["locken", "Locken"]]) +
+    swatches("Haarfarbe", "hairC", HAIRC) +
+    chips("Bart", "beard", [["keiner", "keiner"], ["stoppeln", "Stoppeln"], ["schnauzer", "Schnauzer"], ["voll", "Vollbart"]]) +
+    chips("Brille", "glasses", [["keine", "keine"], ["eckig", "eckig"], ["rund", "rund"], ["sonne", "Sonnenbrille"]]) +
+    chips("Kopf", "hat", [["keine", "nichts"], ["kappe", "Kappe"], ["sonnenhut", "Sonnenhut"]]) +
+    swatches("Shirt", "shirt", CLOTH) +
+    chips("Hose", "pants", [["shorts", "Shorts"], ["lang", "lang"]]) +
+    swatches("Hosenfarbe", "pantsC", CLOTH) +
+    swatches("Schuhe", "shoes", CLOTH) +
+    chips("Rucksack und Handschuhe", "pack", [["true", "ja"], ["false", "nein"]]) +
+    `<div class="actions"><button type="button" id="reset">Zurücksetzen</button></div>`;
+  $("#panelEdit").querySelectorAll("button[data-k]").forEach((b) => b.onclick = () => {
+    const k = b.dataset.k; let v = b.dataset.v;
+    F[k] = b.dataset.num ? +v : v === "true" ? true : v === "false" ? false : v;
+    save(); build(); renderEditor();
+  });
+  $("#panelEdit").querySelectorAll("input[data-k]").forEach((inp) => inp.oninput = () => {
+    const k = inp.dataset.k; F[k] = +inp.value; $("#o_" + k).textContent = FMT[k](F[k]); save(); build();
+  });
+  $("#reset").onclick = () => { F = { ...FIG0 }; save(); build(); renderEditor(); };
+}
+for (const [tab, panel] of [["#tabEdit", "#panelEdit"], ["#tabFood", "#panelFood"]]) {
+  $(tab).onclick = () => {
+    for (const [t2, p2] of [["#tabEdit", "#panelEdit"], ["#tabFood", "#panelFood"]]) { $(t2).setAttribute("aria-selected", String(t2 === tab)); $(p2).hidden = p2 !== panel; }
+  };
+}
+
+/* ---------------- Loop ---------------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (FIG) {
+    FIG.root.rotation.y = yaw;
+    eatStep(dt); crumbStep(dt);
+    const b = FIG.belly; b.scale.z += ((FIG.bellyTarget || FIG.bellyBase) - b.scale.z) * Math.min(1, dt * 2);
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+resize(); build(); renderEditor(); renderTray(); renderFood();
+requestAnimationFrame(loop);
+window.__fig = { feed: () => feed(FOODS[0]), F };
+</script>
+</body>
+</html>
