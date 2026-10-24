@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        navigateFallbackDenylist: [/^\/atem/, /^\/changes/]
+        navigateFallbackDenylist: [/^\/atem/, /^\/changes/, /^\/karte/]
       },
       includeAssets: ['favicon.ico', 'graphics/logo_512x512.png'],
       manifest: {

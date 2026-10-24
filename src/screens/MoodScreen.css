@@ -158,6 +158,10 @@
   color: var(--accent);
 }
 
+.map-bubble {
+  color: var(--accent);
+}
+
 /* Instruction */
 .mood-instruction {
   font-size: 12px;
