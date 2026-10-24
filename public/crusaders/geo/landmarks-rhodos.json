@@ -1,6 +1,6 @@
 {
  "region": "rhodos",
- "about": "Wahrzeichen so, wie man sie heute begehen kann. Jedes hat einen Anker (lat, lon) und Bauteile in Metern: x nach Osten, y nach oben, z nach Süden, relativ zum Anker. base: 'boden' = auf dem Gelände, 'meer' = ab Meereshöhe. frei: Radius in Metern, in dem keine generischen Häuser und Bäume stehen. Bauteile: rock [x,y,z, rx,rz,h, oben], box [x,y,z, w,h,d, dreh°], cyl [x,y,z, r,h], cols [x1,z1, x2,z2, y, n, r,h], row [x1,z1, x2,z2, y, n, w,h,d], ring [x,y,z, rx,rz, h,dicke, türme], wall [[lon,lat]…, h,dicke, türme], colring [x,y,z, r, n, rs,h] (Säulenrund), dome [x,y,z, r] (Kuppel), palm [x,y,z, h]; Farbe am Ende. Positionen auf zehn Meter, Maße nach Plänen und Luftbildern geschätzt.",
+ "about": "Wahrzeichen so, wie man sie heute begehen kann. Jedes hat einen Anker (lat, lon) und Bauteile in Metern: x nach Osten, y nach oben, z nach Süden, relativ zum Anker. base: 'boden' = auf dem Gelände, 'meer' = ab Meereshöhe. frei: Radius in Metern, in dem keine generischen Häuser und Bäume stehen. Bauteile: rock [x,y,z, rx,rz,h, oben], box [x,y,z, w,h,d, dreh°], cyl [x,y,z, r,h], cols [x1,z1, x2,z2, y, n, r,h], row [x1,z1, x2,z2, y, n, w,h,d], ring [x,y,z, rx,rz, h,dicke, türme], wall [[lon,lat]…, h,dicke, türme], colring [x,y,z, r, n, rs,h] (Säulenrund), dome [x,y,z, r] (Kuppel), palm [x,y,z, h], crown [x,y,z, r, h] (Baumkrone); Farbe am Ende. Positionen auf zehn Meter, Maße nach Plänen und Luftbildern geschätzt.",
  "colors": {
   "fels": "#b08a5c",
   "stein": "#d2b48a",
@@ -821,6 +821,138 @@
      -38,
      12,
      "palme"
+    ]
+   ]
+  },
+  {
+   "id": "apolakkia-platane",
+   "name": "Platane von Apolakkia",
+   "lat": 36.0667,
+   "lon": 27.7878,
+   "base": "boden",
+   "frei": 30,
+   "parts": [
+    [
+     "cyl",
+     0,
+     0,
+     0,
+     2.6,
+     9,
+     "stamm"
+    ],
+    [
+     "cyl",
+     -3,
+     6,
+     1,
+     1.2,
+     7,
+     "stamm"
+    ],
+    [
+     "cyl",
+     3,
+     6,
+     -1,
+     1.3,
+     8,
+     "stamm"
+    ],
+    [
+     "crown",
+     0,
+     16,
+     0,
+     15,
+     9,
+     "palme"
+    ],
+    [
+     "crown",
+     -9,
+     14,
+     4,
+     9,
+     6,
+     "palme"
+    ],
+    [
+     "crown",
+     9,
+     15,
+     -3,
+     10,
+     6,
+     "palme"
+    ]
+   ]
+  },
+  {
+   "id": "rhodos-akropolis",
+   "name": "Akropolis von Rhodos",
+   "lat": 36.43,
+   "lon": 28.2093,
+   "base": "boden",
+   "frei": 60,
+   "parts": [
+    [
+     "box",
+     0,
+     0,
+     0,
+     34,
+     2,
+     18,
+     0,
+     "stein"
+    ],
+    [
+     "cols",
+     -12,
+     -6,
+     12,
+     -6,
+     2,
+     4,
+     1,
+     10,
+     "marmor"
+    ],
+    [
+     "box",
+     0,
+     12,
+     -6,
+     30,
+     1.6,
+     2.4,
+     0,
+     "marmor"
+    ],
+    [
+     "box",
+     10,
+     0,
+     60,
+     30,
+     1,
+     120,
+     0,
+     "stein"
+    ],
+    [
+     "row",
+     -6,
+     60,
+     -6,
+     110,
+     1,
+     6,
+     4,
+     2,
+     10,
+     "stein"
     ]
    ]
   }
