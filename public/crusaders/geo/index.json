@@ -13,7 +13,9 @@
     28.3,
     36.5
    ],
-   "landmarks": "landmarks-rhodos.json"
+   "landmarks": "landmarks-rhodos.json",
+   "strassen": "strassen-rhodos.json",
+   "seewege": "seewege-rhodos.json"
   },
   {
    "id": "umland-rhodos",

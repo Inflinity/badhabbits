@@ -32,6 +32,8 @@ style.textContent = `:root { --pc-ink: #3b2412; --pc-red: #c8321e; --pc-paper: #
 .pcThumb img { width: 100%; border-radius: 3px; }
 .pcThumb.locked { background: #efe6d4; box-shadow: none; aspect-ratio: 3/2.35; justify-content: center; align-items: center; color: #a08a6a; cursor: default; }
 .pcThumb small { font-weight: 400; }
+.pcKind { grid-column: 1 / -1; margin: 8px 0 0; font: 400 18px "Alfa Slab One", Georgia, serif; }
+.pcKind small { font: 400 13px "Figtree", sans-serif; color: #7a5a3a; }
 #pcCard {
   position: relative; width: 100%; aspect-ratio: 3/2; background-size: cover; border: 9px solid #fffaf0; border-radius: 4px;
   box-shadow: 0 8px 22px rgba(0,0,0,0.3); overflow: hidden; touch-action: none; container-type: inline-size;
@@ -125,7 +127,32 @@ const SCENES = {
     `<path d="M140 300 L190 170 L230 120 L290 110 L330 160 L360 300 Z" fill="#8f6a4a"/>` +
     `<rect x="225" y="70" width="90" height="50" fill="#c9a98a"/>` + Array.from({ length: 6 }, (_, i) => `<rect x="${225 + i * 16}" y="58" width="10" height="14" fill="#c9a98a"/>`).join("") +
     `<rect x="300" y="80" width="18" height="18" fill="#fff"/><path d="M296 80 L309 66 L322 80 Z" fill="#c0392b"/>`,
+  // a law scroll: the sea law of Rhodes, unrolled on a harbour wall
+  lexrhodia: () => sky("#8fd0f2", "#eaf6fb") + sea(250) +
+    `<rect x="0" y="292" width="600" height="108" fill="#c9a873"/>` + Array.from({ length: 12 }, (_, i) => `<line x1="${i * 50}" y1="292" x2="${i * 50 + 20}" y2="400" stroke="#b08e5a" stroke-width="2"/>`).join("") +
+    [380, 460, 540].map((x) => `<path d="M${x - 12} 250 L${x - 9} 205 H${x + 9} L${x + 12} 250 Z" fill="#f4ede0"/><path d="M${x - 10} 207 Q${x} 192 ${x + 10} 207 Z" fill="#8a5a33"/>`).join("") +
+    `<path d="M70 120 H430 Q440 120 440 132 V300 Q440 312 430 312 H70 Q60 312 60 300 V132 Q60 120 70 120 Z" fill="#f1dfb0" stroke="#a87c3a" stroke-width="3"/>` +
+    `<rect x="40" y="108" width="34" height="216" rx="17" fill="#d9bf86" stroke="#8a6a3a" stroke-width="3"/><rect x="426" y="108" width="34" height="216" rx="17" fill="#d9bf86" stroke="#8a6a3a" stroke-width="3"/>` +
+    `<text x="250" y="165" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="26" fill="#5a3412">ΝΟΜΟΣ ΡΟΔΙΩΝ ΝΑΥΤΙΚΟΣ</text>` +
+    `<text x="250" y="198" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="20" fill="#7a4a1a">Lex Rhodia de iactu</text>` +
+    Array.from({ length: 6 }, (_, i) => `<line x1="${105 + (i % 2) * 10}" y1="${222 + i * 13}" x2="${395 - (i % 3) * 20}" y2="${222 + i * 13}" stroke="#a07a48" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`).join("") +
+    `<circle cx="385" cy="285" r="20" fill="#a3341f"/><circle cx="385" cy="285" r="13" fill="none" stroke="#e0a090" stroke-width="2"/>` +
+    `<path d="M140 268 q30 -28 60 0 Z M170 268 V246 L188 262 Z" fill="#7a4a1a" opacity="0.8"/>`,
+  // a film poster: The Guns of Navarone, filmed on Rhodes in 1961 (our own drawing, after the film)
+  navarone: () => `<defs><linearGradient id="ps" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1a2e"/><stop offset="0.55" stop-color="#b8442a"/><stop offset="1" stop-color="#f2a23c"/></linearGradient></defs>
+    <rect width="600" height="400" fill="#1a1414"/><rect x="150" y="10" width="300" height="380" fill="url(#ps)" stroke="#f1e4c4" stroke-width="6"/>
+    <path d="M150 390 V170 L230 120 L300 150 L340 110 L420 160 L450 140 V390 Z" fill="#3a2a22"/>
+    <path d="M220 210 h60 v30 h-60 Z M330 230 h60 v30 h-60 Z" fill="#120c0a"/>
+    <path d="M250 222 L170 200 L172 210 L250 232 Z M360 242 L262 214 L264 224 L360 252 Z" fill="#6b6a64" stroke="#2a2a28" stroke-width="2"/>
+    <path d="M150 340 Q300 325 450 345 V390 H150 Z" fill="#1f4f78"/><path d="M270 338 l30 -12 l30 12 Z M300 326 v-14" stroke="#f1e4c4" stroke-width="2" fill="#7a5230"/>
+    <text x="300" y="52" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="22" fill="#f6e2b4" letter-spacing="2">DIE KANONEN</text>
+    <text x="300" y="86" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="34" fill="#ffd36a" letter-spacing="3">VON NAVARONE</text>
+    <text x="300" y="376" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#f6e2b4">gedreht auf Rhodos · 1961</text>
+    <circle cx="90" cy="200" r="34" fill="#c0392b"/><text x="90" y="206" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="16" fill="#fff">KINO</text>`,
 };
+// what can be collected: postcards, law scrolls, film posters; each one is a card
+const KINDS = { postkarte: "Postkarte", gesetzesrolle: "Gesetzesrolle", filmposter: "Filmposter" };
+const titleOf = (s) => s.title || "Grüße aus " + s.name;
 const SPOTS = [
   { id: "rhodos", name: "Rhodos", lat: 36.4495, lon: 28.2265, r: 1.5 },
   { id: "lindos", name: "Lindos", lat: 36.0915, lon: 28.0875, r: 1.2 },
@@ -135,7 +162,12 @@ const SPOTS = [
   { id: "petaloudes", name: "Petaloudes", lat: 36.335, lon: 28.063, r: 0.9 },
   { id: "kamiros", name: "Kamiros", lat: 36.336, lon: 27.92, r: 0.9 },
   { id: "monolithos", name: "Monolithos", lat: 36.128, lon: 27.723, r: 1.2 },
+  // Rhodes gave the sea its first law: the scroll lies in the harbour
+  { id: "lexrhodia", kind: "gesetzesrolle", name: "Lex Rhodia", title: "Lex Rhodia · Seerecht von Rhodos", lat: 36.4508, lon: 28.2272, r: 0.45 },
+  // the Kallithea springs were a film set
+  { id: "navarone", kind: "filmposter", name: "Navarone", title: "Die Kanonen von Navarone", lat: 36.3803, lon: 28.2405, r: 0.35 },
 ];
+SPOTS.forEach((s) => { s.kind = s.kind || "postkarte"; });
 const sceneSVG = (id) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="1500" height="1000">${SCENES[id]()}</svg>`;
 const sceneURL = (id) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sceneSVG(id));
 const PC_KEY = "rhodos-postkarten";
@@ -147,7 +179,8 @@ function pcBadge() { $("#pcBtn").textContent = "✉" + (pcCount() ? " " + pcCoun
 
 // where you are: a spot reached for the first time pops its card
 function postcardCheck(f) {
-  for (const s of SPOTS) {
+  // the smallest circles first: a hidden find inside a postcard's circle pops before the postcard
+  for (const s of [...SPOTS].sort((a, b) => a.r - b.r)) {
     if (PC[s.id] || popping === s.id) continue;
     if (distKm([f.lat, f.lon], [s.lat, s.lon]) <= s.r && f.acc < 300) { popCard(s); break; }
   }
@@ -157,7 +190,8 @@ function popCard(s) {
   popping = s.id;
   const pop = $("#pcPop");
   pop.querySelector("img").src = sceneURL(s.id);
-  pop.querySelector("b").textContent = "Grüße aus " + s.name;
+  pop.querySelector("b").textContent = titleOf(s);
+  pop.querySelector("small").textContent = (s.kind === "postkarte" ? "Postkarte" : KINDS[s.kind] + " gefunden!") + " · Tippen zum Schnappen";
   pop.hidden = false; pop.classList.remove("in"); void pop.offsetWidth; pop.classList.add("in");
   if (navigator.vibrate) try { navigator.vibrate([40, 60, 40]); } catch (e) {}
   pop.onclick = () => { snap(s); };
@@ -174,9 +208,12 @@ const stampItem = (s) => ({ k: "stamp", x: 82, y: 22, s: 1, r: -12, t: s.name.to
 /* the collection */
 $("#pcBtn").onclick = () => {
   const list = $("#pcList");
-  list.innerHTML = SPOTS.map((s) => PC[s.id]
-    ? `<button type="button" class="pcThumb" data-id="${s.id}"><img src="${sceneURL(s.id)}" alt=""><span>${s.name}</span></button>`
-    : `<div class="pcThumb locked"><span>${s.name}</span><small>noch nicht dort</small></div>`).join("");
+  list.innerHTML = Object.keys(KINDS).map((k) => {
+    const of = SPOTS.filter((s) => s.kind === k), n = of.filter((s) => PC[s.id]).length;
+    return `<h3 class="pcKind">${{ postkarte: "Postkarten", gesetzesrolle: "Gesetzesrollen", filmposter: "Filmposter" }[k]} <small>${n} von ${of.length}</small></h3>` + of.map((s) => PC[s.id]
+      ? `<button type="button" class="pcThumb" data-id="${s.id}"><img src="${sceneURL(s.id)}" alt=""><span>${s.name}</span></button>`
+      : `<div class="pcThumb locked"><span>${k === "postkarte" ? s.name : "???"}</span><small>${k === "postkarte" ? "noch nicht dort" : "irgendwo auf Rhodos"}</small></div>`).join("");
+  }).join("");
   list.querySelectorAll("button[data-id]").forEach((b) => b.onclick = () => { $("#pcAll").hidden = true; openEditor(b.dataset.id); });
   $("#pcAll").hidden = false;
 };
@@ -192,7 +229,7 @@ function openEditor(id) {
   ED = { id, s, sel: -1, ink: INK[0] };
   $("#pcEd").hidden = false;
   $("#pcCard").style.backgroundImage = `url("${sceneURL(id)}")`;
-  $("#pcTitle").textContent = "Grüße aus " + s.name;
+  $("#pcTitle").textContent = titleOf(s);
   $("#pcEmoji").innerHTML = EMOJI.map((e) => `<button type="button" data-e="${e}">${e}</button>`).join("");
   $("#pcEmoji").querySelectorAll("button").forEach((b) => b.onclick = () => addItem({ k: "emoji", t: b.dataset.e, x: 30 + Math.random() * 40, y: 40 + Math.random() * 30, s: 1, r: 0 }));
   $("#pcStick").innerHTML = STICKERS.map(([v, t]) => `<button type="button" data-v="${v}">${t}</button>`).join("");
