@@ -118,6 +118,13 @@ export default function MoodScreen({
           </svg>
         </a>
 
+        <a className="action-bubble map-bubble" href="/figur/" aria-label="Figur und Kalorien">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="5" r="3"></circle>
+            <path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"></path>
+          </svg>
+        </a>
+
         <button className="action-bubble tip-bubble">
           <span className="bubble-icon">?</span>
         </button>
