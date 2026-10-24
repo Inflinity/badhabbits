@@ -86,6 +86,25 @@ body {
 #oath a, #oath button { display: block; text-decoration: none; text-align: center; border-radius: 8px; padding: 13px; font: 800 15px "Cinzel", serif; cursor: pointer; border: 0; }
 #oath a { background: var(--blood); color: #fbefd6; }
 #oath button { background: transparent; color: var(--muted); }
+/* the shape you take */
+#look { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; background: #1c140c url("strand.jpg") center top / cover no-repeat; }
+#lookStage { flex: 1; min-height: 40vh; touch-action: none; }
+#lookStage canvas { width: 100%; height: 100%; display: block; }
+#lookPanel { max-height: 54vh; overflow-y: auto; gap: 10px; }
+#lookPanel::before, #lookPanel::after { display: none; }
+.lookHead b { display: block; font: 800 22px "Cinzel", serif; }
+.lookHead span { font-style: italic; color: var(--muted); font-size: 15px; }
+.opt { display: flex; flex-direction: column; gap: 6px; }
+.opt i { font-style: normal; color: var(--blood); text-transform: none; letter-spacing: 0; font-family: "IM Fell English", serif; font-size: 14px; }
+.opt input[type=range] { width: 100%; accent-color: var(--blood); }
+.sw { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw button { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff8e6; box-shadow: 0 0 0 1px rgba(110,86,56,0.5); cursor: pointer; }
+.sw button[aria-pressed=true] { box-shadow: 0 0 0 3px var(--blood); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid rgba(110,86,56,0.45); background: rgba(255,250,235,0.6); border-radius: 6px; padding: 7px 10px; font: 600 14px "Cinzel", serif; color: var(--ink); cursor: pointer; }
+.chips button[aria-pressed=true] { background: var(--ink); color: var(--parch); }
+#lookRand { background: rgba(255,250,235,0.85); color: var(--ink); border: 1px solid rgba(110,86,56,0.5); }
+#lookOk { background: var(--blood); color: #fbefd6; box-shadow: 0 3px 0 #5a1a10; }
 </style>
 </head>
 <body>
@@ -130,11 +149,29 @@ body {
     <div class="seal" id="sealL">C</div>
     <h2 id="oathName"></h2>
     <p id="oathText"></p>
-    <a href="/karte/">Zur Karte</a>
+    <a href="#" id="toLook">Gestalt annehmen</a>
+    <a href="welt/" id="toWorld" hidden>In die Welt</a>
     <button type="button" id="again">Neu beginnen</button>
   </section>
 </div>
 
+<section id="look" hidden>
+  <div id="lookStage"></div>
+  <div class="parch" id="lookPanel">
+    <div class="lookHead"><b id="lookName"></b><span>in Lumpen, wie das Meer dich ausgespuckt hat</span></div>
+    <div class="opt"><span class="label">Haut</span><div class="sw" id="oSkin"></div></div>
+    <div class="opt"><span class="label">Statur <i id="oBuildT"></i></span><input type="range" id="oBuild" min="0" max="1" step="0.01"></div>
+    <div class="opt"><span class="label">Kraft <i id="oMusT"></i></span><input type="range" id="oMus" min="0" max="1" step="0.01"></div>
+    <div class="opt"><span class="label">Größe <i id="oHT"></i></span><input type="range" id="oH" min="150" max="200" step="1"></div>
+    <div class="opt"><span class="label">Haar</span><div class="chips" id="oHair"></div></div>
+    <div class="opt"><span class="label">Haarfarbe</span><div class="sw" id="oHairC"></div></div>
+    <div class="opt" id="oBeardRow"><span class="label">Bart</span><div class="chips" id="oBeard"></div></div>
+    <div class="big"><button type="button" id="lookRand">🎲 Würfeln</button><button type="button" id="lookOk">In die Welt</button></div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="avatar.js"></script>
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
@@ -276,7 +313,77 @@ function showOath(me) {
   $("#oathName").textContent = me.name + " von " + me.von[0];
   $("#oathText").innerHTML = `Gestrandet an fremden Gestaden, erhebst du dich aus dem Sand${me.von[1] ? ", " + (me.sex === "f" ? "Tochter" : "Sohn") + " aus " + me.von[1] : ""}.<br><br>Schiffbrüchig, Stufe 0. Dein Weg beginnt hier.`;
   $("#oath").hidden = false;
+  $("#toLook").textContent = me.look ? "Gestalt ändern" : "Gestalt annehmen";
+  $("#toWorld").hidden = !me.look;
 }
+
+/* ---------------- The shape you take ---------------- */
+const AV = window.CrusaderAvatar;
+let LK = null, lookR = null, lookScene, lookCam, lookFig = null, lookYaw = 0.3;
+function lookInit() {
+  if (lookR) return;
+  lookR = new THREE.WebGLRenderer({ antialias: true, alpha: true }); lookR.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  $("#lookStage").append(lookR.domElement);
+  lookScene = new THREE.Scene();
+  lookCam = new THREE.PerspectiveCamera(30, 1, 0.1, 50); lookCam.position.set(0, 1.1, 4.2); lookCam.lookAt(0, 0.95, 0);
+  lookScene.add(new THREE.HemisphereLight(0xfff6e6, 0x5a4a38, 0.6));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 0.9); sun.position.set(-2, 4, 3); lookScene.add(sun);
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), new THREE.MeshBasicMaterial({ color: 0x3a2a18, transparent: true, opacity: 0.45 }));
+  sh.rotation.x = -Math.PI / 2; sh.scale.set(1.3, 0.8, 1); lookScene.add(sh);
+  let dragX = null; const st = $("#lookStage");
+  st.addEventListener("pointerdown", (e) => { dragX = e.clientX; st.setPointerCapture(e.pointerId); });
+  st.addEventListener("pointermove", (e) => { if (dragX != null) { lookYaw += (e.clientX - dragX) * 0.01; dragX = e.clientX; } });
+  st.addEventListener("pointerup", () => { dragX = null; });
+  let last = performance.now();
+  const loop = (now) => {
+    if ($("#look").hidden) { requestAnimationFrame(loop); return; }
+    const r = $("#lookStage").getBoundingClientRect();
+    if (lookR.domElement.width !== Math.round(r.width * lookR.getPixelRatio())) { lookR.setSize(r.width, r.height, false); lookCam.aspect = r.width / r.height; lookCam.updateProjectionMatrix(); }
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (lookFig) { lookFig.root.rotation.y = lookYaw; lookFig.update(dt, 0); }
+    lookR.render(lookScene, lookCam); requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+function lookBuild() {
+  if (lookFig) lookScene.remove(lookFig.root);
+  lookFig = AV.build(THREE, LK); lookScene.add(lookFig.root);
+}
+const BUILD_T = (v) => ["hager", "schlank", "kräftig", "breit", "rund"][Math.min(4, Math.floor(v * 5))];
+const MUS_T = (v) => ["schwach", "zäh", "kräftig", "stark"][Math.min(3, Math.floor(v * 4))];
+function lookPanel() {
+  const sw = (id, list, key) => { $(id).innerHTML = list.map((c, i) => `<button type="button" style="background:${c}" data-i="${i}" aria-pressed="${LK[key] === i}"></button>`).join("");
+    $(id).querySelectorAll("button").forEach((b) => b.onclick = () => { LK[key] = +b.dataset.i; lookChanged(); }); };
+  const chips = (id, list, key) => { $(id).innerHTML = list.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${LK[key] === v}">${t}</button>`).join("");
+    $(id).querySelectorAll("button").forEach((b) => b.onclick = () => { LK[key] = b.dataset.v; lookChanged(); }); };
+  sw("#oSkin", AV.SKIN, "skin"); sw("#oHairC", AV.HAIRC, "hairC");
+  chips("#oHair", AV.HAIR[LK.sex], "hair"); chips("#oBeard", AV.BEARD, "beard");
+  $("#oBeardRow").hidden = LK.sex === "f";
+  $("#oBuild").value = LK.build; $("#oBuildT").textContent = BUILD_T(LK.build);
+  $("#oMus").value = LK.muscle; $("#oMusT").textContent = MUS_T(LK.muscle);
+  $("#oH").value = LK.height; $("#oHT").textContent = LK.height + " cm";
+}
+function lookChanged() { lookPanel(); lookBuild(); }
+for (const [id, key] of [["#oBuild", "build"], ["#oMus", "muscle"], ["#oH", "height"]]) $(id).oninput = (e) => { LK[key] = +e.target.value; lookChanged(); };
+$("#lookRand").onclick = () => {
+  const r = (a) => a[Math.floor(Math.random() * a.length)];
+  Object.assign(LK, { skin: Math.floor(Math.random() * AV.SKIN.length), hairC: Math.floor(Math.random() * AV.HAIRC.length), build: Math.random(), muscle: Math.random(),
+    height: Math.round((LK.sex === "f" ? 158 : 168) + Math.random() * 24), hair: r(AV.HAIR[LK.sex])[0], beard: r(AV.BEARD)[0] });
+  lookChanged();
+};
+$("#toLook").onclick = (e) => {
+  e.preventDefault();
+  const me = JSON.parse(localStorage.getItem(ME_KEY));
+  LK = { ...AV.defaults(me.sex), ...(me.look || {}), sex: me.sex };
+  $("#lookName").textContent = me.name + " von " + me.von[0];
+  $("#oath").hidden = true; $("#look").hidden = false;
+  lookInit(); lookPanel(); lookBuild();
+};
+$("#lookOk").onclick = () => {
+  const me = JSON.parse(localStorage.getItem(ME_KEY)); me.look = { ...LK };
+  try { localStorage.setItem(ME_KEY, JSON.stringify(me)); } catch (e) {}
+  location.href = "welt/";
+};
 $("#again").onclick = () => {
   if (!confirm("Wirklich neu beginnen? Dein Name bleibt vergeben.")) return;
   try { localStorage.removeItem(ME_KEY); } catch (e) {}
