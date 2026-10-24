@@ -125,6 +125,10 @@ export default function MoodScreen({
           </svg>
         </a>
 
+        <a className="action-bubble crusaders-bubble" href="/crusaders/" aria-label="Crusaders">
+          <img src="/crusaders/icon-192.png" alt="" />
+        </a>
+
         <button className="action-bubble tip-bubble">
           <span className="bubble-icon">?</span>
         </button>
