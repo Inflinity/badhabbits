@@ -188,6 +188,12 @@ select {
 }
 .toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.92rem; }
 .toggles label { display: flex; align-items: center; gap: 8px; }
+#calChart { width: 100%; height: 150px; display: block; }
+.calpad {
+  border: 1px dashed var(--line); border-radius: 14px; padding: 26px 12px; text-align: center;
+  color: var(--muted); user-select: none; -webkit-user-select: none; touch-action: none;
+}
+.calpad.on { background: var(--surface); border-color: var(--breath); color: var(--breath); }
 .changes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .changes button {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
@@ -334,6 +340,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
       <div class="seg">
         <input type="radio" name="mode" id="mPortal" value="portal" checked><label for="mPortal">Portal</label>
         <input type="radio" name="mode" id="mJb" value="jb"><label for="mJb">Just Breathe</label>
+        <input type="radio" name="mode" id="mEngine" value="engine"><label for="mEngine">Kalibrierung</label>
         <input type="radio" name="mode" id="mBox" value="box"><label for="mBox">Viereck</label>
         <input type="radio" name="mode" id="mTiefe" value="tiefe"><label for="mTiefe">Tiefe</label>
         <input type="radio" name="mode" id="mReal" value="realtime"><label for="mReal">Echtzeit</label>
@@ -470,6 +477,22 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
     </details>
   </form>
 
+  <section class="summary" id="calPanel" hidden>
+    <h2>Engine-Kalibrierung</h2>
+    <canvas id="calChart" height="150" aria-label="Atemfluss und Meer, die letzten 15 Sekunden"></canvas>
+    <p class="hint">Türkis: dein Luftstrom (oben ein, unten aus) · Bernstein: wie laut das Meer rauscht · hell: dein Finger</p>
+    <div class="field"><label for="calThr">Empfindlichkeit <output id="calThrOut"></output></label><input type="range" id="calThr" min="0.02" max="0.3" step="0.01"></div>
+    <div class="field"><label for="calTau">Glättung <output id="calTauOut"></output></label><input type="range" id="calTau" min="0.03" max="0.25" step="0.01"></div>
+    <div class="field"><label for="calLook">Vorausschau <output id="calLookOut"></output></label><input type="range" id="calLook" min="0" max="0.8" step="0.05"></div>
+    <div class="field"><label for="calDyn">Dynamik <output id="calDynOut"></output></label><input type="range" id="calDyn" min="0.6" max="2.5" step="0.1"></div>
+    <div class="calpad" id="calPad">Finger drauflassen, solange du einatmest</div>
+    <div class="actions">
+      <button type="button" id="calTest">Finger-Test (60 s)</button>
+      <button type="button" class="ghost" id="calReset">Standard</button>
+    </div>
+    <p class="hint" id="calResult">Atme ganz normal. Stell die Regler, bis das Meer genau mit deinem Atem kommt und geht. Die Einstellung gilt danach für alle Modi.</p>
+  </section>
+
   <div class="actions" id="running" hidden>
     <button type="button" class="ghost" id="dimBtn">Abdunkeln</button>
     <button type="button" class="ghost" id="pauseBtn" hidden>Pause</button>
@@ -486,12 +509,14 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v23 · 24.10. 02:00 · Luzid TLR";
-const S = { lucidCue: "Ton", wbtb: false, markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
+const VERSION = "v24 · 24.10. 12:00 · Kalibrierung";
+const CAL0 = { thr: 0.12, tau: 0.1, look: 0.3, dyn: 1.2 };
+const S = { cal: { ...CAL0 }, lucidCue: "Ton", wbtb: false, markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
+S.cal = { ...CAL0, ...(S.cal || {}) };
 if (!["portal", "jb", "box", "tiefe", "realtime", "lead"].includes(S.mode)) S.mode = "portal";
 // the Portal journeys ride on Just Breathe: same start, same sea, then their own way
-const isJB = () => S.mode === "jb" || S.mode === "portal";
+const isJB = () => S.mode === "jb" || S.mode === "portal" || S.mode === "engine";
 const BOX_IDS = ["bIn", "bTop", "bOut", "bBot"], JB_IDS = ["jIn", "jTop", "jOut", "jBot"];
 function readBox(ids = BOX_IDS) {
   return ids.map((id, i) => {
@@ -510,7 +535,7 @@ function updateFields() {
   $("#boxField").hidden = mode !== "box";
   $("#jbField").hidden = mode !== "jb";
   $("#portalField").hidden = mode !== "portal";
-  $("#durField").hidden = mode === "jb" || mode === "portal";
+  $("#durField").hidden = mode === "jb" || mode === "portal" || mode === "engine";
   $("#targetField").hidden = $("#ratioField").hidden = !(mode === "tiefe" || mode === "lead" || mode === "jb");
   const jEl = document.querySelector("input[name=journey]:checked"), j = jEl ? jEl.value : "sleep";
   $("#lucidField").hidden = j !== "lucid";
@@ -778,7 +803,8 @@ function makeFlow(dIn) {
     if (f.prevA != null) f.va += ((f.pa - f.prevA) / 0.05 - f.va) * (0.05 / 0.3);
     f.prevA = f.pa;
     f.aa += ((f.va - f.prevV) / 0.05 - f.aa) * (0.05 / 0.3); f.prevV = f.va;
-    const a = f.pa + f.va * 0.3, flowA = f.va + f.aa * 0.3;
+    const look = S.cal ? S.cal.look : 0.3;
+    const a = f.pa + f.va * look, flowA = f.va + f.aa * look;
     // moving the phone produces swings a hundred times a breath: start the comparison afresh
     if (!quiet) { f.cab = 0; f.caa = 1e-12; f.cbb = 1e-12; f.ring = []; f.n = 0; }
     f.n = (f.n || 0) + 1;
@@ -2070,18 +2096,20 @@ function audioSea(dt) {
   if (!A.ctx) return;
   const t = A.ctx.currentTime, e = sess.flowEng;
   const ok = e && sig.seen && !sig.disturbed;
-  const fl = ok ? clamp((Math.abs(e.flow) - 0.12) / 0.88, 0, 1) : 0;
+  const C = S.cal || CAL0;
+  const fl = ok ? clamp((Math.abs(e.flow) - C.thr) / (1 - C.thr), 0, 1) : 0;
   // smoothed and rate-limited, so a shaky signal (after sport, a pounding heart) cannot crackle
-  const fo = sess.flowOut + (fl - sess.flowOut) * Math.min(1, dt / 0.1);
-  sess.flowOut += clamp(fo - sess.flowOut, -4 * dt, 5 * dt);
+  const fo = sess.flowOut + (fl - sess.flowOut) * Math.min(1, dt / C.tau);
+  sess.flowOut += clamp(fo - sess.flowOut, -0.4 / C.tau * dt, 0.5 / C.tau * dt);
   const mix = sess.dir ? sess.dir.mix : 0, puYou = 0.45 + ((ok ? e.u : 0.45) - 0.45) * mix;
   // once the sea leads, your gusts cross over into its even swell
   const a = SP.aOut;
   const level = (1 - a) * sess.flowOut + a * (0.08 + 0.92 * Math.abs(SP.flow));
   const pu = (1 - a) * puYou + a * (SP.y + 1) / 2;
-  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 0.12);
+  A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 1.2 * C.tau);
   // the sea is the whole of Just Breathe, so it plays regardless of the sound chips
-  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, 1.2) * (S.mode === "portal" ? J.seaMul : 1), t, 0.07);
+  A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, C.dyn) * (S.mode === "portal" ? J.seaMul : 1), t, 0.7 * C.tau);
+  if (S.mode === "engine") calRecord(e && ok ? e.flow : 0);
   A.padGain.gain.setTargetAtTime(0, t, 0.5);
   if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(S.mode === "portal" ? J.bowl : 0, t, 0.8);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
@@ -2368,6 +2396,8 @@ function seaDirection(t, dt) {
   d.next = t + 5;
   const al = dot(sig.u, e.dIn) < 0 ? -1 : 1;
   e.dIn = sig.u.map((v) => v * al);
+  // the finger test is the better judge: no votes while it runs, and none after it decided
+  if (CAL.test || d.calibrated) return;
   const v = e.vote(); if (!v) return;
   d.votes.push(v); if (d.votes.length > 12) d.votes.shift();
   // the votes overlap (30 s windows every 5 s); for a later flip keep one per 30 s, over 5 min
@@ -2660,7 +2690,7 @@ function tick() {
     seaDirection(t, dt);
     if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
     const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
-    const handOver = !(S.mode === "portal" && (S.journey === "tank" || samOn())) && !NIGHT.asleep;
+    const handOver = !(S.mode === "portal" && (S.journey === "tank" || samOn())) && !NIGHT.asleep && S.mode !== "engine";
     if (ph === "sea" && rested && handOver && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
     if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
     if (S.mode === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
@@ -2939,7 +2969,9 @@ async function start(ev) {
       setPrompt("Kein Bewegungssensor erreichbar. Der Klang führt dich trotzdem.");
     }
   }, 2500);
-  if (S.autodim) setTimeout(() => { if (sess.phase !== "idle") $("#dim").hidden = false; }, 9000);
+  $("#calPanel").hidden = S.mode !== "engine";
+  if (S.mode === "engine") calOpen();
+  if (S.autodim && S.mode !== "engine") setTimeout(() => { if (sess.phase !== "idle") $("#dim").hidden = false; }, 9000);
 }
 
 function finish(natural) {
@@ -2959,7 +2991,7 @@ function finish(natural) {
   if (A.shGain) A.shGain.gain.setTargetAtTime(0, A.ctx.currentTime, 0.8);
   $("#saveNote").textContent = "Ins Tagebuch";
   try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
-  $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false;
+  $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false; $("#calPanel").hidden = true; CAL.test = null;
   setPrompt(natural ? "Fertig. Lass dir Zeit beim Aufstehen." : "Leg dich hin, Handy flach auf die Brust, Kopfhörer rein.");
   const rows = [["Dauer", Math.floor(dur / 60) + ":" + String(Math.floor(dur % 60)).padStart(2, "0") + " min"]];
   if (sess.naturalRate) rows.push(["Atem am Anfang", sess.naturalRate.toFixed(1) + " /min"]);
@@ -3072,6 +3104,109 @@ function postRender() {
   });
 }
 $("#postClear").addEventListener("click", () => { postSave(postLoad().map((c) => (c.done ? { to: "", text: "", done: false } : c))); postRender(); });
+
+/* ---------------- Engine calibration ----------------
+   Only the sea and your breath. Four dials shape how the airflow becomes sound, live:
+   sensitivity (how little air already sounds), smoothing, look-ahead (how far the slow
+   accelerometer is projected forward), dynamics (soft breaths quieter or louder).
+   The finger test gives a ground truth: a finger on the pad while breathing in. From it come
+   the delay between your breath and the sea, whether in and out are the right way round,
+   and how well they match. The settings are kept and used in every mode. */
+const CAL = { hist: [], touch: 0, test: null };
+const CAL_DIALS = [["calThr", "thr", (v) => Math.round((0.32 - v) / 0.3 * 100) + " %"], ["calTau", "tau", (v) => Math.round(v * 1000) + " ms"],
+  ["calLook", "look", (v) => v.toFixed(2).replace(".", ",") + " s"], ["calDyn", "dyn", (v) => v.toFixed(1).replace(".", ",")]];
+function calShow() { for (const [id, k, f] of CAL_DIALS) { $("#" + id).value = S.cal[k]; $("#" + id + "Out").textContent = f(S.cal[k]); } }
+function calSave() { try { localStorage.setItem("atemlotse8", JSON.stringify(S)); } catch (e) {} }
+function calOpen() { CAL.hist = []; CAL.test = null; calShow(); requestAnimationFrame(calDraw); }
+for (const [id, k, f] of CAL_DIALS) $("#" + id).addEventListener("input", (ev) => {
+  S.cal[k] = parseFloat(ev.target.value); $("#" + id + "Out").textContent = f(S.cal[k]); calSave();
+  logEvent("cal", { [k]: S.cal[k] });
+});
+$("#calReset").addEventListener("click", () => { S.cal = { ...CAL0 }; calShow(); calSave(); logEvent("cal", { reset: true }); });
+const calPad = $("#calPad");
+const calTouch = (on) => (ev) => { ev.preventDefault(); CAL.touch = on; calPad.classList.toggle("on", !!on); };
+calPad.addEventListener("pointerdown", calTouch(1));
+for (const n of ["pointerup", "pointercancel", "pointerleave"]) calPad.addEventListener(n, calTouch(0));
+function calRecord(flow) {
+  const t = now();
+  CAL.hist.push([t, flow, sess.flowOut, CAL.touch]);
+  while (CAL.hist.length && CAL.hist[0][0] < t - 15) CAL.hist.shift();
+  const T = CAL.test;
+  if (T) {
+    T.rows.push([flow, CAL.touch]);
+    const left = Math.ceil(T.end - t);
+    if (left > 0) $("#calResult").textContent = `Finger-Test: noch ${left} s. Finger auf das Feld, solange du einatmest, beim Ausatmen loslassen.`;
+    else calAnalyse();
+  }
+}
+$("#calTest").addEventListener("click", () => {
+  if (sess.phase !== "sea") { $("#calResult").textContent = "Einen Moment: Der Test geht, sobald das Meer deinem Atem folgt."; return; }
+  CAL.test = { end: now() + 60, rows: [] };
+  logEvent("calTest", { start: true });
+});
+// correlation of the finger (in = 1, out = 0) with the airflow, shifted by lag samples (flow later)
+function calCorr(rows, lag) {
+  let sa = 0, sb = 0, sab = 0, saa = 0, sbb = 0, n = 0;
+  for (let i = Math.max(0, -lag); i < rows.length && i + lag < rows.length; i++) {
+    const a = rows[i][1] - 0.5, b = rows[i + lag][0];
+    sa += a; sb += b; sab += a * b; saa += a * a; sbb += b * b; n++;
+  }
+  if (n < 50) return 0;
+  const ca = saa - sa * sa / n, cb = sbb - sb * sb / n;
+  return (sab - sa * sb / n) / Math.sqrt(ca * cb + 1e-12);
+}
+function calAnalyse() {
+  const rows = CAL.test.rows; CAL.test = null;
+  const presses = rows.filter((r, i) => i && r[1] && !rows[i - 1][1]).length;
+  if (presses < 4) { $("#calResult").textContent = "Zu wenige Atemzüge mit Finger erkannt. Noch einmal: Finger drauf beim Einatmen, los beim Ausatmen."; return; }
+  let best = { c: 0, lag: 0 };
+  for (let lag = -30; lag <= 30; lag++) { const c = calCorr(rows, lag); if (Math.abs(c) > Math.abs(best.c)) best = { c, lag }; }
+  const delay = best.lag * 0.05, match = Math.round(Math.abs(best.c) * 100);
+  const lines = [`${presses} Atemzüge mit Finger. Übereinstimmung ${match} %.`];
+  if (match < 40) {
+    logEvent("calResult", { presses, match, delay: +delay.toFixed(2), weak: true });
+    $("#calResult").textContent = lines[0] + " Zu unsicher, ich ändere nichts. Handy flacher und fester auflegen, etwas tiefer atmen und den Test wiederholen.";
+    return;
+  }
+  if (sess.dir) { sess.dir.calibrated = true; sess.dir.sure = true; }
+  if (best.c < 0) {
+    if (sess.flowEng) sess.flowEng.flip();
+    if (sess.dir) { sess.dir.sure = true; sess.dir.votes = []; sess.dir.slow = []; sess.dir.flippedAt = now(); }
+    lines.push("Ein und aus waren vertauscht. Ich habe es umgedreht.");
+  } else lines.push("Ein und aus stimmen.");
+  if (delay > 0.1) {
+    const nl = clamp(S.cal.look + delay * 0.8, 0, 0.8);
+    lines.push(`Das Meer kam ${delay.toFixed(2).replace(".", ",")} s nach deinem Finger. Vorausschau von ${S.cal.look.toFixed(2).replace(".", ",")} auf ${nl.toFixed(2).replace(".", ",")} s gestellt.`);
+    S.cal.look = +nl.toFixed(2);
+  } else if (delay < -0.15) {
+    const nl = clamp(S.cal.look + delay * 0.8, 0, 0.8);
+    lines.push(`Das Meer kam ${(-delay).toFixed(2).replace(".", ",")} s vor deinem Finger. Vorausschau auf ${nl.toFixed(2).replace(".", ",")} s verringert.`);
+    S.cal.look = +nl.toFixed(2);
+  } else lines.push(`Das Meer kommt praktisch gleichzeitig mit deinem Finger (${delay >= 0 ? "+" : ""}${delay.toFixed(2).replace(".", ",")} s).`);
+  if (match < 50) lines.push("Die Übereinstimmung ist noch schwach: Handy flacher und fester auflegen, etwas tiefer atmen, oder den Test wiederholen.");
+  else lines.push("Wiederhole den Test, bis sich nichts mehr ändert.");
+  calShow(); calSave();
+  logEvent("calResult", { presses, match, delay: +delay.toFixed(2), flipped: best.c < 0, look: S.cal.look });
+  $("#calResult").textContent = lines.join(" ");
+}
+function calDraw() {
+  if (S.mode !== "engine" || sess.phase === "idle") return;
+  const cv = $("#calChart"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = 150;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = H * dpr; }
+  const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
+  const h = CAL.hist, t1 = now(), X = (t) => W - ((t1 - t) / 15) * W, mid = H / 2;
+  c.fillStyle = "rgba(220,232,229,0.10)";
+  for (let i = 1; i < h.length; i++) if (h[i][3]) c.fillRect(X(h[i - 1][0]), 0, X(h[i][0]) - X(h[i - 1][0]) + 0.5, H);
+  c.strokeStyle = col("--line"); c.lineWidth = 1; c.beginPath(); c.moveTo(0, mid); c.lineTo(W, mid); c.stroke();
+  // threshold band: below it the sea is silent
+  const thr = S.cal.thr * (H / 2.4);
+  c.fillStyle = "rgba(127,209,193,0.08)"; c.fillRect(0, mid - thr, W, 2 * thr);
+  const line = (k, y, color) => { c.strokeStyle = color; c.lineWidth = 2; c.beginPath(); h.forEach((p, i) => { const yy = y(p[k]); i ? c.lineTo(X(p[0]), yy) : c.moveTo(X(p[0]), yy); }); c.stroke(); };
+  line(1, (v) => mid - clamp(v, -1.2, 1.2) * (H / 2.4), col("--breath"));
+  line(2, (v) => H - 4 - clamp(v, 0, 1) * (H - 8), col("--guide"));
+  requestAnimationFrame(calDraw);
+}
 
 $("#setup").addEventListener("submit", start);
 $("#stopBtn").addEventListener("click", () => finish(false));
