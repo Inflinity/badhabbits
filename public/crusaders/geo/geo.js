@@ -27,7 +27,13 @@
     // the few special places get a list of building parts (a few kilobytes each)
     const landmarks = [];
     for (const r of regions) if (r.landmarks) { const lm = await (await fetch(base + r.landmarks)).json(); for (const l of lm.landmarks) landmarks.push({ ...l, colors: lm.colors }); }
-    return { regions, features, landmarks, source: regions.map((r) => r.data.source) };
+    // main roads and sea lanes, where a region has them
+    const roads = [], lanes = [], ports = [];
+    for (const r of regions) {
+      if (r.strassen) { const rd = await (await fetch(base + r.strassen)).json(); for (const f of rd.features) roads.push({ ...f, lines: rings(f.d) }); }
+      if (r.seewege) { const sw = await (await fetch(base + r.seewege)).json(); lanes.push(...sw.routes); ports.push(...sw.ports); }
+    }
+    return { regions, features, landmarks, roads, lanes, ports, source: regions.map((r) => r.data.source) };
   }
   window.CrusadersGeo = { load, rings };
 })();

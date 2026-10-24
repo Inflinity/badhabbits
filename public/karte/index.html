@@ -130,6 +130,7 @@ svg { width: 100%; height: 100%; display: block; user-select: none; -webkit-user
       <g id="shallow" fill="none" stroke="var(--shallow)" stroke-width="2.6" stroke-linejoin="round" filter="url(#soft)" opacity="0.85"></g>
       <g id="land" stroke="var(--land-dark)" stroke-width="0.25" stroke-linejoin="round"></g>
       <g id="relief"></g>
+      <g id="roads" fill="none" stroke-linecap="round" stroke-linejoin="round"></g>
       <g id="deco"></g>
       <g id="places"></g>
       <polyline id="trail" fill="none" stroke="var(--gps)" stroke-width="0.35" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>
@@ -266,6 +267,13 @@ for (const [ch, lat, lon, s] of deco) { const [x, y] = P(lon, lat); const t = el
   const t = el("text", { x: 12, y: 4, "text-anchor": "middle", "font-size": 3.6, "font-family": "Alfa Slab One, Georgia, serif", fill: "var(--ink)" }, g);
   t.textContent = "RHODOS";
 })();
+
+// main roads from the Crusaders coast data (same SVG paths, mapped from 1/100000 degree to km)
+fetch("/crusaders/geo/strassen-rhodos.json").then((r) => r.json()).then((rd) => {
+  const g = $("#roads"); g.setAttribute("transform", `matrix(${KM * KX / 1e5} 0 0 ${KM / 1e5} ${-LON0 * KM * KX} ${LAT0 * KM})`);
+  for (const f of rd.features) for (const [w, c] of [[{ primary: 3.2, secondary: 2.4, tertiary: 1.6 }[f.class], "#a07a48"], [{ primary: 2.2, secondary: 1.5, tertiary: 0.9 }[f.class], "#fff8e6"]])
+    el("path", { d: f.d, stroke: c, "stroke-width": w, "vector-effect": "non-scaling-stroke", opacity: f.class === "tertiary" ? 0.75 : 1 }, g);
+}).catch(() => {});
 
 /* ---------------- Pan and zoom (one finger drags, two pinch, buttons) ---------------- */
 const svg = $("#map"), wrap = $("#wrap");
