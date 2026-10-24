@@ -1,0 +1,30 @@
+{
+ "format": "crusaders-geo/1",
+ "about": "Küsten der Welt von Crusaders. Jede Region ist eine Datei mit Land-Flächen als SVG-Pfade. Einheit: 1/100000 Grad, x = Länge, y = minus Breite (Norden oben). Genaue Regionen stammen aus OpenStreetMap, grobe aus Natural Earth; eine genaue ersetzt die grobe, wo beide sich überdecken.",
+ "regions": [
+  {
+   "id": "rhodos",
+   "file": "rhodos.json",
+   "name": "Rhodos",
+   "quality": "genau",
+   "bbox": [
+    27.6,
+    35.82,
+    28.3,
+    36.5
+   ]
+  },
+  {
+   "id": "umland-rhodos",
+   "file": "umland-rhodos.json",
+   "name": "Umland von Rhodos",
+   "quality": "grob",
+   "bbox": [
+    26.9,
+    35.4,
+    29.2,
+    37.2
+   ]
+  }
+ ]
+}

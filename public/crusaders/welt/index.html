@@ -20,6 +20,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 .lb b { display: block; font: 700 15px "IM Fell English", serif; }
 .lb i { display: block; font: italic 11px "IM Fell English", serif; color: #ffe9b8; }
 .lb.pc b { color: #ffd76a; }
+.lb.sight b { font-style: italic; color: #ffe9b8; }
 /* HUD, after the old pirate games: a quest scroll, a compass medallion, buttons */
 .quest {
   position: fixed; left: 10px; top: max(10px, env(safe-area-inset-top)); max-width: calc(100% - 80px); display: flex; align-items: center; gap: 8px;
@@ -53,6 +54,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   position: fixed; left: 50%; top: 70px; transform: translateX(-50%); max-width: 92%; background: rgba(241,228,196,0.96); border: 2px solid #d9b56e; border-radius: 10px;
   padding: 8px 14px; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
 }
+#src { position: fixed; left: 14px; top: calc(max(10px, env(safe-area-inset-top)) + 58px); font: 10px "Figtree", sans-serif; color: rgba(255,255,255,0.85); text-shadow: 0 0 3px #000; pointer-events: none; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1c140c url("../strand.jpg") center / cover; color: #fff; font: italic 22px "IM Fell English", serif; text-shadow: 0 2px 8px #000; z-index: 50; }
 </style>
 </head>
@@ -78,11 +80,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 </div>
 <div class="date"></div>
 <div id="toast" hidden></div>
+<div id="src"></div>
 <div id="loading">Die Insel erhebt sich aus dem Meer …</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="../avatar.js"></script>
 <script src="../postcards.js"></script>
+<script src="../geo/geo.js"></script>
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
@@ -113,24 +117,53 @@ const fbm = (x, z) => vnoise(x, z) * 0.5 + vnoise(x * 2.1, z * 2.1) * 0.27 + vno
 const PEAKS = [[27.86, 36.2, 1.2, 4.5], [27.79, 36.14, 0.8, 3.5], [27.94, 36.27, 0.79, 3.5], [28.05, 36.3, 0.42, 5], [27.9, 36.06, 0.45, 6],
   [27.84, 35.98, 0.35, 5], [28.0, 36.18, 0.4, 4], [28.087, 36.093, 0.12, 0.8], [28.14, 36.24, 0.3, 2]];
 const W0 = -6, W1 = 76, D0 = -6, D1 = 84, CELL = 0.34;
-let rings = [], segs = [];
-function inside(x, z, ring) {
-  let c = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, zi] = ring[i], [xj, zj] = ring[j];
-    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+/* The coast and the land are kept apart. The land (hills, woods, towns) is a coarse grid and may be
+   rough; where land ends is decided only by the coast data (geo/, from OpenStreetMap): its SVG paths
+   are drawn into a mask, and the mask cuts the land exactly at the shore, paints the beach and lights
+   the shallows. Mask: R = land, G = beach, B = near the coast (for the turquoise water). */
+const MRES = 0.03;                         // 30 m per mask pixel
+const MW = Math.round((W1 - W0) / MRES), MH = Math.round((D1 - D0) / MRES);
+let MASK = null, maskTex = null;
+function drawMask(features) {
+  const cv = document.createElement("canvas"); cv.width = MW; cv.height = MH;
+  const c = cv.getContext("2d");
+  c.fillStyle = "#000"; c.fillRect(0, 0, MW, MH);
+  // from path units (1e-5 degree, y = -latitude) straight to mask pixels
+  const to = () => c.setTransform(KM * KX / MRES / 1e5, 0, 0, KM / MRES / 1e5, (-LON0 * KM * KX - W0) / MRES, (LAT0 * KM - D0) / MRES);
+  const paths = features.map((f) => new Path2D(f.d));
+  c.globalCompositeOperation = "lighter";
+  // B: the shallows, a soft glow around every coast (drawn small and blurred, then laid over)
+  const sm = document.createElement("canvas"); sm.width = Math.ceil(MW / 4); sm.height = Math.ceil(MH / 4);
+  const s4 = sm.getContext("2d"); s4.globalCompositeOperation = "lighter";
+  for (const [blur, a] of [[1.5, 0.6], [6, 0.5]]) {
+    s4.save(); s4.filter = `blur(${blur}px)`; s4.setTransform(KM * KX / MRES / 4e5, 0, 0, KM / MRES / 4e5, (-LON0 * KM * KX - W0) / MRES / 4, (LAT0 * KM - D0) / MRES / 4);
+    s4.fillStyle = `rgba(0,0,255,${a})`; for (const p of paths) s4.fill(p); s4.restore();
   }
-  return c;
+  c.imageSmoothingEnabled = true; c.drawImage(sm, 0, 0, MW, MH);
+  // R: land, exactly
+  c.save(); to(); c.fillStyle = "#f00"; for (const p of paths) c.fill(p); c.restore();
+  // G: the beach, a band along the shoreline (only its land half shows)
+  c.save(); to(); c.strokeStyle = "#0f0"; c.lineWidth = 40; c.lineJoin = "round"; for (const p of paths) c.stroke(p); c.restore();
+  const img = c.getImageData(0, 0, MW, MH).data;
+  MASK = new Uint8Array(MW * MH * 2);
+  for (let i = 0, j = 0; i < img.length; i += 4, j += 2) { MASK[j] = img[i]; MASK[j + 1] = img[i + 1]; }
+  maskTex = new THREE.CanvasTexture(cv);
+  maskTex.generateMipmaps = false; maskTex.minFilter = THREE.LinearFilter; maskTex.magFilter = THREE.LinearFilter;
+  maskTex.wrapS = maskTex.wrapT = THREE.ClampToEdgeWrapping;
 }
-function coastDist(x, z) {
-  let best = 1e9;
-  for (const [ax, az, bx, bz] of segs) {
-    const dx = bx - ax, dz = bz - az, l = dx * dx + dz * dz;
-    let t = l ? ((x - ax) * dx + (z - az) * dz) / l : 0; t = clamp(t, 0, 1);
-    const ex = ax + t * dx - x, ez = az + t * dz - z, d = ex * ex + ez * ez;
-    if (d < best) best = d;
-  }
-  return Math.sqrt(best);
+const mpx = (x, z) => { const i = Math.floor((x - W0) / MRES), j = Math.floor((z - D0) / MRES); return i >= 0 && j >= 0 && i < MW && j < MH ? (j * MW + i) * 2 : -1; };
+const isLand = (x, z) => { const k = mpx(x, z); return k >= 0 && MASK[k] > 127; };
+const isBeach = (x, z) => { const k = mpx(x, z); return k >= 0 && MASK[k] > 127 && MASK[k + 1] > 60; };
+// both land and sea floor read the mask in their shaders
+function withMask(material, frag) {
+  material.onBeforeCompile = (sh) => {
+    sh.uniforms.uMask = { value: maskTex };
+    sh.uniforms.uMaskBox = { value: new THREE.Vector4(W0, D0, W1 - W0, D1 - D0) };
+    sh.vertexShader = "varying vec2 vMaskUv;\nuniform vec4 uMaskBox;\n" + sh.vertexShader.replace("#include <worldpos_vertex>",
+      "#include <worldpos_vertex>\nvec4 mwp = modelMatrix * vec4(transformed, 1.0);\nvMaskUv = vec2((mwp.x - uMaskBox.x) / uMaskBox.z, 1.0 - (mwp.z - uMaskBox.y) / uMaskBox.w);");
+    sh.fragmentShader = "varying vec2 vMaskUv;\nuniform sampler2D uMask;\n" + sh.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n" + frag);
+  };
+  return material;
 }
 let NX, NZ, H, LAND, DIST;
 function heightAt(x, z) {
@@ -139,45 +172,57 @@ function heightAt(x, z) {
   const h = (a, b) => H[b * NX + a];
   return h(i, j) * (1 - fx) * (1 - fz) + h(i + 1, j) * fx * (1 - fz) + h(i, j + 1) * (1 - fx) * fz + h(i + 1, j + 1) * fx * fz;
 }
-function buildLand(coast) {
-  rings = [coast.rhodes, ...coast.islands, coast.main].map((r) => r.map(([lon, lat]) => P(lon, lat)));
-  for (const r of rings) for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; segs.push([a[0], a[1], b[0], b[1]]); }
+function buildLand(features) {
+  drawMask(features);
   NX = Math.ceil((W1 - W0) / CELL) + 1; NZ = Math.ceil((D1 - D0) / CELL) + 1;
   H = new Float32Array(NX * NZ); LAND = new Uint8Array(NX * NZ); DIST = new Float32Array(NX * NZ);
-  const peaks = PEAKS.map(([lon, lat, h, r]) => [...P(lon, lat), h, r]);
-  const bbox = rings.map((r) => { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const [x, z] of r) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, z); d = Math.max(d, z); } return [a, b, c, d]; });
+  // land at each grid point (any land within half a cell, so the grid always reaches past the true coast)
   for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
-    const x = W0 + i * CELL, z = D0 + j * CELL, k = j * NX + i;
-    let land = false;
-    for (let r = 0; r < rings.length && !land; r++) { const b = bbox[r]; if (x >= b[0] && x <= b[1] && z >= b[2] && z <= b[3] && inside(x, z, rings[r])) land = true; }
-    const d = coastDist(x, z);
-    let h;
-    if (land) {
-      h = 0.02 + 0.18 * smooth(0, 2.5, d);
-      for (const [px, pz, ph, pr] of peaks) { const q = ((x - px) ** 2 + (z - pz) ** 2) / (pr * pr); if (q < 9) h += ph * Math.exp(-q) * smooth(0, 1.2, d); }
-      h += (fbm(x * 0.35, z * 0.35) - 0.45) * 0.22 * smooth(0, 1.5, d);
-      h = Math.max(0.01, h) * EXAG;
-    } else h = -Math.min(1.6, 0.06 + d * 0.32);
-    H[k] = h; LAND[k] = land ? 1 : 0; DIST[k] = d;
+    const x = W0 + i * CELL, z = D0 + j * CELL; let l = 0;
+    for (const [ox, oz] of [[0, 0], [-0.17, 0], [0.17, 0], [0, -0.17], [0, 0.17]]) if (isLand(x + ox, z + oz)) { l = isLand(x, z) ? 2 : 1; if (l === 2) break; }
+    LAND[j * NX + i] = l;
   }
-  const geo = new THREE.PlaneGeometry((NX - 1) * CELL, (NZ - 1) * CELL, NX - 1, NZ - 1);
-  geo.rotateX(-Math.PI / 2); geo.translate(W0 + (NX - 1) * CELL / 2, 0, D0 + (NZ - 1) * CELL / 2);
-  const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
-  for (let v = 0; v < pos.count; v++) {
-    const x = pos.getX(v), z = pos.getZ(v), i = Math.round((x - W0) / CELL), j = Math.round((z - D0) / CELL), k = clamp(j, 0, NZ - 1) * NX + clamp(i, 0, NX - 1);
-    const h = H[k]; pos.setY(v, h);
-    const n = fbm(x * 0.8, z * 0.8);
-    if (!LAND[k]) c.set(DIST[k] < 0.6 ? "#7fe0d0" : DIST[k] < 2 ? "#3cb7c9" : "#1f6aa8").lerp(new THREE.Color("#1a5590"), smooth(1, 6, DIST[k]) * 0.6);
-    else if (h < 0.06 && DIST[k] < 0.35) c.set("#ead9a6");
-    else if (h > 1.45) c.set("#c2b296");
-    else if (h > 1.0) c.set(n > 0.5 ? "#8e7d5e" : "#9a8a68");
+  // distance to the coast in cells (two-pass chamfer), inland and out to sea
+  const INF = 1e6, din = new Float32Array(NX * NZ), dout = new Float32Array(NX * NZ);
+  for (let k = 0; k < NX * NZ; k++) { din[k] = LAND[k] === 2 ? INF : 0; dout[k] = LAND[k] ? 0 : INF; }
+  for (const d of [din, dout]) {
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i; if (i) d[k] = Math.min(d[k], d[k - 1] + 1); if (j) d[k] = Math.min(d[k], d[k - NX] + 1); if (i && j) d[k] = Math.min(d[k], d[k - NX - 1] + 1.414); if (j && i < NX - 1) d[k] = Math.min(d[k], d[k - NX + 1] + 1.414); }
+    for (let j = NZ - 1; j >= 0; j--) for (let i = NX - 1; i >= 0; i--) { const k = j * NX + i; if (i < NX - 1) d[k] = Math.min(d[k], d[k + 1] + 1); if (j < NZ - 1) d[k] = Math.min(d[k], d[k + NX] + 1); if (i < NX - 1 && j < NZ - 1) d[k] = Math.min(d[k], d[k + NX + 1] + 1.414); if (i && j < NZ - 1) d[k] = Math.min(d[k], d[k + NX - 1] + 1.414); }
+  }
+  const peaks = PEAKS.map(([lon, lat, h, r]) => [...P(lon, lat), h, r]);
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const x = W0 + i * CELL, z = D0 + j * CELL, k = j * NX + i, d = din[k] * CELL;
+    let h = 0.012 + 0.18 * smooth(0, 2.5, d);
+    for (const [px, pz, ph, pr] of peaks) { const q = ((x - px) ** 2 + (z - pz) ** 2) / (pr * pr); if (q < 9) h += ph * Math.exp(-q) * smooth(0, 1.2, d); }
+    h += (fbm(x * 0.35, z * 0.35) - 0.45) * 0.22 * smooth(0, 1.5, d);
+    H[k] = LAND[k] ? Math.max(0.012, h) * EXAG : -Math.min(1.6, 0.05 + dout[k] * CELL * 0.32);
+    DIST[k] = LAND[k] ? d : dout[k] * CELL;
+  }
+  const grid = (heights, colorOf) => {
+    const geo = new THREE.PlaneGeometry((NX - 1) * CELL, (NZ - 1) * CELL, NX - 1, NZ - 1);
+    geo.rotateX(-Math.PI / 2); geo.translate(W0 + (NX - 1) * CELL / 2, 0, D0 + (NZ - 1) * CELL / 2);
+    const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
+    for (let v = 0; v < pos.count; v++) {
+      const x = pos.getX(v), z = pos.getZ(v), k = clamp(Math.round((z - D0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - W0) / CELL), 0, NX - 1);
+      pos.setY(v, heights(k)); colorOf(c, k, x, z); col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals(); return geo;
+  };
+  // the land: cut at the true coast, beach painted along it
+  const landGeo = grid((k) => (LAND[k] ? H[k] : 0.012), (c, k, x, z) => {
+    const h = H[k], n = fbm(x * 0.8, z * 0.8);
+    if (h > 1.45 * EXAG / 1.6) c.set("#c2b296"); else if (h > 1.0) c.set(n > 0.5 ? "#8e7d5e" : "#9a8a68");
     else c.set(n > 0.56 ? "#3f7a34" : n > 0.45 ? "#5f9445" : "#8eaa5a");
-    col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
-  }
-  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-  geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  scene.add(mesh); return mesh;
+  });
+  const land = new THREE.Mesh(landGeo, withMask(new THREE.MeshLambertMaterial({ vertexColors: true }),
+    "vec4 mk = texture2D(uMask, vMaskUv);\nif (mk.r < 0.5) discard;\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.85, 0.65), smoothstep(0.15, 0.6, mk.g));"));
+  scene.add(land);
+  // the sea floor: everywhere below, turquoise near the coast, dark blue far out
+  const seaGeo = grid((k) => -Math.min(1.6, 0.05 + (LAND[k] ? 0 : DIST[k]) * 0.32), (c) => c.set("#1f6aa8"));
+  const sea = new THREE.Mesh(seaGeo, withMask(new THREE.MeshLambertMaterial({ vertexColors: true }),
+    "vec4 mk = texture2D(uMask, vMaskUv);\ndiffuseColor.rgb = mix(vec3(0.10, 0.36, 0.62), vec3(0.50, 0.90, 0.84), clamp(mk.b * 1.4, 0.0, 1.0));"));
+  scene.add(sea);
+  return land;
 }
 
 /* ---------------- Scene ---------------- */
@@ -200,37 +245,33 @@ water.rotation.x = -Math.PI / 2; water.position.set(35, 0, 40); scene.add(water)
 const lmat = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
 function scatter(n, test, place) { const out = []; let tries = 0; while (out.length < n && tries++ < n * 30) { const x = W0 + Math.random() * (W1 - W0), z = D0 + Math.random() * (D1 - D0); if (test(x, z)) out.push(place(x, z)); } return out; }
 const landAt = (x, z) => { const i = Math.round((x - W0) / CELL), j = Math.round((z - D0) / CELL); return i >= 0 && j >= 0 && i < NX && j < NZ ? j * NX + i : -1; };
+const gridLand = (x, z) => { const k = landAt(x, z); return k >= 0 && LAND[k] === 2; };
 function instanced(geo, color, list) {
   const m = new THREE.InstancedMesh(geo, lmat(color), list.length), o = new THREE.Object3D();
   list.forEach(([x, y, z, s, ry], i) => { o.position.set(x, y, z); o.scale.setScalar(s); o.rotation.set(0, ry || 0, 0); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
   scene.add(m); return m;
 }
 function trees() {
-  const ok = (x, z) => { const k = landAt(x, z); if (k < 0 || !LAND[k]) return false; const h = H[k]; return DIST[k] > 0.3 && h < 1.3 && fbm(x * 0.8, z * 0.8) > 0.47; };
+  const ok = (x, z) => { if (!isLand(x, z) || isBeach(x, z)) return false; const k = landAt(x, z); return DIST[k] > 0.25 && H[k] < 1.3 && fbm(x * 0.8, z * 0.8) > 0.47; };
   const pines = scatter(5200, ok, (x, z) => [x, heightAt(x, z), z, 0.8 + Math.random() * 0.7]);
   const pg = new THREE.ConeGeometry(0.018, 0.06, 5); pg.translate(0, 0.045, 0);
   const tg = new THREE.CylinderGeometry(0.004, 0.005, 0.02, 4); tg.translate(0, 0.01, 0);
   instanced(pg, "#2f6b2e", pines); instanced(tg, "#6b4a2a", pines);
-  const olive = scatter(2600, (x, z) => { const k = landAt(x, z); return k >= 0 && LAND[k] && DIST[k] > 0.2 && H[k] < 0.5 && fbm(x * 0.8, z * 0.8) <= 0.47; }, (x, z) => [x, heightAt(x, z), z, 0.7 + Math.random() * 0.6]);
+  const olive = scatter(2600, (x, z) => { if (!isLand(x, z) || isBeach(x, z)) return false; const k = landAt(x, z); return H[k] < 0.5 && fbm(x * 0.8, z * 0.8) <= 0.47; }, (x, z) => [x, heightAt(x, z), z, 0.7 + Math.random() * 0.6]);
   const og = new THREE.IcosahedronGeometry(0.016, 0); og.translate(0, 0.022, 0);
   instanced(og, "#7d9a52", olive); instanced(tg, "#6b4a2a", olive);
 }
 // towns: white cubes with flat roofs, a few with red tiles, around each place
-const TOWNS = [["Rhodos", 36.44, 28.223, 1.3, 260, "Festung der Johanniter"], ["Ialysos", 36.415, 28.15, 0.6, 70, ""], ["Kremasti", 36.405, 28.118, 0.4, 40, ""],
-  ["Paradisi", 36.395, 28.085, 0.4, 35, ""], ["Kallithea", 36.38, 28.235, 0.3, 20, "Heilquellen"], ["Faliraki", 36.34, 28.2, 0.6, 70, "Strände"], ["Afantou", 36.293, 28.165, 0.4, 40, ""],
-  ["Kolymbia", 36.245, 28.155, 0.4, 30, ""], ["Archangelos", 36.212, 28.115, 0.55, 70, ""], ["Malona", 36.175, 28.075, 0.3, 25, ""], ["Lindos", 36.092, 28.087, 0.35, 70, "Akropolis"],
-  ["Lardos", 36.082, 28.012, 0.35, 30, ""], ["Pefki", 36.062, 28.06, 0.3, 25, ""], ["Kiotari", 36.043, 27.968, 0.3, 20, ""], ["Gennadi", 36.023, 27.925, 0.35, 30, ""],
-  ["Lachania", 35.985, 27.888, 0.25, 15, ""], ["Prasonisi", 35.883, 27.763, 0.2, 8, "Zwei Meere"], ["Kattavia", 35.952, 27.783, 0.3, 25, ""], ["Messanagros", 36.005, 27.82, 0.25, 15, ""],
-  ["Apolakkia", 36.053, 27.8, 0.3, 25, ""], ["Monolithos", 36.128, 27.73, 0.25, 15, "Burg auf dem Fels"], ["Siana", 36.135, 27.77, 0.25, 15, ""], ["Embonas", 36.228, 27.853, 0.35, 30, "Weinberge"],
-  ["Kritinia", 36.268, 27.833, 0.25, 20, ""], ["Kamiros", 36.336, 27.92, 0.2, 6, "antike Stadt"], ["Salakos", 36.292, 27.95, 0.25, 15, ""], ["Petaloudes", 36.335, 28.06, 0.15, 4, "Tal der Schmetterlinge"],
-  ["Laerma", 36.155, 27.96, 0.25, 15, ""], ["Asklipio", 36.052, 27.948, 0.25, 15, ""], ["Profilia", 36.083, 27.86, 0.2, 12, ""], ["Symi", 36.615, 27.84, 0.4, 50, "Insel"]];
+// towns and villages come from the coast data (OpenStreetMap places); their size from their kind
+let TOWNS = [];
+const SIZE = { city: [1.3, 260], town: [0.55, 70], village: [0.3, 24] };
 function towns() {
   const walls = [], roofs = [], red = [];
   for (const [, lat, lon, r, n] of TOWNS) {
     const [cx, cz] = P(lon, lat);
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d, k = landAt(x, z);
-      if (k < 0 || !LAND[k]) continue;
+      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
+      if (!isLand(x, z) || isBeach(x, z)) continue;
       const s = 1.3 + Math.random() * 0.9, y = heightAt(x, z), ry = Math.random() * Math.PI;
       walls.push([x, y, z, s, ry]); (Math.random() < 0.35 ? red : roofs).push([x, y, z, s, ry]);
     }
@@ -246,37 +287,38 @@ function landmarks() {
   const stone = lmat("#c9a873"), white = lmat("#f3ede0"), dark = lmat("#7a5a3a");
   const add = (geo, m, [x, y, z], dy = 0, ry = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y + dy, z); o.rotation.y = ry; scene.add(o); return o; };
   // Rhodos: a ring of walls with towers, the grand master's palace, three windmills on the mole
-  const [rx, ry0, rz] = g(28.225, 36.445);
+  const [rx, ry0, rz] = g(28.2259, 36.4448);
   for (let i = 0; i < 16; i++) {
     const a = (i / 16) * Math.PI * 2, x = rx + Math.cos(a) * 0.45, z = rz + Math.sin(a) * 0.35;
     add(new THREE.BoxGeometry(0.2, 0.05, 0.03), stone, [x, heightAt(x, z), z], 0.025, -a + Math.PI / 2);
     if (i % 2 === 0) add(new THREE.CylinderGeometry(0.03, 0.035, 0.08, 6), stone, [x, heightAt(x, z), z], 0.04);
   }
   add(new THREE.BoxGeometry(0.14, 0.09, 0.12), stone, [rx, ry0, rz - 0.1], 0.045);
-  for (let i = 0; i < 3; i++) { const p = g(28.229 + i * 0.0015, 36.452); const m = add(new THREE.CylinderGeometry(0.012, 0.016, 0.05, 6), white, p, 0.025);
+  for (let i = 0; i < 3; i++) { const p = g(28.2262 + i * 0.0009, 36.4508 + i * 0.0006); const m = add(new THREE.CylinderGeometry(0.012, 0.016, 0.05, 6), white, p, 0.025);
     const sail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.006, 0.003), dark); sail.position.set(0, 0.02, 0.012); m.add(sail); const s2 = sail.clone(); s2.rotation.z = Math.PI / 2; m.add(s2); }
   // Lindos: the acropolis on its rock
-  const [lx, ly, lz] = g(28.0885, 36.0905);
+  const [lx, ly, lz] = g(28.0879, 36.0909);
   add(new THREE.CylinderGeometry(0.11, 0.16, 0.12, 7), lmat("#b7905c"), [lx, ly, lz], 0.06);
   for (let i = 0; i < 8; i++) add(new THREE.CylinderGeometry(0.005, 0.005, 0.045, 5), white, [lx - 0.05 + i * 0.014, ly + 0.12, lz], 0.022);
   add(new THREE.BoxGeometry(0.12, 0.006, 0.03), white, [lx, ly + 0.12, lz], 0.047);
   // Monolithos: a castle on a needle of rock
-  const [mx, my, mz] = g(27.723, 36.128);
+  const [mx, my, mz] = g(27.7258, 36.1284);
   add(new THREE.ConeGeometry(0.08, 0.2, 6), lmat("#8f6a4a"), [mx, my, mz], 0.08);
   add(new THREE.BoxGeometry(0.07, 0.05, 0.05), stone, [mx, my, mz], 0.2);
   // Kamiros: columns of the ancient town
-  const [kx, ky, kz] = g(27.921, 36.334);
+  const [kx, ky, kz] = g(27.9208, 36.3361);
   for (let i = 0; i < 6; i++) add(new THREE.CylinderGeometry(0.005, 0.005, 0.03 + (i % 3) * 0.012, 5), white, [kx + (i % 3) * 0.02, ky, kz + Math.floor(i / 3) * 0.03], 0.02);
   // the wreck you washed up from, on the beach of Tsambika
-  let [wx, wz] = P(28.147, 36.236), best = 1e9;
-  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i; if (!LAND[k] || DIST[k] > 0.25) continue;
-    const x = W0 + i * CELL, z = D0 + j * CELL, d = (x - wx) ** 2 + (z - wz) ** 2; if (d < best) { best = d; WRECK = [x, z]; } }
+  let [wx, wz] = P(28.150, 36.233), best = 1e9;
+  for (let z = wz - 3; z < wz + 3; z += 0.02) for (let x = wx - 3; x < wx + 3; x += 0.02) {
+    if (!isBeach(x, z)) continue; const d = (x - wx) ** 2 + (z - wz) ** 2; if (d < best) { best = d; WRECK = [x, z]; } }
   [wx, wz] = WRECK; const wy = heightAt(wx, wz);
   const wreck = new THREE.Group(); wreck.position.set(wx + 0.05, Math.max(0, wy), wz); wreck.rotation.set(0.3, 0.8, 0.25); scene.add(wreck);
   const hull = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.025), lmat("#6b4a2a")); wreck.add(hull);
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.07, 4), lmat("#5a3a20")); mast.position.y = 0.035; mast.rotation.z = 0.5; wreck.add(mast);
   const rag = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 0.025), new THREE.MeshLambertMaterial({ color: 0xcdb48a, side: THREE.DoubleSide })); rag.position.set(0.012, 0.05, 0); rag.rotation.set(0.2, 0.4, 0.5); wreck.add(rag);
-  WRECK = [wx - 0.05, wz - 0.03];
+  // you wake a little inland of the wreck
+  for (const [ox, oz] of [[-0.06, 0], [0, -0.06], [0.06, 0], [0, 0.06], [-0.04, -0.04]]) if (isLand(wx + ox, wz + oz) && !isBeach(wx + ox, wz + oz)) { WRECK = [wx + ox * 0.6, wz + oz * 0.6]; break; }
 }
 let WRECK = null;
 // ships sailing on the sea
@@ -328,11 +370,25 @@ function makeAvatar() {
 
 /* ---------------- Camera: behind and above, like the old sailing games ---------------- */
 let camDist = 0.38, camYaw = 0.6, camPitch = 0.95;
+/* Two fingers push the view away from you, on an elastic band: up to 100 km (a hard day's march)
+   it follows freely, beyond it stretches and pulls back when you let go. "zu mir" brings it home. */
+const LEASH = 100;
+const pan = { x: 0, z: 0, held: false, home: false };
+function panBy(dx, dz) {
+  const d0 = Math.hypot(pan.x, pan.z);
+  const k = d0 > LEASH ? 0.25 / (1 + (d0 - LEASH) / 20) : 1;      // past the leash the band gets stiffer
+  pan.x += dx * k; pan.z += dz * k;
+}
+function panStep(dt) {
+  const d = Math.hypot(pan.x, pan.z);
+  if (pan.home) { pan.x *= Math.max(0, 1 - dt * 4); pan.z *= Math.max(0, 1 - dt * 4); if (d < 0.01) { pan.x = pan.z = 0; pan.home = false; } }
+  else if (!pan.held && d > LEASH) { const t = LEASH + (d - LEASH) * Math.max(0, 1 - dt * 6); pan.x *= t / d; pan.z *= t / d; }
+}
 function placeCamera() {
-  const y = heightAt(pl.x, pl.z);
-  const cx = pl.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist, cz = pl.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+  const fx = pl.x + pan.x, fz = pl.z + pan.z, y = Math.max(0, heightAt(fx, fz));
+  const cx = fx + Math.sin(camYaw) * Math.cos(camPitch) * camDist, cz = fz + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
   camera.position.set(cx, Math.max(heightAt(cx, cz) + 0.05, y + Math.sin(camPitch) * camDist), cz);
-  camera.lookAt(pl.x, y + 0.02, pl.z);
+  camera.lookAt(fx, y + 0.02, fz);
   scene.fog.near = camDist * 4 + 4; scene.fog.far = camDist * 14 + 30;
   $("#roseSvg").style.transform = `rotate(${(camYaw * 180) / Math.PI}deg)`;
 }
@@ -341,20 +397,31 @@ $("#zOut").onclick = () => { camDist = Math.min(60, camDist * 1.6); };
 let view = 0;
 $("#viewBtn").onclick = () => { view = (view + 1) % 3; camPitch = [0.95, 0.5, 1.35][view]; };
 // fingers: one drags the view round, two pinch; a tap walks there (without GPS)
-const ptrs = new Map(); let pinch = null, downAt = null;
+const ptrs = new Map(); let pinch = null, mid = null, downAt = null;
 const el = renderer.domElement;
-el.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); downAt = [e.clientX, e.clientY, performance.now()]; pinch = null; });
+el.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); downAt = ptrs.size === 1 ? [e.clientX, e.clientY, performance.now()] : null; pinch = null; mid = null; pan.held = ptrs.size >= 2; pan.home = false; });
 el.addEventListener("pointermove", (e) => {
   if (!ptrs.has(e.pointerId)) return;
   const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
   if (ptrs.size === 1) { camYaw -= (e.clientX - prev[0]) * 0.008; camPitch = clamp(camPitch + (e.clientY - prev[1]) * 0.005, 0.25, 1.45); }
-  else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) camDist = clamp(camDist * (pinch / d), 0.12, 60); pinch = d; }
+  else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if (pinch) camDist = clamp(camDist * (pinch / d), 0.12, 60);
+    if (mid) {
+      // move the ground under the fingers: screen pixels to kilometres at the current height
+      const kmPerPx = (2 * camDist * Math.tan((camera.fov * Math.PI) / 360)) / innerHeight;
+      const sx = -(m[0] - mid[0]) * kmPerPx, sy = -(m[1] - mid[1]) * kmPerPx / Math.max(0.35, Math.sin(camPitch));
+      panBy(Math.cos(camYaw) * sx + Math.sin(camYaw) * sy, -Math.sin(camYaw) * sx + Math.cos(camYaw) * sy);
+    }
+    pinch = d; mid = m;
+  }
 });
 el.addEventListener("pointerup", (e) => {
-  ptrs.delete(e.pointerId); pinch = null;
+  ptrs.delete(e.pointerId); pinch = null; mid = null; pan.held = ptrs.size >= 2;
   if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 8 && performance.now() - downAt[2] < 400) tapWalk(e.clientX, e.clientY);
   downAt = null;
 });
+el.addEventListener("pointercancel", (e) => { ptrs.delete(e.pointerId); pinch = null; mid = null; downAt = null; pan.held = ptrs.size >= 2; });
 el.addEventListener("wheel", (e) => { e.preventDefault(); camDist = clamp(camDist * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 0.12, 60); }, { passive: false });
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let terrain = null;
@@ -362,11 +429,10 @@ function tapWalk(px, py) {
   if (gps.on && gps.onIsland) { toast("Mit GPS gehst du selbst. Ohne GPS kannst du per Tippen wandern."); return; }
   ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObject(terrain)[0]; if (!hit) return;
-  const k = landAt(hit.point.x, hit.point.z);
-  if (k < 0 || !LAND[k]) { toast("Ohne Boot geht es nicht übers Wasser."); return; }
+  if (!isLand(hit.point.x, hit.point.z)) { toast("Ohne Boot geht es nicht übers Wasser."); return; }
   pl.tx = hit.point.x; pl.tz = hit.point.z; tgtMark.position.set(pl.tx, hit.point.y + 0.003, pl.tz); tgtMark.visible = true;
 }
-$("#centre").onclick = () => { camDist = 0.38; camPitch = 0.95; };
+$("#centre").onclick = () => { camDist = 0.38; camPitch = 0.95; pan.home = true; };
 
 /* ---------------- GPS: you walk the island, and so does your figure ---------------- */
 const gps = { on: false, watch: null, onIsland: false, last: null };
@@ -377,7 +443,7 @@ $("#gpsBtn").onclick = () => {
   gps.watch = navigator.geolocation.watchPosition(onFix, (e) => toast({ 1: "Standort nicht erlaubt.", 2: "Kein GPS-Signal.", 3: "GPS antwortet nicht." }[e.code] || e.message), { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
 };
 function onFix(p) {
-  const c = p.coords, [x, z] = P(c.longitude, c.latitude), k = landAt(x, z);
+  const c = p.coords, [x, z] = P(c.longitude, c.latitude);
   const was = gps.onIsland;
   gps.onIsland = x > W0 && x < W1 && z > D0 && z < D1;
   gps.last = { lat: c.latitude, lon: c.longitude, acc: c.accuracy };
@@ -412,14 +478,20 @@ function loop(now) {
   if (avatar) { avatar.g.position.set(pl.x, y, pl.z); avatar.g.rotation.y = pl.face; avatar.update(dt, pl.walk); }
   ring.position.set(pl.x, y + 0.002, pl.z); ring.scale.setScalar(1 + Math.sin(now / 300) * 0.08);
   for (const sh of ships) { sh.a += sh.v * dt / sh.r; sh.s.position.set(sh.cx + Math.cos(sh.a) * sh.r, 0, sh.cz + Math.sin(sh.a) * sh.r); sh.s.rotation.y = -sh.a + (sh.v > 0 ? 0 : Math.PI); }
-  placeCamera(); renderer.render(scene, camera); drawLabels();
+  panStep(dt); placeCamera(); renderer.render(scene, camera); drawLabels();
   if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); }
   requestAnimationFrame(loop);
 }
-fetch("coast.json").then((r) => r.json()).then((coast) => {
-  terrain = buildLand(coast);
+window.CrusadersGeo.load().then((geo) => {
+  // where an exact region exists, its coast wins over the rough one
+  const exact = geo.regions.filter((r) => r.quality === "genau").map((r) => r.bbox);
+  const feats = geo.features.filter((f) => f.quality === "genau" || !f.rings.every((ring) => ring.every(([lon, lat]) => exact.some(([a, b, c, d]) => lon >= a && lon <= c && lat >= b && lat <= d))));
+  TOWNS = geo.regions.flatMap((r) => (r.data.places || []).map((p) => [p.name, p.lat, p.lon, ...(SIZE[p.kind] || SIZE.village)]));
+  terrain = buildLand(feats);
+  $("#src").textContent = "Küste © OpenStreetMap-Mitwirkende (ODbL) · Natural Earth";
   trees(); towns(); landmarks(); sailboats();
-  for (const [name, lat, lon, , , sub] of TOWNS) { const [x, z] = P(lon, lat); label(name, sub, x, z); }
+  for (const [name, lat, lon] of TOWNS) { const [x, z] = P(lon, lat); label(name, "", x, z); }
+  for (const r of geo.regions) for (const st of r.data.sights || []) { const [x, z] = P(st.lon, st.lat); label(st.name, st.sub, x, z, "sight"); }
   for (const s of window.Postcards.spots) { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
   makeAvatar();
   [pl.x, pl.z] = WRECK;
