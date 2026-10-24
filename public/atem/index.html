@@ -354,6 +354,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
         <input type="radio" name="journey" id="jLucid" value="lucid"><label for="jLucid">Luzid</label>
         <input type="radio" name="journey" id="jDeep" value="deep"><label for="jDeep">Tiefe</label>
         <input type="radio" name="journey" id="jTank" value="tank"><label for="jTank">Tank</label>
+        <input type="radio" name="journey" id="jStory" value="story"><label for="jStory">Garten</label>
       </div>
       <p class="hint" id="journeyHint"></p>
       <details id="samBuilder">
@@ -479,6 +480,7 @@ button:focus-visible { outline: 2px solid var(--breath); outline-offset: 3px; }
 
   <section class="summary" id="calPanel" hidden>
     <h2>Engine-Kalibrierung</h2>
+    <p class="hint">Zweimal aufs Handy klopfen (oder doppelt tippen): nächste Klangstufe. <b id="calLayer"></b></p>
     <canvas id="calChart" height="150" aria-label="Atemfluss und Meer, die letzten 15 Sekunden"></canvas>
     <p class="hint">Türkis: dein Luftstrom (oben ein, unten aus) · Bernstein: wie laut das Meer rauscht · hell: dein Finger</p>
     <div class="field"><label for="calThr">Empfindlichkeit <output id="calThrOut"></output></label><input type="range" id="calThr" min="0.02" max="0.3" step="0.01"></div>
@@ -509,7 +511,7 @@ const now = () => performance.now() / 1000;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------------- Settings ---------------- */
-const VERSION = "v24 · 24.10. 12:00 · Kalibrierung";
+const VERSION = "v25 · 24.10. 15:00 · Garten";
 const CAL0 = { thr: 0.12, tau: 0.1, look: 0.3, dyn: 1.2 };
 const S = { cal: { ...CAL0 }, lucidCue: "Ton", wbtb: false, markOnset: false, snoreCue: "aus", journey: "sleep", carrier: 136.1, lucidH: 5, jb: [2, 4, 2, 4], sleepFade: 20, snore: false, box: [4, 4, 4, 4], target: 6, ratio: 1.5, mode: "portal", minutes: 10, volume: 0.35, tone: true, sea: true, bowl: true, heart: true, voiceName: "", voice: true, chimes: true, autodim: true };
 try { Object.assign(S, JSON.parse(localStorage.getItem("atemlotse8") || "{}")); } catch (e) {}
@@ -528,6 +530,7 @@ const JOURNEY_HINT = {
   sleep: "Genau so, wie es dich zum ersten Mal schlafen ließ, bleibt es eingefroren unter /atem/klassik/. Das Meer folgt dir, dann führt es dich langsamer. Binaurale Beats gleiten von Alpha über Theta Richtung Delta, nur solange du mitgehst und dein Puls nicht steigt. Dann wird alles still, die Aufzeichnung läuft weiter.",
   lucid: "Nach der Methode „Targeted Lucidity Reactivation“ (TLR) aus dem Schlaflabor der Northwestern University. Vor dem Einschlafen übst du etwa acht Minuten: Immer wenn das Signal kommt, fragst du dich „Träume ich?“, schaust auf Atem, Körper und Gedanken und klopfst zweimal leise aufs Handy. In der zweiten Nachthälfte achtet die App auf traumtypisch unruhigen Atem bei ruhigem Körper und spielt dann dasselbe Signal, ganz leise. Mit WBTB weckt sie dich vorher kurz für eine zweite Übungsrunde. Morgens fragt sie, ob du das Signal im Traum gehört hast und luzid wurdest. Ein Experiment, kein Versprechen.",
   deep: "Resonanzatmung: Das Meer probiert ruhige Tempi von 6,5 bis 4,5 Atemzügen pro Minute und misst, wo dein Herzschlag am stärksten mitschwingt. Dort bleibt es, und ein heller Klang wächst mit der Welle.",
+  story: "Streifzug durch den Garten: ein Märchen zum Einschlafen, etwa zwanzig Minuten. Die Stimme liest im Takt deines Atems, jeder Satz beginnt mit deinem Ausatmen auf einem Herzschlag. Je ruhiger du wirst, desto langsamer, leiser und seltener spricht sie. Schläfst du ein, verstummt sie und das Meer blendet aus.",
   tank: "Schwarz und fast still. Nur dein Atem als Meer und ganz leise dein eigener Herzschlag. Alles wird langsam immer weniger. Schweben.",
 };
 function updateFields() {
@@ -984,7 +987,7 @@ function heartSample(t, r, moving) {
     if (h[n - 2] > 2 * med && t - 0.05 - HB.lastBeat > gap) {
       HB.lastBeat = t - 0.05; HB.beat = true;
       HB.beats.push(HB.lastBeat); if (HB.beats.length > 400) HB.beats.shift();
-      if (sess.phase !== "place") heartSound();
+      if (sess.phase !== "place") { heartSound(); storyBeat(); }
     }
   }
   if (t >= HB.nextEst && HB.buf.length >= 160) { HB.nextEst = t + 2; heartEstimate(); }
@@ -1334,9 +1337,9 @@ function initBinaural() {
   const mk = (pan) => { const o = ctx.createOscillator(); o.type = "sine"; const pn = ctx.createStereoPanner(); pn.pan.value = pan; o.connect(pn).connect(g); o.start(); return o; };
   A.binL = mk(-1); A.binR = mk(1); A.binGain = g;
 }
-function setBinaural(beat, level) {
+function setBinaural(beat, level, carrier) {
   if (!A.binGain) return;
-  const t = A.ctx.currentTime, c = S.carrier;
+  const t = A.ctx.currentTime, c = carrier || S.carrier;
   A.binL.frequency.setTargetAtTime(c - beat / 2, t, 0.8);
   A.binR.frequency.setTargetAtTime(c + beat / 2, t, 0.8);
   A.binGain.gain.setTargetAtTime(0.035 * level, t, 1.5);
@@ -1515,8 +1518,16 @@ function journeyUpdate(t, dt) {
     }
     if (withIt) J.beat = toward(J.beat, 7, dt * 0.01);
   } else {
+    // the garden story: the sea follows you while the story is read; at its end, or once you sleep, the sounds go
+    if (jn === "story" && J.stage === "follow") {
+      if (ph === "sea" && t - sess.phaseStart > 20) storyTick(t);
+      J.seaMul = toward(J.seaMul, 1 - 0.4 * ST.i / STORY_LINES.length, dt / 20);
+      J.heartMul = S.heart ? 0.08 : 0;
+      if (ST.done) J_stage("fade", "Schlaf gut.");
+    }
+    if (jn === "story" && J.stage !== "follow") { storyStop(); J.heartMul = toward(J.heartMul, 0, dt / 60); }
     // sleep and lucid: descend while with it, then let go into the night
-    if (J.stage === "follow" && ph === "seaLead" && SP.slowing) {
+    if (jn !== "story" && J.stage === "follow" && ph === "seaLead" && SP.slowing) {
       if (jn === "lucid") {
         J_stage("imprint", "Training: Kommt das Signal, frag dich „Träume ich?“ und klopf zweimal aufs Handy.",
           "Wir üben jetzt dein Traumsignal. Immer wenn es kommt, fragst du dich: Träume ich? Und klopfst zweimal leise aufs Handy.");
@@ -2081,7 +2092,8 @@ const BOWL_HZ = 196; // G3
 // In Just Breathe the sea carries everything; drone and heartbeat join at a whisper (5 %) with the sea,
 // the sustained bowl only as it starts to lead.
 function mix(layer) {
-  if (S.mode === "portal" && layer === "heart") return S.journey === "tank" || samOn() ? J.heartMul : 0;
+  if (S.mode === "engine") return layer === "heart" && calLayer().heart ? 0.15 : 0;
+  if (S.mode === "portal" && layer === "heart") return S.journey === "tank" || S.journey === "story" || samOn() ? J.heartMul : 0;
   if (!isJB()) return 1;
   if (sess.phase === "sea" || sess.phase === "seaLead" || sess.phase === "night" || (sess.phase === "sleep" && sess.flowEng)) return 0;
   if (layer === "bowl") return sess.phase === "blend" ? 0.3 * sess.alpha : ["jb", "sleep"].includes(sess.phase) ? 0.3 : 0;
@@ -2109,7 +2121,7 @@ function audioSea(dt) {
   A.nFilter.frequency.setTargetAtTime(80 * Math.pow(2, pu * 3.2), t, 1.2 * C.tau);
   // the sea is the whole of Just Breathe, so it plays regardless of the sound chips
   A.nGain.gain.setTargetAtTime(0.14 * Math.pow(level, C.dyn) * (S.mode === "portal" ? J.seaMul : 1), t, 0.7 * C.tau);
-  if (S.mode === "engine") calRecord(e && ok ? e.flow : 0);
+  if (S.mode === "engine") { calRecord(e && ok ? e.flow : 0); calSound(dt, pu); }
   A.padGain.gain.setTargetAtTime(0, t, 0.5);
   if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(S.mode === "portal" ? J.bowl : 0, t, 0.8);
   A.dGain.gain.setTargetAtTime(0, t, 0.5);
@@ -2146,7 +2158,7 @@ function bowlLevel(v, k) {
 }
 function heartSound() {
   if (samOn() && SAM.st && (SAM.st.herz === "spüren" || SAM.st.herz === "beides") && !SAM.ending) haptic(28);
-  if (!A.ctx || !(S.heart || (S.mode === "portal" && (S.journey === "tank" || (samOn() && J.heartMul > 0))))) return;
+  if (!A.ctx || !(S.heart || (S.mode === "engine" && calLayer().heart) || (S.mode === "portal" && (S.journey === "tank" || (samOn() && J.heartMul > 0))))) return;
   // soft "lub-dub": two low, short thumps
   const ctx = A.ctx, t = ctx.currentTime;
   for (const [dt, f, v0] of [[0, 62, 0.22], [0.17, 52, 0.14]]) {
@@ -2219,6 +2231,104 @@ function say(text) {
   } catch (e) {}
 }
 
+/* ---------------- Streifzug durch den Garten ----------------
+   A fairy tale for falling asleep, read with your breath: each sentence starts as you breathe
+   out, on the next heartbeat. Chapter by chapter it leaves more breaths between sentences and
+   speaks slower, softer and a little lower; your breathing and pulse set the pace on top. */
+const STORY = [
+  { gap: 1, lines: [
+    "Es ist Abend geworden.", "Die Luft ist warm und still.", "Vor dir liegt ein Garten, den du noch nicht kennst.",
+    "Ein altes Tor aus Holz, halb offen.", "Du legst die Hand auf das Holz. Es ist noch warm von der Sonne.",
+    "Das Tor schwingt auf, ganz leise.", "Und du gehst hinein.", "Unter deinen Füßen knirscht feiner Kies.",
+    "Ein Schritt. Und noch einer.", "Mit jedem Ausatmen wird der Weg ein wenig weicher.", "Rechts und links wächst Lavendel.",
+    "Du streifst ihn mit den Fingern, und sein Duft steigt auf.", "Du atmest ihn ein.", "Und lässt ihn wieder gehen.",
+    "Irgendwo summt eine letzte Biene auf dem Heimweg.", "Sie hat es nicht eilig.", "Niemand hat es hier eilig.",
+    "Der Garten hat Zeit. Und du auch." ] },
+  { gap: 1, lines: [
+    "Der Weg macht eine sanfte Biegung.", "Dahinter steht ein Bogen aus Rosen.", "Die Blüten sind schwer und müde vom Tag.",
+    "Sie neigen die Köpfe, als wollten sie schlafen.", "Du gehst unter dem Bogen hindurch.", "Ein Blütenblatt fällt auf deine Schulter.",
+    "Du lässt es dort liegen.", "Vor dir plätschert ein kleiner Brunnen.", "Das Wasser fällt in eine steinerne Schale.",
+    "Und aus der Schale in eine zweite.", "Immer im gleichen Takt. Wie ein ruhiger Atem.", "Du setzt dich auf den Rand des Brunnens.",
+    "Der Stein ist kühl und glatt.", "Du hältst eine Hand ins Wasser.", "Es ist weich und klar.",
+    "Kleine Kreise laufen von deinen Fingern weg.", "Sie werden größer. Und leiser.", "Bis sie am Rand verschwinden.",
+    "Genau so dürfen deine Gedanken jetzt gehen.", "Ein Kreis. Und dann Ruhe." ] },
+  { gap: 1, lines: [
+    "Hinter dem Brunnen steht ein alter Apfelbaum.", "Sein Stamm ist knorrig und breit.", "Er steht hier schon sehr, sehr lange.",
+    "Du lehnst dich mit dem Rücken an ihn.", "Die Rinde ist warm.", "Du spürst, wie fest er im Boden steht.",
+    "Seine Wurzeln reichen tief in die dunkle, weiche Erde.", "Und du spürst, wie auch du schwerer wirst.", "Deine Füße. Deine Beine.",
+    "Dein Rücken, der am Baum lehnt.", "Über dir rascheln die Blätter im Abendwind.", "Ein Rascheln beim Einatmen.",
+    "Und Stille beim Ausatmen.", "Ein Apfel löst sich und fällt ins Gras.", "Ein dumpfer, weicher Laut.",
+    "Dann wieder nur das Rascheln.", "Der Himmel zwischen den Blättern wird dunkelblau.", "Der erste Stern erscheint." ] },
+  { gap: 1, lines: [
+    "Ein schmaler Pfad führt hinunter zu einem Teich.", "Du gehst ganz langsam.", "Das Gras ist feucht vom Abendtau.",
+    "Es kühlt deine Füße.", "Der Teich liegt still da, wie ein dunkler Spiegel.", "Seerosen schwimmen darauf. Sie haben ihre Blüten schon geschlossen.",
+    "Am Ufer sitzt ein Frosch und schaut dich an.", "Dann taucht er lautlos ins Wasser.", "Und plötzlich leuchtet es im Schilf.",
+    "Ein kleines Licht. Dann noch eins.", "Glühwürmchen.", "Sie steigen auf und sinken wieder.", "Auf und ab.",
+    "So langsam wie dein Atem.", "Eines setzt sich auf deine Hand.", "Es leuchtet. Und wird dunkel. Und leuchtet wieder.",
+    "Du schaust ihm einfach zu.", "Es gibt nichts zu tun.", "Nur leuchten und dunkel werden." ] },
+  { gap: 2, lines: [
+    "Neben dem Teich liegt eine Wiese.", "Das Gras ist hoch und weich.", "Du legst dich hinein.",
+    "Die Halme schließen sich über dir wie eine Decke.", "Die Erde trägt dich.", "Du musst dich nicht mehr halten.",
+    "Über dir geht der Mond auf.", "Er ist groß und rund und silbern.", "Sein Licht legt sich auf dein Gesicht.",
+    "Auf deine Schultern.", "Auf deine Hände.", "Alles wird silbern und still.", "Der Brunnen plätschert in der Ferne.",
+    "Die Glühwürmchen tanzen über dem Teich.", "Und der Garten atmet.", "Er atmet ein, wenn du einatmest.",
+    "Und er atmet aus, wenn du ausatmest." ] },
+  { gap: 2, lines: [
+    "Am Ende der Wiese steht eine alte Mauer.", "Efeu wächst über die Steine.", "Und mitten im Efeu ist eine kleine Tür.",
+    "Sie ist aus warmem, hellem Stein.", "Zeichen sind darin eingeritzt. Ein Auge. Eine Sonne. Ein Vogel.",
+    "Die Tür steht einen Spalt offen.", "Warmes, goldenes Licht fällt heraus.", "Dahinter liegt ein Tempel aus Sandstein.",
+    "Hohe Säulen. Ein Duft von Harz und Honig.", "Du musst nicht hineingehen.", "Du darfst. Wenn du willst. Im Traum.",
+    "Die Tür wartet auf dich.", "Ganz ohne Eile." ] },
+  { gap: 3, lines: [
+    "Du liegst im weichen Gras.", "Der Mond wacht über dem Garten.", "Alles ist an seinem Platz.",
+    "Der Baum. Der Brunnen. Der Teich.", "Die kleine Tür im Efeu.", "Und du.", "Schwer und warm und still.",
+    "Der Garten bleibt die ganze Nacht bei dir.", "Schlaf gut." ] },
+];
+const STORY_LINES = STORY.flatMap((c, k) => c.lines.map((text) => ({ text, gap: c.gap, ch: k })));
+const ST = { i: 0, outSeen: 0, breathsLeft: 0, armedAt: 0, lastSpoke: 0, done: false, on: false };
+function storyReset() { Object.assign(ST, { i: 0, outSeen: BT.nOut, breathsLeft: 0, armedAt: 0, lastSpoke: 0, done: false, on: false }); }
+function storySpeak(line) {
+  if (!("speechSynthesis" in window)) return;
+  const k = ST.i / STORY_LINES.length;                     // 0 → 1 over the story
+  const p = btPeriods(6), br = p.length >= 3 ? 60 / median(p) : 8;
+  const hr = HB.bpm || 66;
+  const rate = clamp((0.86 - 0.12 * k) * clamp(br / 8, 0.9, 1.08) * clamp(hr / 66, 0.95, 1.05), 0.66, 0.95);
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(line.text);
+    u.lang = "de-DE"; u.rate = rate; u.pitch = 0.95 - 0.1 * k; u.volume = 0.85 - 0.35 * k;
+    const voices = speechSynthesis.getVoices();
+    const de = voices.find((v) => v.name === S.voiceName) || voices.find((v) => v.lang && v.lang.startsWith("de"));
+    if (de) u.voice = de;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+  logEvent("story", { i: ST.i, rate: +rate.toFixed(2), br: +br.toFixed(1), hr: Math.round(hr) });
+  setPrompt(line.text);
+}
+// called every tick while the story runs: count breaths out, arm at the start of the one to speak on
+function storyTick(t) {
+  if (ST.done) return;
+  if (!ST.on) { ST.on = true; ST.outSeen = BT.nOut; ST.breathsLeft = 1; ST.lastSpoke = t; }
+  if (BT.nOut !== ST.outSeen) {
+    ST.outSeen = BT.nOut;
+    ST.breathsLeft--;
+    if (ST.breathsLeft <= 0 && !speechSynthesis.speaking) ST.armedAt = t;
+  }
+  // no breath seen for a while: go on anyway, slowly
+  if (!ST.armedAt && t - ST.lastSpoke > 16 && !speechSynthesis.speaking) ST.armedAt = t;
+  // armed: wait for the next heartbeat, but not longer than a second
+  if (ST.armedAt && t - ST.armedAt > 1) storyNext(t);
+}
+function storyBeat() { if (ST.on && ST.armedAt && !ST.done) storyNext(now()); }
+function storyNext(t) {
+  const line = STORY_LINES[ST.i];
+  ST.armedAt = 0;
+  if (!line) { ST.done = true; logEvent("storyEnd", {}); return; }
+  storySpeak(line); ST.lastSpoke = t; ST.i++;
+  ST.breathsLeft = line.gap;
+}
+function storyStop() { if (ST.on) { try { speechSynthesis.cancel(); } catch (e) {} } ST.on = false; }
+
 /* ---------------- Session ---------------- */
 const sess = {
   phase: "idle", phaseStart: 0, start: 0, lastTick: 0, timer: null,
@@ -2277,7 +2387,7 @@ function jbIntroCues(t, el) {
 /* Breaths on the real-time flow: a change of direction counts once the air has gone the new way
    for 0.5 s, so a stumble does not split a breath (checked on a recorded session: 9.0–9.3/min
    steady, where counting every turn gave 0.8 s "breaths"). */
-const BT = { st: 0, cand: null, on: [], ins: [], lastOff: null, n: 0 };
+const BT = { st: 0, cand: null, on: [], ins: [], lastOff: null, n: 0, nOut: 0 };
 function btReset() { Object.assign(BT, { st: 0, cand: null, on: [], ins: [], lastOff: null, n: 0 }); }
 function btStep(t, v) {
   const want = v > 0.2 ? 1 : v < -0.2 ? -1 : 0;
@@ -2285,7 +2395,7 @@ function btStep(t, v) {
     if (!BT.cand || BT.cand[0] !== want) BT.cand = [want, t];
     else if (t - BT.cand[1] >= 0.5) {
       if (want === 1) { BT.on.push(BT.cand[1]); if (BT.on.length > 12) BT.on.shift(); BT.n++; }
-      else if (BT.on.length) { BT.ins.push(BT.cand[1] - BT.on[BT.on.length - 1]); if (BT.ins.length > 12) BT.ins.shift(); BT.lastOff = BT.cand[1]; }
+      else if (BT.on.length) { BT.ins.push(BT.cand[1] - BT.on[BT.on.length - 1]); if (BT.ins.length > 12) BT.ins.shift(); BT.lastOff = BT.cand[1]; BT.nOut++; }
       BT.st = want; BT.cand = null;
     }
   } else if (want === BT.st) BT.cand = null;
@@ -2690,7 +2800,7 @@ function tick() {
     seaDirection(t, dt);
     if (sess.flowEng && !sig.disturbed) btStep(t, sess.flowEng.flow);
     const rested = !sess.seaBackAt || t - sess.seaBackAt > 90;
-    const handOver = !(S.mode === "portal" && (S.journey === "tank" || samOn())) && !NIGHT.asleep && S.mode !== "engine";
+    const handOver = !(S.mode === "portal" && (S.journey === "tank" || S.journey === "story" || samOn())) && !NIGHT.asleep && S.mode !== "engine";
     if (ph === "sea" && rested && handOver && sess.dir && sess.dir.sure && sess.dir.mix >= 1 && el > 60 && btSteady()) setPhase("seaLead");
     if (ph === "seaLead" || SP.aOut > 0.01) spStep(dt);
     if (S.mode === "jb" && S.sleepFade > 0 && t - sess.start > S.sleepFade * 60) setPhase("sleep");
@@ -2944,7 +3054,7 @@ async function start(ev) {
   window.addEventListener("devicemotion", onMotion);
   keepAwake();
   sess.hasSensor = "DeviceMotionEvent" in window;
-  sess.start = now(); sess.lastTick = now(); sess.history = []; sess.lastWithAt = 0; sess.saidFollow = false;
+  sess.start = now(); sess.lastTick = now(); sess.history = []; sess.lastWithAt = 0; sess.saidFollow = false; storyReset();
   sess.hrStart = null; sess.arrived = false; sess.boxCycles = 0; sess.qOut = 0.3; sess.boxDur = S.box.slice(); sess.jbStart = null; sess.polPrior = false;
   sess.turns = []; sess.alpha = 0; sess.layersOn = false; sess.flowOut = 0; sess.fit = null;
   btReset(); SP.a = 0; SP.aOut = 0; sess.seaBackAt = null;
@@ -2991,7 +3101,7 @@ function finish(natural) {
   if (A.shGain) A.shGain.gain.setTargetAtTime(0, A.ctx.currentTime, 0.8);
   $("#saveNote").textContent = "Ins Tagebuch";
   try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null;
-  $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false; $("#calPanel").hidden = true; CAL.test = null;
+  $("#dim").hidden = true; $("#running").hidden = true; $("#setup").hidden = false; $("#calPanel").hidden = true; CAL.test = null; storyStop();
   setPrompt(natural ? "Fertig. Lass dir Zeit beim Aufstehen." : "Leg dich hin, Handy flach auf die Brust, Kopfhörer rein.");
   const rows = [["Dauer", Math.floor(dur / 60) + ":" + String(Math.floor(dur % 60)).padStart(2, "0") + " min"]];
   if (sess.naturalRate) rows.push(["Atem am Anfang", sess.naturalRate.toFixed(1) + " /min"]);
@@ -3007,7 +3117,7 @@ function finish(natural) {
     rows.push(["Schritte", (SAM.ending ? SAM.j.schritte.length : Math.max(0, SAM.i)) + " von " + SAM.j.schritte.length + " ganz gegangen"]);
     if (SAM.guards.length) rows.push(["Leitplanken", SAM.guards.map((g) => ({ rapid: "schnelles Atmen begrenzt", pulse: "Pause wegen Puls" })[g] || g).join(", ")]);
   } else if (S.mode === "portal") {
-    const name = { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank" }[S.journey];
+    const name = { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank", story: "Garten" }[S.journey];
     rows.push(["Reise", name + (J.stage === "night" ? ", bis in die Nacht" : "")]);
     rows.push(["Frequenz zuletzt", J.beat.toFixed(1).replace(".", ",") + " Hz (" + BAND(J.beat) + ")"]);
     if (S.journey === "deep" && J.best) rows.push(["Dein Resonanztempo", String(J.best).replace(".", ",") + " Atemzüge/min" + (J.bestWave ? ", Herzwelle " + J.bestWave.toFixed(1).replace(".", ",") + " Schläge/min" : "")]);
@@ -3041,7 +3151,7 @@ function finish(natural) {
   sess.diaryId = null;
   const note = NOTE[S.journey] || NOTE.night;
   if (isJB() && (dur >= 600 || (NOTE[S.journey] && dur >= 120))) {
-    const what = S.mode === "portal" ? (samOn() ? SAM.j.titel : { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank" }[S.journey]) : "Just Breathe";
+    const what = S.mode === "portal" ? (samOn() ? SAM.j.titel : { sleep: "Einschlafen", lucid: "Luzid", deep: "Tiefe", tank: "Tank", story: "Garten" }[S.journey]) : "Just Breathe";
     const entry = { id: LOG.startedAt, start: LOG.startedAt, what, dur: Math.round(dur / 60) + " min", rows: rows.filter(([a]) => !["Log", "Dauer"].includes(a)), note: "", noteLabel: note.short };
     const list = diaryLoad(); list.push(entry); diarySave(list); sess.diaryId = entry.id;
   }
@@ -3112,21 +3222,65 @@ $("#postClear").addEventListener("click", () => { postSave(postLoad().map((c) =>
    The finger test gives a ground truth: a finger on the pad while breathing in. From it come
    the delay between your breath and the sea, whether in and out are the right way round,
    and how well they match. The settings are kept and used in every mode. */
-const CAL = { hist: [], touch: 0, test: null };
+const CAL = { hist: [], touch: 0, test: null, layer: 0, switchedAt: 0 };
+const CAL_LAYERS = [
+  { name: "Nur Meer", sea: 1 },
+  { name: "Meer und Klangschale", sea: 1, bowl: 1 },
+  { name: "Dazu Herzschlag", sea: 1, bowl: 1, heart: 1 },
+  { name: "Dazu Shepard-Ton", sea: 1, bowl: 1, heart: 1, shepard: 1 },
+  { name: "Dazu Drohne", sea: 1, bowl: 1, heart: 1, shepard: 1, drone: 1 },
+  { name: "Stille", silent: 1 },
+  { name: "Heilfrequenz 136,1 Hz", heal: 1 },
+  { name: "Geschichte", sea: 1, story: 1 },
+];
+const calLayer = () => CAL_LAYERS[CAL.layer] || CAL_LAYERS[0];
+// two knocks on the phone (or a double tap on the screen): next layer
+function calKnockCheck(t) {
+  const k = doubleKnockSince(Math.max(CAL.switchedAt, t - 3));
+  if (k && !CAL.test) calNextLayer(k);
+}
+function calNextLayer(at) {
+  const was = calLayer();
+  CAL.layer = (CAL.layer + 1) % CAL_LAYERS.length; CAL.switchedAt = at || now();
+  const L = calLayer();
+  if (was.story && !L.story) storyStop();
+  if (L.story) { ST.on = false; ST.done = false; if (ST.i >= STORY_LINES.length) ST.i = 0; }
+  logEvent("calLayer", { n: CAL.layer + 1, name: L.name });
+  $("#calLayer").textContent = (CAL.layer + 1) + " / " + CAL_LAYERS.length + " · " + L.name;
+  if (!L.story) say(L.name);
+}
 const CAL_DIALS = [["calThr", "thr", (v) => Math.round((0.32 - v) / 0.3 * 100) + " %"], ["calTau", "tau", (v) => Math.round(v * 1000) + " ms"],
   ["calLook", "look", (v) => v.toFixed(2).replace(".", ",") + " s"], ["calDyn", "dyn", (v) => v.toFixed(1).replace(".", ",")]];
 function calShow() { for (const [id, k, f] of CAL_DIALS) { $("#" + id).value = S.cal[k]; $("#" + id + "Out").textContent = f(S.cal[k]); } }
 function calSave() { try { localStorage.setItem("atemlotse8", JSON.stringify(S)); } catch (e) {} }
-function calOpen() { CAL.hist = []; CAL.test = null; calShow(); requestAnimationFrame(calDraw); }
+function calOpen() {
+  CAL.hist = []; CAL.test = null; CAL.layer = 0; CAL.switchedAt = now(); storyReset();
+  $("#calLayer").textContent = "1 / " + CAL_LAYERS.length + " · " + CAL_LAYERS[0].name;
+  calShow(); requestAnimationFrame(calDraw);
+}
 for (const [id, k, f] of CAL_DIALS) $("#" + id).addEventListener("input", (ev) => {
   S.cal[k] = parseFloat(ev.target.value); $("#" + id + "Out").textContent = f(S.cal[k]); calSave();
   logEvent("cal", { [k]: S.cal[k] });
 });
+document.addEventListener("dblclick", () => { if (S.mode === "engine" && sess.phase !== "idle" && !CAL.test) calNextLayer(); });
 $("#calReset").addEventListener("click", () => { S.cal = { ...CAL0 }; calShow(); calSave(); logEvent("cal", { reset: true }); });
 const calPad = $("#calPad");
 const calTouch = (on) => (ev) => { ev.preventDefault(); CAL.touch = on; calPad.classList.toggle("on", !!on); };
 calPad.addEventListener("pointerdown", calTouch(1));
 for (const n of ["pointerup", "pointercancel", "pointerleave"]) calPad.addEventListener(n, calTouch(0));
+function calSound(dt, pu) {
+  const tt = now();
+  calKnockCheck(tt);
+  const L = calLayer(), t = A.ctx.currentTime;
+  if (!L.sea) A.nGain.gain.setTargetAtTime(0, t, 0.3);
+  if (A.bowlGain) A.bowlGain.gain.setTargetAtTime(L.bowl ? 0.01 + 0.03 * pu : 0, t, 0.4);
+  A.dGain.gain.setTargetAtTime(L.drone ? 0.05 : 0, t, 0.8);
+  if (L.shepard && !A.shGain) initShepard();
+  if (A.shGain) { const e = sess.flowEng; setShepard(-1, !!e && e.flow < -0.15, L.shepard ? 1 : 0, dt); }
+  if (L.heal && !A.binGain) initBinaural();
+  if (A.binGain) setBinaural(6, L.heal ? 1 : 0, 136.1);
+  if (L.story && sess.phase === "sea") storyTick(tt);
+}
 function calRecord(flow) {
   const t = now();
   CAL.hist.push([t, flow, sess.flowOut, CAL.touch]);
