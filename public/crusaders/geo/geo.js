@@ -1,6 +1,6 @@
 /* The coasts of the Crusaders world, read from the region files listed in index.json.
    Land is stored as SVG paths: units of 1/100000 degree, x = longitude, y = minus latitude.
-   CrusadersGeo.load(ids) → { regions, features: [{ name, quality, d, rings: [[[lon, lat], …]] }] } */
+   CrusadersGeo.load(ids) → { regions, features: [{ name, quality, d, rings: [[[lon, lat], …]] }], landmarks } */
 (function () {
   "use strict";
   const base = (document.currentScript && document.currentScript.src.replace(/[^/]*$/, "")) || "/crusaders/geo/";
@@ -24,7 +24,10 @@
     const regions = await Promise.all(list.map(async (r) => ({ ...r, data: await (await fetch(base + r.file)).json() })));
     const features = [];
     for (const r of regions) for (const f of r.data.features) features.push({ ...f, region: r.id, quality: r.quality, rings: rings(f.d) });
-    return { regions, features, source: regions.map((r) => r.data.source) };
+    // the few special places get a list of building parts (a few kilobytes each)
+    const landmarks = [];
+    for (const r of regions) if (r.landmarks) { const lm = await (await fetch(base + r.landmarks)).json(); for (const l of lm.landmarks) landmarks.push({ ...l, colors: lm.colors }); }
+    return { regions, features, landmarks, source: regions.map((r) => r.data.source) };
   }
   window.CrusadersGeo = { load, rings };
 })();

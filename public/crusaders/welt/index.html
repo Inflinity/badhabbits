@@ -195,7 +195,7 @@ function buildLand(features) {
     let h = 0.012 + 0.18 * smooth(0, 2.5, d);
     for (const [px, pz, ph, pr] of peaks) { const q = ((x - px) ** 2 + (z - pz) ** 2) / (pr * pr); if (q < 9) h += ph * Math.exp(-q) * smooth(0, 1.2, d); }
     h += (fbm(x * 0.35, z * 0.35) - 0.45) * 0.22 * smooth(0, 1.5, d);
-    H[k] = LAND[k] ? Math.max(0.012, h) * EXAG : -Math.min(1.6, 0.05 + dout[k] * CELL * 0.32);
+    H[k] = LAND[k] ? Math.max(0.0015, h * smooth(0, 0.6, d)) * EXAG : -Math.min(1.6, 0.05 + dout[k] * CELL * 0.32);
     DIST[k] = LAND[k] ? d : dout[k] * CELL;
   }
   const grid = (heights, colorOf) => {
@@ -209,7 +209,7 @@ function buildLand(features) {
     geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals(); return geo;
   };
   // the land: cut at the true coast, beach painted along it
-  const landGeo = grid((k) => (LAND[k] ? H[k] : 0.012), (c, k, x, z) => {
+  const landGeo = grid((k) => (LAND[k] ? H[k] : 0.0024), (c, k, x, z) => {
     const h = H[k], n = fbm(x * 0.8, z * 0.8);
     if (h > 1.45 * EXAG / 1.6) c.set("#c2b296"); else if (h > 1.0) c.set(n > 0.5 ? "#8e7d5e" : "#9a8a68");
     else c.set(n > 0.56 ? "#3f7a34" : n > 0.45 ? "#5f9445" : "#8eaa5a");
@@ -252,12 +252,12 @@ function instanced(geo, color, list) {
   scene.add(m); return m;
 }
 function trees() {
-  const ok = (x, z) => { if (!isLand(x, z) || isBeach(x, z)) return false; const k = landAt(x, z); return DIST[k] > 0.25 && H[k] < 1.3 && fbm(x * 0.8, z * 0.8) > 0.47; };
+  const ok = (x, z) => { if (!isLand(x, z) || isBeach(x, z) || !freeAt(x, z)) return false; const k = landAt(x, z); return DIST[k] > 0.25 && H[k] < 1.3 && fbm(x * 0.8, z * 0.8) > 0.47; };
   const pines = scatter(5200, ok, (x, z) => [x, heightAt(x, z), z, 0.8 + Math.random() * 0.7]);
   const pg = new THREE.ConeGeometry(0.018, 0.06, 5); pg.translate(0, 0.045, 0);
   const tg = new THREE.CylinderGeometry(0.004, 0.005, 0.02, 4); tg.translate(0, 0.01, 0);
   instanced(pg, "#2f6b2e", pines); instanced(tg, "#6b4a2a", pines);
-  const olive = scatter(2600, (x, z) => { if (!isLand(x, z) || isBeach(x, z)) return false; const k = landAt(x, z); return H[k] < 0.5 && fbm(x * 0.8, z * 0.8) <= 0.47; }, (x, z) => [x, heightAt(x, z), z, 0.7 + Math.random() * 0.6]);
+  const olive = scatter(2600, (x, z) => { if (!isLand(x, z) || isBeach(x, z) || !freeAt(x, z)) return false; const k = landAt(x, z); return H[k] < 0.5 && fbm(x * 0.8, z * 0.8) <= 0.47; }, (x, z) => [x, heightAt(x, z), z, 0.7 + Math.random() * 0.6]);
   const og = new THREE.IcosahedronGeometry(0.016, 0); og.translate(0, 0.022, 0);
   instanced(og, "#7d9a52", olive); instanced(tg, "#6b4a2a", olive);
 }
@@ -271,7 +271,7 @@ function towns() {
     const [cx, cz] = P(lon, lat);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
-      if (!isLand(x, z) || isBeach(x, z)) continue;
+      if (!isLand(x, z) || isBeach(x, z) || !freeAt(x, z)) continue;
       const s = 1.3 + Math.random() * 0.9, y = heightAt(x, z), ry = Math.random() * Math.PI;
       walls.push([x, y, z, s, ry]); (Math.random() < 0.35 ? red : roofs).push([x, y, z, s, ry]);
     }
@@ -281,33 +281,70 @@ function towns() {
   const rr = new THREE.ConeGeometry(0.018, 0.012, 4); rr.rotateY(Math.PI / 4); rr.translate(0, 0.024, 0);
   instanced(wg, "#f6f1e4", walls); instanced(rg, "#e8dcc4", roofs); instanced(rr, "#b8502e", red);
 }
-// landmarks: the knights' walls and windmills of Rhodos, the acropolis of Lindos, Monolithos, Kamiros, a wreck
-function landmarks() {
+/* Landmarks from the coast data: each a short list of parts in metres, built here the same way for
+   every place in the world. Drawn 1.6 times their size, like the hills, so they read from above. */
+const LS = 0.0016;    // metres to kilometres, times 1.6
+let FREE = [];        // [x, z, r]: around landmarks no generic houses or trees
+const freeAt = (x, z) => FREE.every(([fx, fz, r]) => (x - fx) ** 2 + (z - fz) ** 2 > r * r);
+function landmarks(list) {
   const g = (lon, lat) => { const [x, z] = P(lon, lat); return [x, heightAt(x, z), z]; };
-  const stone = lmat("#c9a873"), white = lmat("#f3ede0"), dark = lmat("#7a5a3a");
-  const add = (geo, m, [x, y, z], dy = 0, ry = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y + dy, z); o.rotation.y = ry; scene.add(o); return o; };
-  // Rhodos: a ring of walls with towers, the grand master's palace, three windmills on the mole
-  const [rx, ry0, rz] = g(28.2259, 36.4448);
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2, x = rx + Math.cos(a) * 0.45, z = rz + Math.sin(a) * 0.35;
-    add(new THREE.BoxGeometry(0.2, 0.05, 0.03), stone, [x, heightAt(x, z), z], 0.025, -a + Math.PI / 2);
-    if (i % 2 === 0) add(new THREE.CylinderGeometry(0.03, 0.035, 0.08, 6), stone, [x, heightAt(x, z), z], 0.04);
+  const mats = {}, M = (c) => mats[c] || (mats[c] = lmat(c));
+  FREE = list.filter((lm) => lm.frei).map((lm) => [...P(lm.lon, lm.lat), lm.frei * LS]);
+  for (const lm of list) {
+    const [ax, ay, az] = g(lm.lon, lm.lat), y0 = lm.base === "meer" ? 0 : Math.max(0, ay);
+    const col = (n) => M(lm.colors[n] || n);
+    const put = (geo, c, x, y, z, ry = 0) => { const o = new THREE.Mesh(geo, col(c)); o.position.set(ax + x * LS, y0 + y * LS, az + z * LS); o.rotation.y = -ry * Math.PI / 180; scene.add(o); return o; };
+    for (const p of lm.parts) {
+      const t = p[0], c = p[p.length - 1];
+      if (t === "rock") {
+        const [, x, y, z, rx, rz, h, top] = p, geo = new THREE.CylinderGeometry(top, 1, 1, 10, 3);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) { const k = 1 + (hash(i % 10, Math.round(pos.getY(i) * 3)) - 0.5) * 0.25; pos.setX(i, pos.getX(i) * k); pos.setZ(i, pos.getZ(i) * k); }
+        geo.computeVertexNormals(); geo.translate(0, 0.5, 0); geo.scale(rx * LS, h * LS, rz * LS);
+        put(geo, c, x, y, z);
+      } else if (t === "box") {
+        const [, x, y, z, w, h, d, ry] = p, geo = new THREE.BoxGeometry(w * LS, h * LS, d * LS); geo.translate(0, h * LS / 2, 0);
+        put(geo, c, x, y, z, ry);
+      } else if (t === "cyl") {
+        const [, x, y, z, r, h] = p, geo = new THREE.CylinderGeometry(r * LS, r * LS, h * LS, 8); geo.translate(0, h * LS / 2, 0);
+        put(geo, c, x, y, z);
+      } else if (t === "cols" || t === "row") {
+        const [, x1, z1, x2, z2, y, n] = p, ry = Math.atan2(z2 - z1, x2 - x1) * 180 / Math.PI;
+        for (let i = 0; i < n; i++) {
+          const f = n > 1 ? i / (n - 1) : 0, x = x1 + (x2 - x1) * f, z = z1 + (z2 - z1) * f;
+          let geo;
+          if (t === "cols") { const [, , , , , , , r, h] = p; geo = new THREE.CylinderGeometry(r * LS, r * 1.1 * LS, h * LS, 6); geo.translate(0, h * LS / 2, 0); }
+          else { const [, , , , , , , w, h, d] = p; geo = new THREE.BoxGeometry(w * LS, h * LS, d * LS); geo.translate(0, h * LS / 2, 0); }
+          put(geo, c, x, y, z, -ry);
+        }
+      } else if (t === "ring") {
+        const [, x, y, z, rx, rz, h, th, towers] = p, N = 24;
+        for (let i = 0; i < N; i++) {
+          const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
+          const px = (Math.cos(a0) * rx + Math.cos(a1) * rx) / 2, pz = (Math.sin(a0) * rz + Math.sin(a1) * rz) / 2;
+          const len = Math.hypot(Math.cos(a1) * rx - Math.cos(a0) * rx, Math.sin(a1) * rz - Math.sin(a0) * rz);
+          const geo = new THREE.BoxGeometry(len * LS * 1.05, h * LS, th * LS); geo.translate(0, h * LS / 2, 0);
+          put(geo, c, x + px, y, z + pz, Math.atan2(Math.sin(a1) * rz - Math.sin(a0) * rz, Math.cos(a1) * rx - Math.cos(a0) * rx) * 180 / Math.PI);
+          if (towers && i % Math.max(1, Math.round(N / towers)) === 0) { const tg = new THREE.CylinderGeometry(th * 1.8 * LS, th * 2 * LS, h * 1.4 * LS, 6); tg.translate(0, h * 0.7 * LS, 0); put(tg, c, x + Math.cos(a0) * rx, y, z + Math.sin(a0) * rz); }
+        }
+      } else if (t === "wall") {
+        const [, pts, h, th, every] = p; let run = 0;
+        for (let i = 0; i + 1 < pts.length; i++) {
+          const [x0, z0] = P(...pts[i]), [x1, z1] = P(...pts[i + 1]), len = Math.hypot(x1 - x0, z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+          const geo = new THREE.BoxGeometry(len, h * LS, th * LS); geo.translate(0, h * LS / 2, 0);
+          const o = new THREE.Mesh(geo, col(c)); o.position.set(mx, Math.max(0, heightAt(mx, mz)), mz); o.rotation.y = -Math.atan2(z1 - z0, x1 - x0); scene.add(o);
+          for (let s = 0; s < len; s += every / 1000) {
+            if ((run += every / 1000) < every / 1000) continue;
+            const tx = x0 + (x1 - x0) * (s / len), tz = z0 + (z1 - z0) * (s / len), tg = new THREE.BoxGeometry(th * 2 * LS, h * 1.35 * LS, th * 2 * LS); tg.translate(0, h * 0.675 * LS, 0);
+            const tw = new THREE.Mesh(tg, col(c)); tw.position.set(tx, Math.max(0, heightAt(tx, tz)), tz); tw.rotation.y = o.rotation.y; scene.add(tw);
+          }
+        }
+      }
+    }
   }
-  add(new THREE.BoxGeometry(0.14, 0.09, 0.12), stone, [rx, ry0, rz - 0.1], 0.045);
-  for (let i = 0; i < 3; i++) { const p = g(28.2262 + i * 0.0009, 36.4508 + i * 0.0006); const m = add(new THREE.CylinderGeometry(0.012, 0.016, 0.05, 6), white, p, 0.025);
-    const sail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.006, 0.003), dark); sail.position.set(0, 0.02, 0.012); m.add(sail); const s2 = sail.clone(); s2.rotation.z = Math.PI / 2; m.add(s2); }
-  // Lindos: the acropolis on its rock
-  const [lx, ly, lz] = g(28.0879, 36.0909);
-  add(new THREE.CylinderGeometry(0.11, 0.16, 0.12, 7), lmat("#b7905c"), [lx, ly, lz], 0.06);
-  for (let i = 0; i < 8; i++) add(new THREE.CylinderGeometry(0.005, 0.005, 0.045, 5), white, [lx - 0.05 + i * 0.014, ly + 0.12, lz], 0.022);
-  add(new THREE.BoxGeometry(0.12, 0.006, 0.03), white, [lx, ly + 0.12, lz], 0.047);
-  // Monolithos: a castle on a needle of rock
-  const [mx, my, mz] = g(27.7258, 36.1284);
-  add(new THREE.ConeGeometry(0.08, 0.2, 6), lmat("#8f6a4a"), [mx, my, mz], 0.08);
-  add(new THREE.BoxGeometry(0.07, 0.05, 0.05), stone, [mx, my, mz], 0.2);
-  // Kamiros: columns of the ancient town
-  const [kx, ky, kz] = g(27.9208, 36.3361);
-  for (let i = 0; i < 6; i++) add(new THREE.CylinderGeometry(0.005, 0.005, 0.03 + (i % 3) * 0.012, 5), white, [kx + (i % 3) * 0.02, ky, kz + Math.floor(i / 3) * 0.03], 0.02);
+}
+function wreck() {
+  const g = (lon, lat) => { const [x, z] = P(lon, lat); return [x, heightAt(x, z), z]; };
   // the wreck you washed up from, on the beach of Tsambika
   let [wx, wz] = P(28.150, 36.233), best = 1e9;
   for (let z = wz - 3; z < wz + 3; z += 0.02) for (let x = wx - 3; x < wx + 3; x += 0.02) {
@@ -390,6 +427,8 @@ function placeCamera() {
   camera.position.set(cx, Math.max(heightAt(cx, cz) + 0.05, y + Math.sin(camPitch) * camDist), cz);
   camera.lookAt(fx, y + 0.02, fz);
   scene.fog.near = camDist * 4 + 4; scene.fog.far = camDist * 14 + 30;
+  // keep depth precise near the water line (land a few metres above the sea must not flicker)
+  const nr = clamp(camDist * 0.04, 0.005, 2); if (Math.abs(camera.near - nr) > nr * 0.2) { camera.near = nr; camera.updateProjectionMatrix(); }
   $("#roseSvg").style.transform = `rotate(${(camYaw * 180) / Math.PI}deg)`;
 }
 $("#zIn").onclick = () => { camDist = Math.max(0.12, camDist / 1.6); };
@@ -489,7 +528,7 @@ window.CrusadersGeo.load().then((geo) => {
   TOWNS = geo.regions.flatMap((r) => (r.data.places || []).map((p) => [p.name, p.lat, p.lon, ...(SIZE[p.kind] || SIZE.village)]));
   terrain = buildLand(feats);
   $("#src").textContent = "Küste © OpenStreetMap-Mitwirkende (ODbL) · Natural Earth";
-  trees(); towns(); landmarks(); sailboats();
+  landmarks(geo.landmarks); trees(); towns(); wreck(); sailboats();
   for (const [name, lat, lon] of TOWNS) { const [x, z] = P(lon, lat); label(name, "", x, z); }
   for (const r of geo.regions) for (const st of r.data.sights || []) { const [x, z] = P(st.lon, st.lat); label(st.name, st.sub, x, z, "sight"); }
   for (const s of window.Postcards.spots) { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
