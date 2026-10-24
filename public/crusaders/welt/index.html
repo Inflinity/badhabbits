@@ -346,6 +346,8 @@ function landmarks(list) {
         const o = put(trunk, "stamm", x, y, z); o.rotation.z = (hash(x, z) - 0.5) * 0.3;
         for (let i = 0; i < 6; i++) { const leaf = new THREE.BoxGeometry(h * 0.45 * LS, 0.15 * LS, 1.4 * LS); leaf.translate(h * 0.22 * LS, 0, 0);
           const l = new THREE.Mesh(leaf, col(c)); l.position.set(0, h * LS, 0); l.rotation.set(0, (i / 6) * Math.PI * 2, -0.45); o.add(l); }
+      } else if (t === "crown") {
+        const [, x, y, z, r, h] = p, geo = new THREE.IcosahedronGeometry(r * LS, 1); geo.scale(1, (h || r) / r, 1); put(geo, c, x, y, z);
       } else if (t === "wall") {
         const [, pts, h, th, every] = p; let run = 0;
         for (let i = 0; i + 1 < pts.length; i++) {
@@ -565,7 +567,8 @@ function quest() {
   const [lat, lon] = unP(pl.x, pl.z);
   let best = null;
   for (const s of spots) if (!found[s.id]) { const d = distKm([lat, lon], [s.lat, s.lon]); if (!best || d < best.d) best = { s, d }; }
-  const what = best && { postkarte: `Postkarte von ${best.s.name}`, gesetzesrolle: "Gesetzesrolle im Hafen", filmposter: "Filmposter am Drehort" }[best.s.kind];
+  const what = best && ({ postkarte: `Postkarte von ${best.s.name}`, gesetzesrolle: "Gesetzesrolle im Hafen", filmposter: "Filmposter am Drehort",
+    flora: "Ein uralter Baum", skulptur: "Ein Werk der Bildhauer", literatur: "Ein Werk der Dichtung" }[best.s.kind] || "Ein Fund");
   $("#questT").textContent = best ? `${what} · ${best.d < 10 ? best.d.toFixed(1).replace(".", ",") : Math.round(best.d)} km` : "Alles gefunden!";
 }
 

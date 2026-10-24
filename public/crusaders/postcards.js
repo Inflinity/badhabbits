@@ -34,6 +34,8 @@ style.textContent = `:root { --pc-ink: #3b2412; --pc-red: #c8321e; --pc-paper: #
 .pcThumb small { font-weight: 400; }
 .pcKind { grid-column: 1 / -1; margin: 8px 0 0; font: 400 18px "Alfa Slab One", Georgia, serif; }
 .pcKind small { font: 400 13px "Figtree", sans-serif; color: #7a5a3a; }
+.pcItem { grid-column: 1 / -1; margin: 2px 0 -4px; font: 700 14px "Figtree", sans-serif; }
+.pcItem small { font-weight: 400; color: #7a5a3a; }
 #pcCard {
   position: relative; width: 100%; aspect-ratio: 3/2; background-size: cover; border: 9px solid #fffaf0; border-radius: 4px;
   box-shadow: 0 8px 22px rgba(0,0,0,0.3); overflow: hidden; touch-action: none; container-type: inline-size;
@@ -146,12 +148,73 @@ const SCENES = {
     <path d="M250 222 L170 200 L172 210 L250 232 Z M360 242 L262 214 L264 224 L360 252 Z" fill="#6b6a64" stroke="#2a2a28" stroke-width="2"/>
     <path d="M150 340 Q300 325 450 345 V390 H150 Z" fill="#1f4f78"/><path d="M270 338 l30 -12 l30 12 Z M300 326 v-14" stroke="#f1e4c4" stroke-width="2" fill="#7a5230"/>
     <text x="300" y="52" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="22" fill="#f6e2b4" letter-spacing="2">DIE KANONEN</text>
-    <text x="300" y="86" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="34" fill="#ffd36a" letter-spacing="3">VON NAVARONE</text>
+    <text x="300" y="86" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="27" fill="#ffd36a" letter-spacing="2">VON NAVARONE</text>
     <text x="300" y="376" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#f6e2b4">gedreht auf Rhodos · 1961</text>
     <circle cx="90" cy="200" r="34" fill="#c0392b"/><text x="90" y="206" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="16" fill="#fff">KINO</text>`,
 };
-// what can be collected: postcards, law scrolls, film posters; each one is a card
-const KINDS = { postkarte: "Postkarte", gesetzesrolle: "Gesetzesrolle", filmposter: "Filmposter" };
+
+/* Works that live in several places of the world: one work, a card for each place.
+   Each picture is the work in front of the place where you find it. */
+const marble = "#ece6da", marbleD = "#cfc6b4";
+function laokoon(cx, by) {
+  return `<g stroke="#9c927f" stroke-width="2" stroke-linejoin="round">
+    <rect x="${cx - 120}" y="${by}" width="240" height="22" fill="${marbleD}"/>
+    <path d="M${cx - 30} ${by} L${cx - 38} ${by - 70} L${cx - 70} ${by - 120} L${cx - 58} ${by - 128} L${cx - 22} ${by - 92} L${cx - 10} ${by - 150} L${cx + 20} ${by - 150} L${cx + 26} ${by - 100} L${cx + 60} ${by - 170} L${cx + 72} ${by - 162} L${cx + 40} ${by - 80} L${cx + 30} ${by} Z" fill="${marble}"/>
+    <circle cx="${cx + 4}" cy="${by - 164}" r="16" fill="${marble}"/>
+    <path d="M${cx - 110} ${by} L${cx - 100} ${by - 80} L${cx - 84} ${by - 90} L${cx - 76} ${by} Z" fill="${marble}"/><circle cx="${cx - 92}" cy="${by - 100}" r="11" fill="${marble}"/>
+    <path d="M${cx + 76} ${by} L${cx + 82} ${by - 70} L${cx + 100} ${by - 76} L${cx + 106} ${by} Z" fill="${marble}"/><circle cx="${cx + 92}" cy="${by - 86}" r="11" fill="${marble}"/></g>
+    <path d="M${cx - 100} ${by - 40} C${cx - 60} ${by - 90} ${cx - 20} ${by - 10} ${cx} ${by - 70} S${cx + 60} ${by - 140} ${cx + 66} ${by - 166} M${cx + 90} ${by - 30} C${cx + 50} ${by - 60} ${cx + 20} ${by - 40} ${cx - 10} ${by - 110}" fill="none" stroke="#8a8f78" stroke-width="9" stroke-linecap="round"/>`;
+}
+function nike(cx, by, k = 1) {
+  const X = (v) => cx + v * k, Y = (v) => by - v * k;
+  return `<g stroke="#9c927f" stroke-width="2" stroke-linejoin="round">
+    <path d="M${X(-70)} ${Y(0)} L${X(70)} ${Y(0)} L${X(90)} ${Y(30)} L${X(40)} ${Y(50)} L${X(-70)} ${Y(50)} Z" fill="${marbleD}"/>
+    <path d="M${X(-20)} ${Y(50)} L${X(-30)} ${Y(140)} L${X(-10)} ${Y(190)} L${X(15)} ${Y(190)} L${X(28)} ${Y(130)} L${X(40)} ${Y(50)} Z" fill="${marble}"/>
+    <path d="M${X(-8)} ${Y(185)} C${X(-60)} ${Y(240)} ${X(-110)} ${Y(250)} ${X(-150)} ${Y(232)} C${X(-110)} ${Y(215)} ${X(-80)} ${Y(190)} ${X(-60)} ${Y(150)} C${X(-40)} ${Y(165)} ${X(-25)} ${Y(170)} ${X(-8)} ${Y(170)} Z" fill="${marble}"/>
+    <path d="M${X(6)} ${Y(185)} C${X(30)} ${Y(245)} ${X(60)} ${Y(262)} ${X(95)} ${Y(258)} C${X(70)} ${Y(232)} ${X(55)} ${Y(200)} ${X(40)} ${Y(165)} Z" fill="${marble}"/></g>`;
+}
+function argo(cx, y, k = 1) {
+  const X = (v) => cx + v * k, Y = (v) => y - v * k;
+  return `<path d="M${X(-110)} ${Y(10)} Q${X(0)} ${Y(-25)} ${X(110)} ${Y(10)} L${X(125)} ${Y(40)} L${X(95)} ${Y(20)} Q${X(0)} ${Y(5)} ${X(-100)} ${Y(25)} Z" fill="#7a4a24" stroke="#3a2412" stroke-width="2"/>` +
+    Array.from({ length: 12 }, (_, i) => `<line x1="${X(-90 + i * 16)}" y1="${Y(0)}" x2="${X(-100 + i * 16)}" y2="${Y(-30)}" stroke="#3a2412" stroke-width="2"/>`).join("") +
+    `<line x1="${X(0)}" y1="${Y(20)}" x2="${X(0)}" y2="${Y(130)}" stroke="#3a2412" stroke-width="4"/><rect x="${X(-48)}" y="${Y(125)}" width="${96 * k}" height="${80 * k}" fill="#f1e4c4" stroke="#8a5a26" stroke-width="2"/>` +
+    `<circle cx="${X(0)}" cy="${Y(85)}" r="${16 * k}" fill="#c9973c"/>` + Array.from({ length: 8 }, (_, i) => `<line x1="${X(0)}" y1="${Y(85)}" x2="${X(Math.cos(i * 0.785) * 26)}" y2="${Y(85 + Math.sin(i * 0.785) * 26)}" stroke="#c9973c" stroke-width="3"/>`).join("");
+}
+const caption = (t) => `<rect x="0" y="372" width="600" height="28" fill="rgba(43,29,18,0.72)"/><text x="300" y="391" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="15" fill="#f6e2b4">${t}</text>`;
+Object.assign(SCENES, {
+  // the age-old plane tree on the village square of Apolakkia
+  platane: () => sky("#9dd6f2", "#eef8fb") + `<rect y="300" width="600" height="100" fill="#e8dcc0"/>` +
+    [[20, 230, 70, 70], [480, 220, 90, 80], [100, 250, 60, 50]].map((h) => house(...h)).join("") +
+    `<rect x="500" y="150" width="34" height="80" fill="#fbf8f1" stroke="#c9bfae" stroke-width="2"/><path d="M496 150 L517 124 L538 150 Z" fill="#b8502e"/><circle cx="517" cy="170" r="7" fill="#8a6a3a"/>` +
+    `<path d="M270 320 C262 260 250 230 230 200 L250 196 C268 222 282 240 290 262 C296 232 300 210 310 186 L330 192 C318 226 314 262 316 320 Z" fill="#8a6f52" stroke="#5a4532" stroke-width="3"/>` +
+    [[300, 120, 95], [200, 150, 75], [400, 150, 80], [250, 80, 70], [360, 80, 70], [150, 200, 55], [450, 200, 55]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#4f8a3c" stroke="#3a6a2c" stroke-width="2"/>`).join("") +
+    [[300, 105, 50], [230, 140, 40], [380, 130, 42]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#6aa64e"/>`).join("") +
+    [[180, 340], [380, 345], [450, 338]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="24" ry="8" fill="#f4efe2"/><rect x="${x - 3}" y="${y}" width="6" height="22" fill="#6b4a2a"/><rect x="${x + 28}" y="${y - 14}" width="12" height="34" fill="#2f6aa8"/>`).join("") +
+    caption("Die uralte Platane von Apolakkia"),
+  "laokoon-rhodos": () => `<rect width="600" height="400" fill="#d8c08f"/>` +
+    [60, 200, 340, 480].map((x) => `<path d="M${x} 380 V170 Q${x + 60} 90 ${x + 120} 170 V380" fill="#efe1bd" stroke="#a88a52" stroke-width="5"/>`).join("") +
+    `<rect y="360" width="600" height="40" fill="#b9a271"/>` + laokoon(300, 345) + caption("Laokoon · geschaffen von Bildhauern aus Rhodos"),
+  "laokoon-rom": () => `<rect width="600" height="400" fill="#c9cfd4"/><path d="M160 380 V140 Q300 20 440 140 V380 Z" fill="#a9b2ba" stroke="#7d868f" stroke-width="5"/>` +
+    `<rect y="360" width="600" height="40" fill="#8e979f"/>` + laokoon(300, 345) + caption("Laokoon · Vatikanische Museen, Rom"),
+  "nike-lindos": () => sky("#86cdf4", "#e6f5fc") + `<path d="M0 400 V140 L120 110 L300 100 L480 120 L600 150 V400 Z" fill="#c89a5c"/>` +
+    Array.from({ length: 7 }, (_, i) => `<rect x="${250 + i * 14}" y="64" width="8" height="38" fill="#efe3c8"/>`).join("") +
+    `<path d="M80 330 L240 330 L270 280 L200 270 L80 280 Z" fill="none" stroke="#8a6a3a" stroke-width="4"/><path d="M100 290 H230" stroke="#8a6a3a" stroke-width="3"/>` + nike(420, 360, 0.85) + caption("Nike · wie Pythokritos' Schiffsrelief am Fels von Lindos"),
+  "nike-samothrake": () => sky("#9dd6f2", "#eef8fb") + sea(300) + `<path d="M0 300 L0 200 Q150 120 300 160 Q450 110 600 190 V300 Z" fill="#6f9a52"/>` +
+    [[120, 230], [150, 225], [180, 222]].map(([x, y]) => `<rect x="${x}" y="${y}" width="12" height="70" fill="#efe3c8"/>`).join("") + nike(400, 330, 0.95) + caption("Nike von Samothrake · im Heiligtum der Großen Götter"),
+  "nike-paris": () => `<rect width="600" height="400" fill="#b9b2a6"/><path d="M120 400 V80 H480 V400" fill="#cfc8bc"/>` +
+    Array.from({ length: 9 }, (_, i) => `<rect x="${60 + i * 6}" y="${400 - (i + 1) * 14}" width="${480 - i * 12}" height="14" fill="${i % 2 ? "#ddd6ca" : "#e6e0d5"}"/>`).join("") + nike(300, 274, 0.8) +
+    `<text x="300" y="60" text-anchor="middle" font-family="Georgia, serif" font-size="22" letter-spacing="6" fill="#6e665a">LOUVRE</text>` + caption("Nike von Samothrake · Louvre, Paris"),
+  "argonautika-rhodos": () => sky("#f2b06b", "#fde7c4") + sea(290) + `<path d="M0 290 V200 Q200 150 380 180 L600 230 V290 Z" fill="#a8935c"/>` +
+    [[160, 120], [190, 120], [220, 120]].map(([x, y]) => `<rect x="${x}" y="${y}" width="16" height="70" fill="#efe3c8"/>`).join("") + `<rect x="152" y="112" width="92" height="10" fill="#efe3c8"/>` + argo(420, 330, 0.9) +
+    caption("Argonautika · Apollonios von Rhodos"),
+  "argonautika-alexandria": () => sky("#86cdf4", "#e6f5fc") + sea(270) + `<rect x="80" y="110" width="50" height="160" fill="#efe3c8"/><rect x="90" y="60" width="30" height="50" fill="#efe3c8"/><circle cx="105" cy="52" r="10" fill="#ffd36a"/>` + argo(380, 320, 0.9) +
+    caption("Argonautika · Alexandria, wo Apollonios die Bibliothek leitete"),
+  "argonautika-volos": () => sky("#9dd6f2", "#eef8fb") + sea(280) + `<path d="M0 280 L0 120 Q160 60 320 130 Q460 80 600 140 V280 Z" fill="#4f8a3c"/>` + argo(330, 330, 0.95) +
+    caption("Argonautika · Iolkos, wo die Argo in See stach"),
+});
+// what can be collected; every find is a card
+const KINDS = { postkarte: "Postkarte", gesetzesrolle: "Gesetzesrolle", filmposter: "Filmposter", flora: "Flora", skulptur: "Bildhauerwerk", literatur: "Literatur" };
+const KINDS_PL = { postkarte: "Postkarten", gesetzesrolle: "Gesetzesrollen", filmposter: "Filmposter", flora: "Flora", skulptur: "Bildhauerwerke", literatur: "Literatur" };
 const titleOf = (s) => s.title || "Grüße aus " + s.name;
 const SPOTS = [
   { id: "rhodos", name: "Rhodos", lat: 36.4495, lon: 28.2265, r: 1.5 },
@@ -166,6 +229,16 @@ const SPOTS = [
   { id: "lexrhodia", kind: "gesetzesrolle", name: "Lex Rhodia", title: "Lex Rhodia · Seerecht von Rhodos", lat: 36.4508, lon: 28.2272, r: 0.45 },
   // the Kallithea springs were a film set
   { id: "navarone", kind: "filmposter", name: "Navarone", title: "Die Kanonen von Navarone", lat: 36.3803, lon: 28.2405, r: 0.35 },
+  { id: "platane", kind: "flora", name: "Platane", place: "Apolakkia", title: "Die uralte Platane von Apolakkia", hint: "irgendwo auf Rhodos", lat: 36.0667, lon: 27.7878, r: 0.35 },
+  // one work, several places: the card is different in each
+  { id: "laokoon-rhodos", kind: "skulptur", item: "Laokoon-Gruppe", name: "Laokoon", place: "Rhodos", title: "Laokoon · Rhodos", hint: "irgendwo auf Rhodos", lat: 36.4451, lon: 28.2273, r: 0.25 },
+  { id: "laokoon-rom", kind: "skulptur", item: "Laokoon-Gruppe", name: "Laokoon", place: "Rom", title: "Laokoon · Rom", hint: "in Rom", lat: 41.9065, lon: 12.4536, r: 0.5 },
+  { id: "nike-lindos", kind: "skulptur", item: "Nike von Samothrake", name: "Nike", place: "Lindos", title: "Nike · Lindos", hint: "irgendwo auf Rhodos", lat: 36.0905, lon: 28.0883, r: 0.3 },
+  { id: "nike-samothrake", kind: "skulptur", item: "Nike von Samothrake", name: "Nike", place: "Samothrake", title: "Nike · Samothrake", hint: "auf Samothrake", lat: 40.4936, lon: 25.5306, r: 1 },
+  { id: "nike-paris", kind: "skulptur", item: "Nike von Samothrake", name: "Nike", place: "Paris", title: "Nike · Paris", hint: "in Paris", lat: 48.8606, lon: 2.3376, r: 0.5 },
+  { id: "argonautika-rhodos", kind: "literatur", item: "Argonautika", name: "Argonautika", place: "Rhodos", title: "Argonautika · Rhodos", hint: "irgendwo auf Rhodos", lat: 36.4300, lon: 28.2093, r: 0.35 },
+  { id: "argonautika-alexandria", kind: "literatur", item: "Argonautika", name: "Argonautika", place: "Alexandria", title: "Argonautika · Alexandria", hint: "in Alexandria", lat: 31.2089, lon: 29.9092, r: 0.6 },
+  { id: "argonautika-volos", kind: "literatur", item: "Argonautika", name: "Argonautika", place: "Volos", title: "Argonautika · Iolkos", hint: "in Volos, dem alten Iolkos", lat: 39.3616, lon: 22.9422, r: 1 },
 ];
 SPOTS.forEach((s) => { s.kind = s.kind || "postkarte"; });
 const sceneSVG = (id) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="1500" height="1000">${SCENES[id]()}</svg>`;
@@ -203,16 +276,23 @@ function snap(s) {
 }
 $("#pcLater").onclick = (e) => { e.stopPropagation(); const id = popping; $("#pcPop").hidden = true; popping = null;
   const s = SPOTS.find((x) => x.id === id); if (s && !PC[id]) { PC[id] = { at: new Date().toISOString(), items: [stampItem(s)] }; pcSave(); pcBadge(); } };
-const stampItem = (s) => ({ k: "stamp", x: 82, y: 22, s: 1, r: -12, t: s.name.toUpperCase(), d: new Date().toLocaleDateString("de-DE") });
+const stampItem = (s) => ({ k: "stamp", x: 82, y: 22, s: 1, r: -12, t: (s.place || s.name).toUpperCase(), d: new Date().toLocaleDateString("de-DE") });
 
 /* the collection */
 $("#pcBtn").onclick = () => {
   const list = $("#pcList");
+  // by kind, and within a kind by work: a work found in several places shows one card per place
+  const card = (s, label) => PC[s.id]
+    ? `<button type="button" class="pcThumb" data-id="${s.id}"><img src="${sceneURL(s.id)}" alt=""><span>${label}</span></button>`
+    : `<div class="pcThumb locked"><span>${s.kind === "postkarte" ? s.name : s.item && !s.hint.startsWith("irgendwo") ? s.place : "???"}</span><small>${s.kind === "postkarte" ? "noch nicht dort" : s.hint || "irgendwo auf Rhodos"}</small></div>`;
   list.innerHTML = Object.keys(KINDS).map((k) => {
     const of = SPOTS.filter((s) => s.kind === k), n = of.filter((s) => PC[s.id]).length;
-    return `<h3 class="pcKind">${{ postkarte: "Postkarten", gesetzesrolle: "Gesetzesrollen", filmposter: "Filmposter" }[k]} <small>${n} von ${of.length}</small></h3>` + of.map((s) => PC[s.id]
-      ? `<button type="button" class="pcThumb" data-id="${s.id}"><img src="${sceneURL(s.id)}" alt=""><span>${s.name}</span></button>`
-      : `<div class="pcThumb locked"><span>${k === "postkarte" ? s.name : "???"}</span><small>${k === "postkarte" ? "noch nicht dort" : "irgendwo auf Rhodos"}</small></div>`).join("");
+    const items = [...new Set(of.map((s) => s.item || s.id))];
+    return `<h3 class="pcKind">${KINDS_PL[k]} <small>${n} von ${of.length}</small></h3>` + items.map((it) => {
+      const cards = of.filter((s) => (s.item || s.id) === it);
+      const head = cards[0].item ? `<h4 class="pcItem">${cards[0].item} <small>${cards.filter((s) => PC[s.id]).length} von ${cards.length} Orten</small></h4>` : "";
+      return head + cards.map((s) => card(s, s.item ? s.place : s.name)).join("");
+    }).join("");
   }).join("");
   list.querySelectorAll("button[data-id]").forEach((b) => b.onclick = () => { $("#pcAll").hidden = true; openEditor(b.dataset.id); });
   $("#pcAll").hidden = false;
