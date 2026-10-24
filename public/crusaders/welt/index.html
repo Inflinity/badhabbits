@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#8fd0f5">
+<title>Crusaders · Welt</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Caveat:wght@600&family=Cinzel:wght@600;800&family=Figtree:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root { --ink: #2b1d12; --parch: #f1e4c4; --blood: #8e2a1c; --gold: #c9973c; --sea: #1f76b5; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; font: 15px/1.35 "IM Fell English", Georgia, serif; color: var(--ink); }
+#world { position: fixed; inset: 0; touch-action: none; }
+#world canvas { width: 100%; height: 100%; display: block; }
+#labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.lb { position: absolute; transform: translate(-50%, -100%); text-align: center; white-space: nowrap; color: #fff; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.6); }
+.lb b { display: block; font: 700 15px "IM Fell English", serif; }
+.lb i { display: block; font: italic 11px "IM Fell English", serif; color: #ffe9b8; }
+.lb.pc b { color: #ffd76a; }
+/* HUD, after the old pirate games: a quest scroll, a compass medallion, buttons */
+.quest {
+  position: fixed; left: 10px; top: max(10px, env(safe-area-inset-top)); max-width: calc(100% - 80px); display: flex; align-items: center; gap: 8px;
+  background: linear-gradient(#2a6fa8, #1d4f7c); border: 2px solid #d9b56e; border-radius: 22px; padding: 6px 14px 6px 8px; color: #fff;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+}
+.quest .ic { width: 30px; height: 30px; border-radius: 50%; background: #f1e4c4; display: grid; place-items: center; font-size: 17px; flex: 0 0 auto; }
+.quest b { display: block; font: 800 13px "Cinzel", serif; letter-spacing: 0.06em; }
+.quest span { font-size: 14px; }
+.back { position: fixed; right: 10px; top: max(10px, env(safe-area-inset-top)); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: #f1e4c4; border: 2px solid #d9b56e; color: var(--ink); text-decoration: none; font-size: 24px; box-shadow: 0 3px 10px rgba(0,0,0,0.35); }
+.medal {
+  position: fixed; left: 8px; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 8px; pointer-events: none;
+}
+.rose { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle, #f6ead0 0 56%, #2a6fa8 57% 70%, #d9b56e 71% 74%, #1d4f7c 75%);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.4); position: relative; pointer-events: auto; }
+.rose svg { position: absolute; inset: 0; transition: transform 0.15s; }
+.who { display: flex; flex-direction: column; gap: 4px; }
+.who div { background: linear-gradient(#2a6fa8, #1d4f7c); border: 2px solid #d9b56e; border-radius: 16px; color: #fff; padding: 3px 12px; font: 600 14px "IM Fell English", serif; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.who .nm { font: 800 14px "Cinzel", serif; }
+.date { position: fixed; left: 108px; bottom: max(6px, env(safe-area-inset-bottom)); color: #fff; font: italic 13px "IM Fell English", serif; text-shadow: 0 1px 3px #000; display: none; }
+.pad { position: fixed; right: 8px; bottom: max(10px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, 54px); gap: 6px; }
+.pad button {
+  height: 54px; border-radius: 10px; border: 2px solid #d9b56e; background: linear-gradient(#2a6fa8, #1d4f7c); color: #fff; font: 700 11px "Figtree", sans-serif;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+}
+.pad button span { font-size: 20px; line-height: 1; }
+.pad button.on { background: linear-gradient(#e2b54d, #b98a2a); color: var(--ink); }
+#pcBtn { font-size: 18px; }
+#toast {
+  position: fixed; left: 50%; top: 70px; transform: translateX(-50%); max-width: 92%; background: rgba(241,228,196,0.96); border: 2px solid #d9b56e; border-radius: 10px;
+  padding: 8px 14px; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1c140c url("../strand.jpg") center / cover; color: #fff; font: italic 22px "IM Fell English", serif; text-shadow: 0 2px 8px #000; z-index: 50; }
+</style>
+</head>
+<body>
+<div id="world"></div>
+<div id="labels"></div>
+<div class="quest" id="quest"><div class="ic">📜</div><div><b>Quest</b><span id="questT">Erkunde die Insel.</span></div></div>
+<a class="back" href="../" aria-label="Zurück">‹</a>
+<div class="medal">
+  <div class="rose" id="rose"><svg viewBox="0 0 92 92" id="roseSvg"><g transform="translate(46 46)">
+    <path d="M0 -30 L6 0 L0 30 L-6 0 Z" fill="#8e2a1c"/><path d="M-30 0 L0 6 L30 0 L0 -6 Z" fill="#2b1d12"/>
+    <path d="M0 -30 L6 0 L-6 0 Z" fill="#c0402c"/><circle r="4" fill="#d9b56e"/>
+    <text y="-33" text-anchor="middle" font-family="Cinzel" font-weight="800" font-size="10" fill="#fff">N</text></g></svg></div>
+  <div class="who"><div class="nm" id="whoName">–</div><div id="whoLvl">Schiffbrüchig · Stufe 0</div><div id="whoPc">✉ 0 von 8 Postkarten</div></div>
+</div>
+<div class="pad">
+  <button type="button" id="gpsBtn"><span>📍</span>GPS</button>
+  <button type="button" id="pcBtn">✉</button>
+  <button type="button" id="zIn"><span>＋</span>näher</button>
+  <button type="button" id="zOut"><span>－</span>weiter</button>
+  <button type="button" id="centre"><span>◎</span>zu mir</button>
+  <button type="button" id="viewBtn"><span>⛰</span>Blick</button>
+</div>
+<div class="date"></div>
+<div id="toast" hidden></div>
+<div id="loading">Die Insel erhebt sich aus dem Meer …</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../avatar.js"></script>
+<script src="../postcards.js"></script>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const toast = (t, ms = 4000) => { const e = $("#toast"); e.textContent = t; e.hidden = false; clearTimeout(toast.tm); toast.tm = setTimeout(() => { e.hidden = true; }, ms); };
+
+/* ---------------- Coordinates ----------------
+   One unit is one kilometre: x east, z south, y up, from 27.55° E / 36.52° N. Heights are drawn
+   1.6 times taller than they are, so the mountains read from above. */
+const LON0 = 27.55, LAT0 = 36.52, KM = 111.32, KX = Math.cos(36.17 * Math.PI / 180), EXAG = 1.6;
+const P = (lon, lat) => [(lon - LON0) * KM * KX, (LAT0 - lat) * KM];
+const unP = (x, z) => [LAT0 - z / KM, LON0 + x / (KM * KX)];
+const distKm = (a, b) => { const R = 6371, r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+
+/* ---------------- Noise for hills and woods ---------------- */
+function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi, u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const fbm = (x, z) => vnoise(x, z) * 0.5 + vnoise(x * 2.1, z * 2.1) * 0.27 + vnoise(x * 4.3, z * 4.3) * 0.15 + vnoise(x * 8.7, z * 8.7) * 0.08;
+
+/* ---------------- The land ---------------- */
+// the real summits of Rhodes: [lon, lat, height km, radius km]
+const PEAKS = [[27.86, 36.2, 1.2, 4.5], [27.79, 36.14, 0.8, 3.5], [27.94, 36.27, 0.79, 3.5], [28.05, 36.3, 0.42, 5], [27.9, 36.06, 0.45, 6],
+  [27.84, 35.98, 0.35, 5], [28.0, 36.18, 0.4, 4], [28.087, 36.093, 0.12, 0.8], [28.14, 36.24, 0.3, 2]];
+const W0 = -6, W1 = 76, D0 = -6, D1 = 84, CELL = 0.34;
+let rings = [], segs = [];
+function inside(x, z, ring) {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, zi] = ring[i], [xj, zj] = ring[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+  }
+  return c;
+}
+function coastDist(x, z) {
+  let best = 1e9;
+  for (const [ax, az, bx, bz] of segs) {
+    const dx = bx - ax, dz = bz - az, l = dx * dx + dz * dz;
+    let t = l ? ((x - ax) * dx + (z - az) * dz) / l : 0; t = clamp(t, 0, 1);
+    const ex = ax + t * dx - x, ez = az + t * dz - z, d = ex * ex + ez * ez;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
+}
+let NX, NZ, H, LAND, DIST;
+function heightAt(x, z) {
+  // bilinear from the grid
+  const gx = clamp((x - W0) / CELL, 0, NX - 1.001), gz = clamp((z - D0) / CELL, 0, NZ - 1.001), i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
+  const h = (a, b) => H[b * NX + a];
+  return h(i, j) * (1 - fx) * (1 - fz) + h(i + 1, j) * fx * (1 - fz) + h(i, j + 1) * (1 - fx) * fz + h(i + 1, j + 1) * fx * fz;
+}
+function buildLand(coast) {
+  rings = [coast.rhodes, ...coast.islands, coast.main].map((r) => r.map(([lon, lat]) => P(lon, lat)));
+  for (const r of rings) for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; segs.push([a[0], a[1], b[0], b[1]]); }
+  NX = Math.ceil((W1 - W0) / CELL) + 1; NZ = Math.ceil((D1 - D0) / CELL) + 1;
+  H = new Float32Array(NX * NZ); LAND = new Uint8Array(NX * NZ); DIST = new Float32Array(NX * NZ);
+  const peaks = PEAKS.map(([lon, lat, h, r]) => [...P(lon, lat), h, r]);
+  const bbox = rings.map((r) => { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const [x, z] of r) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, z); d = Math.max(d, z); } return [a, b, c, d]; });
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const x = W0 + i * CELL, z = D0 + j * CELL, k = j * NX + i;
+    let land = false;
+    for (let r = 0; r < rings.length && !land; r++) { const b = bbox[r]; if (x >= b[0] && x <= b[1] && z >= b[2] && z <= b[3] && inside(x, z, rings[r])) land = true; }
+    const d = coastDist(x, z);
+    let h;
+    if (land) {
+      h = 0.02 + 0.18 * smooth(0, 2.5, d);
+      for (const [px, pz, ph, pr] of peaks) { const q = ((x - px) ** 2 + (z - pz) ** 2) / (pr * pr); if (q < 9) h += ph * Math.exp(-q) * smooth(0, 1.2, d); }
+      h += (fbm(x * 0.35, z * 0.35) - 0.45) * 0.22 * smooth(0, 1.5, d);
+      h = Math.max(0.01, h) * EXAG;
+    } else h = -Math.min(1.6, 0.06 + d * 0.32);
+    H[k] = h; LAND[k] = land ? 1 : 0; DIST[k] = d;
+  }
+  const geo = new THREE.PlaneGeometry((NX - 1) * CELL, (NZ - 1) * CELL, NX - 1, NZ - 1);
+  geo.rotateX(-Math.PI / 2); geo.translate(W0 + (NX - 1) * CELL / 2, 0, D0 + (NZ - 1) * CELL / 2);
+  const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
+  for (let v = 0; v < pos.count; v++) {
+    const x = pos.getX(v), z = pos.getZ(v), i = Math.round((x - W0) / CELL), j = Math.round((z - D0) / CELL), k = clamp(j, 0, NZ - 1) * NX + clamp(i, 0, NX - 1);
+    const h = H[k]; pos.setY(v, h);
+    const n = fbm(x * 0.8, z * 0.8);
+    if (!LAND[k]) c.set(DIST[k] < 0.6 ? "#7fe0d0" : DIST[k] < 2 ? "#3cb7c9" : "#1f6aa8").lerp(new THREE.Color("#1a5590"), smooth(1, 6, DIST[k]) * 0.6);
+    else if (h < 0.06 && DIST[k] < 0.35) c.set("#ead9a6");
+    else if (h > 1.45) c.set("#c2b296");
+    else if (h > 1.0) c.set(n > 0.5 ? "#8e7d5e" : "#9a8a68");
+    else c.set(n > 0.56 ? "#3f7a34" : n > 0.45 ? "#5f9445" : "#8eaa5a");
+    col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  scene.add(mesh); return mesh;
+}
+
+/* ---------------- Scene ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+$("#world").append(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#8fd0f5");
+scene.fog = new THREE.Fog("#a9dcf5", 30, 120);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 400);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x6a8a6a, 0.75));
+const sun = new THREE.DirectionalLight(0xfff2dc, 0.8); sun.position.set(-30, 60, 20); scene.add(sun);
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+// the sea: a glassy sheet over the coloured sea floor, so the shallows shine turquoise
+const water = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshPhongMaterial({ color: 0x2a8fd0, transparent: true, opacity: 0.55, shininess: 90, specular: 0x9fdcff }));
+water.rotation.x = -Math.PI / 2; water.position.set(35, 0, 40); scene.add(water);
+
+/* ---------------- Things on the land ---------------- */
+const lmat = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+function scatter(n, test, place) { const out = []; let tries = 0; while (out.length < n && tries++ < n * 30) { const x = W0 + Math.random() * (W1 - W0), z = D0 + Math.random() * (D1 - D0); if (test(x, z)) out.push(place(x, z)); } return out; }
+const landAt = (x, z) => { const i = Math.round((x - W0) / CELL), j = Math.round((z - D0) / CELL); return i >= 0 && j >= 0 && i < NX && j < NZ ? j * NX + i : -1; };
+function instanced(geo, color, list) {
+  const m = new THREE.InstancedMesh(geo, lmat(color), list.length), o = new THREE.Object3D();
+  list.forEach(([x, y, z, s, ry], i) => { o.position.set(x, y, z); o.scale.setScalar(s); o.rotation.set(0, ry || 0, 0); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
+  scene.add(m); return m;
+}
+function trees() {
+  const ok = (x, z) => { const k = landAt(x, z); if (k < 0 || !LAND[k]) return false; const h = H[k]; return DIST[k] > 0.3 && h < 1.3 && fbm(x * 0.8, z * 0.8) > 0.47; };
+  const pines = scatter(5200, ok, (x, z) => [x, heightAt(x, z), z, 0.8 + Math.random() * 0.7]);
+  const pg = new THREE.ConeGeometry(0.018, 0.06, 5); pg.translate(0, 0.045, 0);
+  const tg = new THREE.CylinderGeometry(0.004, 0.005, 0.02, 4); tg.translate(0, 0.01, 0);
+  instanced(pg, "#2f6b2e", pines); instanced(tg, "#6b4a2a", pines);
+  const olive = scatter(2600, (x, z) => { const k = landAt(x, z); return k >= 0 && LAND[k] && DIST[k] > 0.2 && H[k] < 0.5 && fbm(x * 0.8, z * 0.8) <= 0.47; }, (x, z) => [x, heightAt(x, z), z, 0.7 + Math.random() * 0.6]);
+  const og = new THREE.IcosahedronGeometry(0.016, 0); og.translate(0, 0.022, 0);
+  instanced(og, "#7d9a52", olive); instanced(tg, "#6b4a2a", olive);
+}
+// towns: white cubes with flat roofs, a few with red tiles, around each place
+const TOWNS = [["Rhodos", 36.44, 28.223, 1.3, 260, "Festung der Johanniter"], ["Ialysos", 36.415, 28.15, 0.6, 70, ""], ["Kremasti", 36.405, 28.118, 0.4, 40, ""],
+  ["Paradisi", 36.395, 28.085, 0.4, 35, ""], ["Kallithea", 36.38, 28.235, 0.3, 20, "Heilquellen"], ["Faliraki", 36.34, 28.2, 0.6, 70, "Strände"], ["Afantou", 36.293, 28.165, 0.4, 40, ""],
+  ["Kolymbia", 36.245, 28.155, 0.4, 30, ""], ["Archangelos", 36.212, 28.115, 0.55, 70, ""], ["Malona", 36.175, 28.075, 0.3, 25, ""], ["Lindos", 36.092, 28.087, 0.35, 70, "Akropolis"],
+  ["Lardos", 36.082, 28.012, 0.35, 30, ""], ["Pefki", 36.062, 28.06, 0.3, 25, ""], ["Kiotari", 36.043, 27.968, 0.3, 20, ""], ["Gennadi", 36.023, 27.925, 0.35, 30, ""],
+  ["Lachania", 35.985, 27.888, 0.25, 15, ""], ["Prasonisi", 35.883, 27.763, 0.2, 8, "Zwei Meere"], ["Kattavia", 35.952, 27.783, 0.3, 25, ""], ["Messanagros", 36.005, 27.82, 0.25, 15, ""],
+  ["Apolakkia", 36.053, 27.8, 0.3, 25, ""], ["Monolithos", 36.128, 27.73, 0.25, 15, "Burg auf dem Fels"], ["Siana", 36.135, 27.77, 0.25, 15, ""], ["Embonas", 36.228, 27.853, 0.35, 30, "Weinberge"],
+  ["Kritinia", 36.268, 27.833, 0.25, 20, ""], ["Kamiros", 36.336, 27.92, 0.2, 6, "antike Stadt"], ["Salakos", 36.292, 27.95, 0.25, 15, ""], ["Petaloudes", 36.335, 28.06, 0.15, 4, "Tal der Schmetterlinge"],
+  ["Laerma", 36.155, 27.96, 0.25, 15, ""], ["Asklipio", 36.052, 27.948, 0.25, 15, ""], ["Profilia", 36.083, 27.86, 0.2, 12, ""], ["Symi", 36.615, 27.84, 0.4, 50, "Insel"]];
+function towns() {
+  const walls = [], roofs = [], red = [];
+  for (const [, lat, lon, r, n] of TOWNS) {
+    const [cx, cz] = P(lon, lat);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d, k = landAt(x, z);
+      if (k < 0 || !LAND[k]) continue;
+      const s = 1.3 + Math.random() * 0.9, y = heightAt(x, z), ry = Math.random() * Math.PI;
+      walls.push([x, y, z, s, ry]); (Math.random() < 0.35 ? red : roofs).push([x, y, z, s, ry]);
+    }
+  }
+  const wg = new THREE.BoxGeometry(0.022, 0.018, 0.018); wg.translate(0, 0.009, 0);
+  const rg = new THREE.BoxGeometry(0.024, 0.004, 0.02); rg.translate(0, 0.019, 0);
+  const rr = new THREE.ConeGeometry(0.018, 0.012, 4); rr.rotateY(Math.PI / 4); rr.translate(0, 0.024, 0);
+  instanced(wg, "#f6f1e4", walls); instanced(rg, "#e8dcc4", roofs); instanced(rr, "#b8502e", red);
+}
+// landmarks: the knights' walls and windmills of Rhodos, the acropolis of Lindos, Monolithos, Kamiros, a wreck
+function landmarks() {
+  const g = (lon, lat) => { const [x, z] = P(lon, lat); return [x, heightAt(x, z), z]; };
+  const stone = lmat("#c9a873"), white = lmat("#f3ede0"), dark = lmat("#7a5a3a");
+  const add = (geo, m, [x, y, z], dy = 0, ry = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y + dy, z); o.rotation.y = ry; scene.add(o); return o; };
+  // Rhodos: a ring of walls with towers, the grand master's palace, three windmills on the mole
+  const [rx, ry0, rz] = g(28.225, 36.445);
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2, x = rx + Math.cos(a) * 0.45, z = rz + Math.sin(a) * 0.35;
+    add(new THREE.BoxGeometry(0.2, 0.05, 0.03), stone, [x, heightAt(x, z), z], 0.025, -a + Math.PI / 2);
+    if (i % 2 === 0) add(new THREE.CylinderGeometry(0.03, 0.035, 0.08, 6), stone, [x, heightAt(x, z), z], 0.04);
+  }
+  add(new THREE.BoxGeometry(0.14, 0.09, 0.12), stone, [rx, ry0, rz - 0.1], 0.045);
+  for (let i = 0; i < 3; i++) { const p = g(28.229 + i * 0.0015, 36.452); const m = add(new THREE.CylinderGeometry(0.012, 0.016, 0.05, 6), white, p, 0.025);
+    const sail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.006, 0.003), dark); sail.position.set(0, 0.02, 0.012); m.add(sail); const s2 = sail.clone(); s2.rotation.z = Math.PI / 2; m.add(s2); }
+  // Lindos: the acropolis on its rock
+  const [lx, ly, lz] = g(28.0885, 36.0905);
+  add(new THREE.CylinderGeometry(0.11, 0.16, 0.12, 7), lmat("#b7905c"), [lx, ly, lz], 0.06);
+  for (let i = 0; i < 8; i++) add(new THREE.CylinderGeometry(0.005, 0.005, 0.045, 5), white, [lx - 0.05 + i * 0.014, ly + 0.12, lz], 0.022);
+  add(new THREE.BoxGeometry(0.12, 0.006, 0.03), white, [lx, ly + 0.12, lz], 0.047);
+  // Monolithos: a castle on a needle of rock
+  const [mx, my, mz] = g(27.723, 36.128);
+  add(new THREE.ConeGeometry(0.08, 0.2, 6), lmat("#8f6a4a"), [mx, my, mz], 0.08);
+  add(new THREE.BoxGeometry(0.07, 0.05, 0.05), stone, [mx, my, mz], 0.2);
+  // Kamiros: columns of the ancient town
+  const [kx, ky, kz] = g(27.921, 36.334);
+  for (let i = 0; i < 6; i++) add(new THREE.CylinderGeometry(0.005, 0.005, 0.03 + (i % 3) * 0.012, 5), white, [kx + (i % 3) * 0.02, ky, kz + Math.floor(i / 3) * 0.03], 0.02);
+  // the wreck you washed up from, on the beach of Tsambika
+  let [wx, wz] = P(28.147, 36.236), best = 1e9;
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i; if (!LAND[k] || DIST[k] > 0.25) continue;
+    const x = W0 + i * CELL, z = D0 + j * CELL, d = (x - wx) ** 2 + (z - wz) ** 2; if (d < best) { best = d; WRECK = [x, z]; } }
+  [wx, wz] = WRECK; const wy = heightAt(wx, wz);
+  const wreck = new THREE.Group(); wreck.position.set(wx + 0.05, Math.max(0, wy), wz); wreck.rotation.set(0.3, 0.8, 0.25); scene.add(wreck);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.025), lmat("#6b4a2a")); wreck.add(hull);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.07, 4), lmat("#5a3a20")); mast.position.y = 0.035; mast.rotation.z = 0.5; wreck.add(mast);
+  const rag = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 0.025), new THREE.MeshLambertMaterial({ color: 0xcdb48a, side: THREE.DoubleSide })); rag.position.set(0.012, 0.05, 0); rag.rotation.set(0.2, 0.4, 0.5); wreck.add(rag);
+  WRECK = [wx - 0.05, wz - 0.03];
+}
+let WRECK = null;
+// ships sailing on the sea
+const ships = [];
+function sailboats() {
+  for (let i = 0; i < 9; i++) {
+    const s = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.012, 0.016), lmat("#7a5230")); hull.position.y = 0.006; s.add(hull);
+    const sail = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 3), lmat("#f6f1e4")); sail.position.y = 0.037; s.add(sail);
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.005, 0.001), lmat("#c0392b")); flag.position.set(0.004, 0.065, 0); s.add(flag);
+    scene.add(s);
+    const c = [[28.3, 36.4], [28.15, 36.05], [27.7, 36.25], [27.65, 35.95], [28.35, 36.2], [27.95, 35.85], [28.23, 36.5], [27.8, 36.45], [28.1, 36.32]][i];
+    const [cx, cz] = P(...c);
+    ships.push({ s, cx, cz, r: 1.5 + Math.random() * 3, a: Math.random() * 6, v: (0.02 + Math.random() * 0.03) * (i % 2 ? 1 : -1) });
+  }
+}
+
+/* ---------------- Labels ---------------- */
+const labels = [];
+function label(name, sub, x, z, cls = "") {
+  const e = document.createElement("div"); e.className = "lb " + cls; e.innerHTML = `<b>${name}</b>` + (sub ? `<i>${sub}</i>` : "");
+  $("#labels").append(e); labels.push({ e, v: new THREE.Vector3(x, heightAt(x, z) + 0.06, z) });
+}
+const pv = new THREE.Vector3();
+function drawLabels() {
+  const far = camDist * 6 + 3;
+  for (const l of labels) {
+    pv.copy(l.v).project(camera);
+    const d = l.v.distanceTo(camera.position);
+    if (pv.z > 1 || d > far || Math.abs(pv.x) > 1.2 || Math.abs(pv.y) > 1.2) { l.e.style.display = "none"; continue; }
+    l.e.style.display = "";
+    l.e.style.left = ((pv.x + 1) / 2) * innerWidth + "px"; l.e.style.top = ((1 - pv.y) / 2) * innerHeight + "px";
+    l.e.style.opacity = String(clamp(1.4 - d / far, 0.3, 1));
+  }
+}
+
+/* ---------------- The player ---------------- */
+let ME = null; try { ME = JSON.parse(localStorage.getItem("crusaders-ich") || "null"); } catch (e) {}
+const AVS = 0.05 / 1.8;      // the figure stands 50 m tall on the map, so you can see it
+let avatar = null, pl = { x: 0, z: 0, tx: null, tz: null, face: 0, walk: 0 };
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.02, 0.026, 24), new THREE.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: 0.85 }));
+ring.rotation.x = -Math.PI / 2; scene.add(ring);
+const tgtMark = new THREE.Mesh(new THREE.RingGeometry(0.012, 0.018, 16), new THREE.MeshBasicMaterial({ color: 0xffffff })); tgtMark.rotation.x = -Math.PI / 2; tgtMark.visible = false; scene.add(tgtMark);
+function makeAvatar() {
+  const look = ME && ME.look ? ME.look : window.CrusaderAvatar.defaults(ME ? ME.sex : "m");
+  avatar = window.CrusaderAvatar.build(THREE, look);
+  const g = new THREE.Group(); g.add(avatar.root); g.scale.setScalar(AVS); scene.add(g); avatar.g = g;
+}
+
+/* ---------------- Camera: behind and above, like the old sailing games ---------------- */
+let camDist = 0.38, camYaw = 0.6, camPitch = 0.95;
+function placeCamera() {
+  const y = heightAt(pl.x, pl.z);
+  const cx = pl.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist, cz = pl.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+  camera.position.set(cx, Math.max(heightAt(cx, cz) + 0.05, y + Math.sin(camPitch) * camDist), cz);
+  camera.lookAt(pl.x, y + 0.02, pl.z);
+  scene.fog.near = camDist * 4 + 4; scene.fog.far = camDist * 14 + 30;
+  $("#roseSvg").style.transform = `rotate(${(camYaw * 180) / Math.PI}deg)`;
+}
+$("#zIn").onclick = () => { camDist = Math.max(0.12, camDist / 1.6); };
+$("#zOut").onclick = () => { camDist = Math.min(60, camDist * 1.6); };
+let view = 0;
+$("#viewBtn").onclick = () => { view = (view + 1) % 3; camPitch = [0.95, 0.5, 1.35][view]; };
+// fingers: one drags the view round, two pinch; a tap walks there (without GPS)
+const ptrs = new Map(); let pinch = null, downAt = null;
+const el = renderer.domElement;
+el.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); downAt = [e.clientX, e.clientY, performance.now()]; pinch = null; });
+el.addEventListener("pointermove", (e) => {
+  if (!ptrs.has(e.pointerId)) return;
+  const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 1) { camYaw -= (e.clientX - prev[0]) * 0.008; camPitch = clamp(camPitch + (e.clientY - prev[1]) * 0.005, 0.25, 1.45); }
+  else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) camDist = clamp(camDist * (pinch / d), 0.12, 60); pinch = d; }
+});
+el.addEventListener("pointerup", (e) => {
+  ptrs.delete(e.pointerId); pinch = null;
+  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 8 && performance.now() - downAt[2] < 400) tapWalk(e.clientX, e.clientY);
+  downAt = null;
+});
+el.addEventListener("wheel", (e) => { e.preventDefault(); camDist = clamp(camDist * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 0.12, 60); }, { passive: false });
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let terrain = null;
+function tapWalk(px, py) {
+  if (gps.on && gps.onIsland) { toast("Mit GPS gehst du selbst. Ohne GPS kannst du per Tippen wandern."); return; }
+  ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObject(terrain)[0]; if (!hit) return;
+  const k = landAt(hit.point.x, hit.point.z);
+  if (k < 0 || !LAND[k]) { toast("Ohne Boot geht es nicht übers Wasser."); return; }
+  pl.tx = hit.point.x; pl.tz = hit.point.z; tgtMark.position.set(pl.tx, hit.point.y + 0.003, pl.tz); tgtMark.visible = true;
+}
+$("#centre").onclick = () => { camDist = 0.38; camPitch = 0.95; };
+
+/* ---------------- GPS: you walk the island, and so does your figure ---------------- */
+const gps = { on: false, watch: null, onIsland: false, last: null };
+$("#gpsBtn").onclick = () => {
+  if (gps.on) { navigator.geolocation.clearWatch(gps.watch); gps.on = false; $("#gpsBtn").classList.remove("on"); toast("GPS aus. Tippe auf die Insel, um zu wandern."); return; }
+  if (!("geolocation" in navigator)) { toast("Dieses Gerät kann keinen Standort liefern."); return; }
+  gps.on = true; $("#gpsBtn").classList.add("on"); toast("Suche Satelliten …");
+  gps.watch = navigator.geolocation.watchPosition(onFix, (e) => toast({ 1: "Standort nicht erlaubt.", 2: "Kein GPS-Signal.", 3: "GPS antwortet nicht." }[e.code] || e.message), { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+};
+function onFix(p) {
+  const c = p.coords, [x, z] = P(c.longitude, c.latitude), k = landAt(x, z);
+  const was = gps.onIsland;
+  gps.onIsland = x > W0 && x < W1 && z > D0 && z < D1;
+  gps.last = { lat: c.latitude, lon: c.longitude, acc: c.accuracy };
+  if (!gps.onIsland) { const d = distKm([c.latitude, c.longitude], [36.434, 28.217]); toast(`Du bist ${Math.round(d)} km von Rhodos entfernt. Bis du dort bist: tippe auf die Insel und wandere.`, 6000); return; }
+  if (!was) { pl.x = x; pl.z = z; toast("Da bist du. Geh los, die Insel wartet."); }
+  pl.tx = x; pl.tz = z; tgtMark.visible = false;
+  window.Postcards.check(gps.last);
+}
+
+/* ---------------- Quest and fame ---------------- */
+function quest() {
+  const found = window.Postcards.found(), spots = window.Postcards.spots, n = Object.keys(found).length;
+  $("#whoPc").textContent = `✉ ${n} von ${spots.length} Postkarten`;
+  const [lat, lon] = unP(pl.x, pl.z);
+  let best = null;
+  for (const s of spots) if (!found[s.id]) { const d = distKm([lat, lon], [s.lat, s.lon]); if (!best || d < best.d) best = { s, d }; }
+  $("#questT").textContent = best ? `Postkarte von ${best.s.name} · ${best.d < 10 ? best.d.toFixed(1).replace(".", ",") : Math.round(best.d)} km` : "Alle Postkarten gefunden!";
+}
+
+/* ---------------- Start ---------------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // walk toward the target
+  if (pl.tx != null) {
+    const dx = pl.tx - pl.x, dz = pl.tz - pl.z, d = Math.hypot(dx, dz);
+    const speed = gps.on && gps.onIsland ? Math.max(0.004, d * 1.5) : 0.025;     // km per second
+    if (d > 0.002) { const st = Math.min(d, speed * dt); pl.x += (dx / d) * st; pl.z += (dz / d) * st; pl.face = Math.atan2(dx, dz); pl.walk = Math.min(1, pl.walk + dt * 3); }
+    else { pl.tx = null; tgtMark.visible = false; }
+  } else pl.walk = Math.max(0, pl.walk - dt * 3);
+  const y = Math.max(0, heightAt(pl.x, pl.z));
+  if (avatar) { avatar.g.position.set(pl.x, y, pl.z); avatar.g.rotation.y = pl.face; avatar.update(dt, pl.walk); }
+  ring.position.set(pl.x, y + 0.002, pl.z); ring.scale.setScalar(1 + Math.sin(now / 300) * 0.08);
+  for (const sh of ships) { sh.a += sh.v * dt / sh.r; sh.s.position.set(sh.cx + Math.cos(sh.a) * sh.r, 0, sh.cz + Math.sin(sh.a) * sh.r); sh.s.rotation.y = -sh.a + (sh.v > 0 ? 0 : Math.PI); }
+  placeCamera(); renderer.render(scene, camera); drawLabels();
+  if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); }
+  requestAnimationFrame(loop);
+}
+fetch("coast.json").then((r) => r.json()).then((coast) => {
+  terrain = buildLand(coast);
+  trees(); towns(); landmarks(); sailboats();
+  for (const [name, lat, lon, , , sub] of TOWNS) { const [x, z] = P(lon, lat); label(name, sub, x, z); }
+  for (const s of window.Postcards.spots) { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
+  makeAvatar();
+  [pl.x, pl.z] = WRECK;
+  $("#whoName").textContent = ME ? ME.name + " von " + ME.von[0] : "Namenlos";
+  const d = new Date(); $(".date").textContent = `${d.getDate()}. ${["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"][d.getMonth()]} Anno Domini 1310`;
+  $("#loading").hidden = true;
+  toast(ME ? `${ME.name}, gestrandet am Strand von Tsambika. Tippe auf die Insel zum Wandern, oder schalte GPS ein.` : "Gestrandet. Tippe auf die Insel zum Wandern.", 7000);
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
