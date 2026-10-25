@@ -254,11 +254,12 @@ function pcBadge() { $("#pcBtn").textContent = "✉" + (pcCount() ? " " + pcCoun
 function postcardCheck(f) {
   // the smallest circles first: a hidden find inside a postcard's circle pops before the postcard
   for (const s of [...SPOTS].sort((a, b) => a.r - b.r)) {
-    if (PC[s.id] || popping === s.id) continue;
+    if (PC[s.id] || popping === s.id || (snoozed[s.id] && Date.now() - snoozed[s.id] < 120000)) continue;
     if (distKm([f.lat, f.lon], [s.lat, s.lon]) <= s.r && f.acc < 300) { popCard(s); break; }
   }
 }
 let popping = null;
+const snoozed = {};
 function popCard(s) {
   popping = s.id;
   const pop = $("#pcPop");
@@ -271,11 +272,19 @@ function popCard(s) {
 }
 function snap(s) {
   $("#pcPop").hidden = true; popping = null;
+  // the world may want you to fight for it first (Crusaders); the card is yours once you win
+  const hook = window.Postcards && window.Postcards.beforeSnap;
+  if (hook && !PC[s.id]) { hook(s, () => collect(s), () => { snoozed[s.id] = Date.now(); }); return; }
+  collect(s);
+}
+function collect(s) {
   if (!PC[s.id]) { PC[s.id] = { at: new Date().toISOString(), items: [stampItem(s)] }; pcSave(); pcBadge(); }
   openEditor(s.id);
 }
 $("#pcLater").onclick = (e) => { e.stopPropagation(); const id = popping; $("#pcPop").hidden = true; popping = null;
-  const s = SPOTS.find((x) => x.id === id); if (s && !PC[id]) { PC[id] = { at: new Date().toISOString(), items: [stampItem(s)] }; pcSave(); pcBadge(); } };
+  const s = SPOTS.find((x) => x.id === id);
+  if (window.Postcards.beforeSnap) { snoozed[id] = Date.now(); return; } // later = it comes back in two minutes
+  if (s && !PC[id]) { PC[id] = { at: new Date().toISOString(), items: [stampItem(s)] }; pcSave(); pcBadge(); } };
 const stampItem = (s) => ({ k: "stamp", x: 82, y: 22, s: 1, r: -12, t: (s.place || s.name).toUpperCase(), d: new Date().toLocaleDateString("de-DE") });
 
 /* the collection */
@@ -419,5 +428,5 @@ pcBadge();
 const testId = new URLSearchParams(location.search).get("postkarte");
 if (testId && SPOTS.find((s) => s.id === testId)) setTimeout(() => popCard(SPOTS.find((s) => s.id === testId)), 800);
 
-window.Postcards = { check: postcardCheck, count: pcCount, spots: SPOTS, found: () => PC, open: () => $("#pcBtn") && $("#pcBtn").click() };
+window.Postcards = Object.assign(window.Postcards || {}, { check: postcardCheck, count: pcCount, spots: SPOTS, found: () => PC, sceneURL, kinds: KINDS, title: titleOf, open: () => $("#pcBtn") && $("#pcBtn").click() });
 })();
