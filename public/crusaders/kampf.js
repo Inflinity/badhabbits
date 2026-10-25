@@ -59,6 +59,44 @@
     ctx.globalAlpha = 1;
   }
 
+  /* ---------------- Backdrops ----------------
+     Where a painting of the surroundings exists, it stands behind the fight at full size, and a
+     strip of pixel sand, scrub and stones in the middle ground hides where painting meets pixels. */
+  const BASE = (document.currentScript && document.currentScript.src || "").replace(/kampf\.js.*$/, "");
+  const BACKDROPS = [
+    { id: "kallithea", img: BASE + "bilder/kampf-kallithea.jpg", lat: 36.3795, lon: 28.2415, r: 4, pos: "30% 0%", ground: 0.55,
+      sand: ["#d4a96a", "#c69a5a", "#b88a4e", "#ddb87c"], bush: ["#3e5a26", "#56762f", "#6f8c3a", "#2c4219"], stone: ["#cbbfa8", "#a89c86"] },
+  ];
+  function backdrop(lat, lon) {
+    let best = null;
+    for (const b of BACKDROPS) { const d = Math.hypot((lat - b.lat) * 111.3, (lon - b.lon) * 111.3 * Math.cos((lat * Math.PI) / 180)); if (d <= b.r && (!best || d < best.d)) best = { b, d }; }
+    return best && best.b;
+  }
+  function midground(W, H, seed, bg) {
+    const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+    let h = Math.floor(seed * 1e6) || 1; const rnd = () => ((h = (h * 16807) % 2147483647) / 2147483647);
+    const P = (col, px, py, w = 1, hh = 1) => { x.fillStyle = col; x.fillRect(px | 0, py | 0, w, hh); };
+    const gY = H * bg.ground, edge = [];
+    for (let i = 0; i < W; i++) edge[i] = Math.round(gY + Math.sin(i * 0.21 + seed) * 1.5 + Math.sin(i * 0.067 + seed * 2) * 3);
+    // sand, a little darker towards you, with ripples
+    for (let i = 0; i < W; i++) for (let j = edge[i]; j < H; j++) {
+      const t = (j - gY) / (H - gY), n = rnd();
+      P(n < 0.08 ? bg.sand[3] : n < 0.25 + t * 0.3 ? bg.sand[1] : t > 0.6 && n > 0.85 ? bg.sand[2] : bg.sand[0], i, j);
+    }
+    // a ragged, dithered seam, then scrub and stones sitting on it so the eye never finds the join
+    for (let i = 0; i < W; i++) for (let k = 1; k <= 3; k++) if ((i + k) % 2 === 0 && rnd() < 0.7 - k * 0.18) P(bg.sand[0], i, edge[i] - k);
+    for (let n = 0; n < Math.round(W / 5); n++) {
+      const bx = Math.floor(rnd() * W), by = edge[bx] + 1, r = 3 + Math.floor(rnd() * 5);
+      for (let dy = -r; dy <= 1; dy++) for (let dx = -r - 1; dx <= r + 1; dx++) {
+        if (dx * dx + dy * dy * 1.3 > r * r + 1 || rnd() < 0.14) continue;
+        P(dy > 0 ? bg.bush[3] : dy < -r / 2 ? (rnd() < 0.5 ? bg.bush[2] : bg.bush[1]) : (rnd() < 0.7 ? bg.bush[0] : bg.bush[1]), bx + dx, by + dy);
+      }
+    }
+    for (let n = 0; n < 7; n++) { const sx = Math.floor(rnd() * W), sy = edge[sx] + 3 + Math.floor(rnd() * (H - gY - 6)), w = 2 + Math.floor(rnd() * 3);
+      P(bg.stone[1], sx, sy + 1, w, 1); P(bg.stone[0], sx, sy, w, 1); }
+    return c;
+  }
+
   /* ---------------- The battle screen ---------------- */
   const css = `
   #kampf { position: fixed; inset: 0; z-index: 60; background: #120d0a; display: flex; flex-direction: column; font-family: "Pixelify Sans", "VT323", monospace; color: #f3ead6; }
@@ -143,8 +181,10 @@
     // big pixels, as many rows as the screen is tall: 136 across, never stretched
     const W = 136, H = clamp(Math.round((W * cv.clientHeight) / Math.max(1, cv.clientWidth)), 96, 280); cv.width = W; cv.height = H;
     const seed = Math.random() * 10;
+    const bg = opt.bg || (opt.at && backdrop(opt.at.lat, opt.at.lon)), mid = bg && midground(W, H, seed, bg);
+    if (bg) cv.style.background = `#2a1a0c url("${bg.img}") ${bg.pos} / cover no-repeat`;
     // places on the field: heroes on the left, foes on the right, spread over the sand
-    const ground = H * 0.47, room = H - ground - 28;
+    const ground = H * (bg ? bg.ground + 0.04 : 0.47), room = H - ground - 28;
     heroes.forEach((h, i) => { h.x = 16 + (i % 2) * 6; h.y = Math.round(ground + 6 + (room / heroes.length) * i); });
     foes.forEach((f, i) => { f.x = W - 44 + (i % 2) * 18; f.y = Math.round(ground + (room / foes.length) * i); });
     let turn = null, picking = null, over = false, last = performance.now(), defend = {}, shake = 0, items = st.figs;
@@ -250,7 +290,7 @@
       }
       // draw
       ctx.save(); if (shake > 0) { shake -= dt; ctx.translate(Math.round((Math.random() - 0.5) * 3), 0); }
-      scenery(ctx, W, H, seed);
+      if (mid) { ctx.clearRect(0, 0, W, H); ctx.drawImage(mid, 0, 0); } else scenery(ctx, W, H, seed);
       for (const f of all()) {
         if (f.hp <= 0 && f.side) continue;
         if (f.lunge > 0) f.lunge -= dt;
@@ -270,5 +310,5 @@
   }
 
   window.Spiel = { get, save, reward, rank, expFor, me, SPR, PAL, sprite };
-  window.Kampf = { start };
+  window.Kampf = { start, backdrop, BACKDROPS };
 })();
