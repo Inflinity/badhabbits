@@ -47,7 +47,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   height: 54px; border-radius: 10px; border: 2px solid #d9b56e; background: linear-gradient(#2a6fa8, #1d4f7c); color: #fff; font: 700 11px "Figtree", sans-serif;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.35);
 }
-.pad button span { font-size: 20px; line-height: 1; }
+.pad button span, .pad a span { font-size: 20px; line-height: 1; }
+.pad.side { top: calc(max(10px, env(safe-area-inset-top)) + 54px); bottom: auto; grid-template-columns: 54px; }
+.pad a { height: 54px; border-radius: 10px; border: 2px solid #d9b56e; background: linear-gradient(#8a5a2a, #5a3816); color: #fff; font: 700 11px "Figtree", sans-serif; text-decoration: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); }
 .pad button.on { background: linear-gradient(#e2b54d, #b98a2a); color: var(--ink); }
 #pcBtn { font-size: 18px; }
 #toast {
@@ -78,6 +81,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   <button type="button" id="centre"><span>◎</span>zu mir</button>
   <button type="button" id="viewBtn"><span>⛰</span>Blick</button>
 </div>
+<div class="pad side">
+  <button type="button" id="auraBtn"><span>✨</span>Aura</button>
+  <a href="../lager/" id="lagerBtn"><span>⛺</span>Lager</a>
+</div>
 <div class="date"></div>
 <div id="toast" hidden></div>
 <div id="src"></div>
@@ -86,6 +93,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="../avatar.js"></script>
 <script src="../postcards.js"></script>
+<script src="../kampf.js"></script>
 <script src="../geo/geo.js"></script>
 <script>
 "use strict";
@@ -506,10 +514,13 @@ $("#viewBtn").onclick = () => { view = (view + 1) % 3; camPitch = [0.95, 0.5, 1.
 // fingers: one drags the view round, two pinch; a tap walks there (without GPS)
 const ptrs = new Map(); let pinch = null, mid = null, downAt = null;
 const el = renderer.domElement;
-el.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); downAt = ptrs.size === 1 ? [e.clientX, e.clientY, performance.now()] : null; pinch = null; mid = null; pan.held = ptrs.size >= 2; pan.home = false; });
+let pressTm = 0;
+el.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); downAt = ptrs.size === 1 ? [e.clientX, e.clientY, performance.now()] : null; pinch = null; mid = null; pan.held = ptrs.size >= 2; pan.home = false;
+  clearTimeout(pressTm); if (downAt) { const d0 = downAt; pressTm = setTimeout(() => { if (downAt === d0 && ptrs.size === 1) { const [x, y] = [...ptrs.values()][0]; if (Math.hypot(x - d0[0], y - d0[1]) < 10) { downAt = null; teleport(x, y); } } }, 600); } });
 el.addEventListener("pointermove", (e) => {
   if (!ptrs.has(e.pointerId)) return;
   const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 1 && downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 10) return;     // still a tap or a long press
   if (ptrs.size === 1) { camYaw -= (e.clientX - prev[0]) * 0.008; camPitch = clamp(camPitch + (e.clientY - prev[1]) * 0.005, 0.25, 1.45); }
   else if (ptrs.size === 2) {
     const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
@@ -533,11 +544,20 @@ el.addEventListener("wheel", (e) => { e.preventDefault(); camDist = clamp(camDis
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let terrain = null;
 function tapWalk(px, py) {
-  if (gps.on && gps.onIsland) { toast("Mit GPS gehst du selbst. Ohne GPS kannst du per Tippen wandern."); return; }
+  if (gps.on && gps.onIsland && !aura.on) { toast("Mit GPS gehst du selbst. Ohne GPS kannst du per Tippen wandern."); return; }
   ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObject(terrain)[0]; if (!hit) return;
   if (!isLand(hit.point.x, hit.point.z)) { toast("Ohne Boot geht es nicht übers Wasser."); return; }
   pl.tx = hit.point.x; pl.tz = hit.point.z; tgtMark.position.set(pl.tx, hit.point.y + 0.003, pl.tz); tgtMark.visible = true;
+}
+// with the aura, a long press puts you there at once
+function teleport(px, py) {
+  if (!aura.on) return;
+  ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObject(terrain)[0]; if (!hit || !isLand(hit.point.x, hit.point.z)) return;
+  pl.x = hit.point.x; pl.z = hit.point.z; pl.tx = null; tgtMark.visible = false; pan.x = pan.z = 0;
+  if (dog) dog.g.position.set(pl.x - 0.02, heightAt(pl.x, pl.z), pl.z + 0.02);
+  toast("✨ Die Aura trägt dich hin.", 1500);
 }
 $("#centre").onclick = () => { camDist = 0.38; camPitch = 0.95; pan.home = true; };
 
@@ -555,15 +575,151 @@ function onFix(p) {
   gps.onIsland = x > W0 && x < W1 && z > D0 && z < D1;
   gps.last = { lat: c.latitude, lon: c.longitude, acc: c.accuracy };
   if (!gps.onIsland) { const d = distKm([c.latitude, c.longitude], [36.434, 28.217]); toast(`Du bist ${Math.round(d)} km von Rhodos entfernt. Bis du dort bist: tippe auf die Insel und wandere.`, 6000); return; }
-  if (!was) { pl.x = x; pl.z = z; toast("Da bist du. Geh los, die Insel wartet."); }
-  pl.tx = x; pl.tz = z; tgtMark.visible = false;
-  window.Postcards.check(gps.last);
+  if (!was) { pl.x = x; pl.z = z; toast("Da bist du. Geh los, die Insel wartet."); porthosSpawn(true); }
+  const moved = !gps.prev || Math.hypot(x - gps.prev[0], z - gps.prev[1]) > 0.015;
+  if (!aura.on || moved || !was) { pl.tx = x; pl.tz = z; tgtMark.visible = false; gps.prev = [x, z]; }
+  if (!aura.on) window.Postcards.check(gps.last);
+}
+
+/* ---------------- The aura of the developer ----------------
+   For now everyone has it: wherever your figure stands counts as where you are, as if the GPS said so.
+   Tap to walk (fast), press long to jump. Finds and quests come to the figure just as they would to you. */
+const aura = { on: window.Spiel.get().aura !== false };
+const auraFx = new THREE.Group();
+{
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 0.06, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: true, opacity: 0.09, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  glow.position.y = 0.035; auraFx.add(glow);
+  const motes = new THREE.Group();
+  for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.0025), new THREE.MeshBasicMaterial({ color: 0xfff1b0 })); m.userData = { a: i * 0.63, h: (i * 0.37) % 1 }; motes.add(m); }
+  auraFx.add(motes); auraFx.userData.motes = motes; scene.add(auraFx);
+}
+function auraStep(now, y) {
+  auraFx.visible = aura.on; if (!aura.on) return;
+  auraFx.position.set(pl.x, y, pl.z);
+  for (const m of auraFx.userData.motes.children) { const u = m.userData, h = (u.h + now / 4000) % 1; m.position.set(Math.cos(u.a + now / 900) * 0.022, h * 0.07, Math.sin(u.a + now / 900) * 0.022); m.rotation.y = now / 300; m.scale.setScalar(1 - h * 0.7); }
+}
+function auraSet(on) { aura.on = on; const s = window.Spiel.get(); s.aura = on; window.Spiel.save(s); $("#auraBtn").classList.toggle("on", on); }
+$("#auraBtn").onclick = () => { auraSet(!aura.on); toast(aura.on ? "✨ Aura des Dev: deine Figur gilt als dein Standort. Tippen = wandern, lange drücken = springen." : "Aura aus. Jetzt zählt nur noch echtes GPS.", 5000); };
+const busy = () => !!document.querySelector("#kampf") || !$("#pcPop").hidden || (document.querySelector("#pcEd") && !document.querySelector("#pcEd").hidden);
+const here = () => { const [lat, lon] = unP(pl.x, pl.z); return { lat, lon, acc: 5 }; };
+
+/* ---------------- Finds must be fought for ---------------- */
+const FIGHTS = {
+  postkarte: { tier: 1, foes: [["bandit", "bandit"], ["bandit"], ["bandit", "soeldner"]], who: "Wegelagerer" },
+  gesetzesrolle: { tier: 2, foes: [["soeldner", "bandit", "soeldner"]], who: "Hafenräuber" },
+  filmposter: { tier: 2, foes: [["schatten", "bandit"]], who: "Schatten" },
+  flora: { tier: 2, foes: [["bulle"]], who: "Eine Bestie" },
+  skulptur: { tier: 2, foes: [["schatten", "schatten"]], who: "Schatten" },
+  literatur: { tier: 2, foes: [["schatten", "bandit", "schatten"]], who: "Schatten" },
+};
+window.Postcards.beforeSnap = (s, collect, later) => {
+  const F = FIGHTS[s.kind] || FIGHTS.postkarte, foes = F.foes[Math.floor(Math.random() * F.foes.length)];
+  const what = s.kind === "postkarte" ? "Postkarte" : window.Postcards.kinds[s.kind];
+  window.Kampf.start({
+    title: `${F.who} bewachen: ${window.Postcards.title(s)}`, foes, tier: F.tier,
+    loot: { img: window.Postcards.sceneURL(s.id), text: `1× ${F.tier > 1 ? "Seltene " : ""}${what}` },
+    onWin: () => { collect(); hud(); },
+    onLose: (why) => { later(); hud(); toast(why === "flucht" ? "Geflohen. Der Fund wartet, in zwei Minuten kannst du es wieder versuchen." : "Niedergeschlagen. In zwei Minuten kannst du es wieder versuchen.", 5000); },
+  });
+};
+
+/* ---------------- Character quests: Befreie Porthos ----------------
+   Not part of the world: they appear every day somewhere near you (for now, 1 km away). */
+const seeded = (str) => { let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296; };
+const today = () => new Date().toISOString().slice(0, 10);
+let porthos = null, dog = null;
+function porthosSpawn(fromGps) {
+  const s = window.Spiel.get(), q = s.quests.porthos || {};
+  if (q.done) return;
+  if (q.day === today() && (q.gps || !fromGps) && q.x != null) return porthosMark(q);
+  const rnd = seeded(today() + (ME ? ME.name : "")), [ax, az] = [pl.x, pl.z];
+  let spot = null;
+  for (let i = 0; i < 60 && !spot; i++) {
+    const a = rnd() * Math.PI * 2, d = 0.7 + rnd() * 0.3, x = ax + Math.cos(a) * d, z = az + Math.sin(a) * d;
+    if (isLand(x, z) && !isBeach(x, z)) spot = [x, z];
+  }
+  if (!spot) spot = [ax + 0.05, az];
+  s.quests.porthos = { day: today(), x: spot[0], z: spot[1], gps: !!fromGps }; window.Spiel.save(s);
+  porthosMark(s.quests.porthos);
+}
+function porthosMark(q) {
+  if (!porthos) {
+    const g = new THREE.Group();
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.014, 0.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xff7a3a, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    beam.position.y = 0.3; g.add(beam);
+    const cage = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.02), new THREE.MeshLambertMaterial({ color: 0x6a4a2a, flatShading: true })); cage.position.y = 0.0125; g.add(cage);
+    for (let i = -2; i <= 2; i++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.028, 0.022), new THREE.MeshLambertMaterial({ color: 0x2a2a2a })); bar.position.set(i * 0.007, 0.014, 0); g.add(bar); }
+    scene.add(g); porthos = { g, beam };
+    label("⛓ Porthos", "Befreie deinen Kriegshund", q.x, q.z, "pc"); porthos.lb = labels[labels.length - 1];
+  }
+  porthos.q = q; porthos.g.position.set(q.x, heightAt(q.x, q.z), q.z); porthos.lb.v.set(q.x, heightAt(q.x, q.z) + 0.07, q.z);
+}
+function porthosFight() {
+  porthos.fighting = true;
+  window.Kampf.start({
+    title: "Sklavenhändler Kerim hält Porthos in Ketten!", foes: ["soeldner", "haendler"], tier: 1, boss: true,
+    loot: { img: dogPicture(), text: "Porthos ist frei! Dein Kriegshund kämpft ab jetzt an deiner Seite." },
+    onWin: () => {
+      const s = window.Spiel.get(); s.quests.porthos = { ...s.quests.porthos, done: today() }; if (!s.party.includes("porthos")) s.party.push("porthos"); window.Spiel.save(s);
+      scene.remove(porthos.g); porthos.lb.e.remove(); labels.splice(labels.indexOf(porthos.lb), 1); porthos = null;
+      makeDog(); hud(); toast("🐕 Porthos bellt vor Freude und weicht dir nicht mehr von der Seite. Im Lager wartet Arbeit.", 7000);
+    },
+    onLose: () => { porthos.fighting = false; porthos.away = true; hud(); toast("Kerim lacht dich aus. Geh ein Stück weg, sammle dich, und komm wieder.", 6000); },
+  });
+}
+function dogPicture() {
+  const c = document.createElement("canvas"); c.width = 30; c.height = 18; const x = c.getContext("2d");
+  x.fillStyle = "#d9b77a"; x.fillRect(0, 0, 30, 18); window.Spiel.sprite(x, "hund", 5, 4, {});
+  const b = document.createElement("canvas"); b.width = 300; b.height = 180; const y = b.getContext("2d"); y.imageSmoothingEnabled = false; y.drawImage(c, 0, 0, 300, 180);
+  return b.toDataURL();
+}
+// Porthos, a low-poly war dog, trots after you
+function makeDog() {
+  const m = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+  const fur = m(0x8a5a32), dark = m(0x3a2414), red = m(0xb8322a), g = new THREE.Group(), root = new THREE.Group();
+  const box = (w, h, d, mat, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); b.position.set(x, y, z); root.add(b); return b; };
+  box(0.34, 0.3, 0.8, fur, 0, 0.62, 0);                     // body
+  box(0.3, 0.3, 0.34, fur, 0, 0.86, 0.48);                  // head
+  box(0.18, 0.16, 0.24, dark, 0, 0.8, 0.72);                // muzzle
+  box(0.08, 0.14, 0.06, dark, -0.1, 1.06, 0.42); box(0.08, 0.14, 0.06, dark, 0.1, 1.06, 0.42);   // ears
+  box(0.38, 0.08, 0.1, red, 0, 0.76, 0.3);                  // collar
+  box(0.06, 0.06, 0.34, fur, 0, 0.8, -0.52).rotation.x = -0.6;                                   // tail
+  const legs = [[-0.11, 0.3], [0.11, 0.3], [-0.11, -0.3], [0.11, -0.3]].map(([x, z]) => box(0.09, 0.46, 0.09, fur, x, 0.24, z));
+  g.add(root); g.scale.setScalar(AVS); scene.add(g);
+  g.position.set(pl.x - 0.02, heightAt(pl.x, pl.z), pl.z + 0.02);
+  dog = { g, legs, t: 0 };
+}
+function dogStep(dt) {
+  if (!dog) return;
+  const p = dog.g.position, bx = pl.x - Math.sin(pl.face + 0.6) * 0.022, bz = pl.z - Math.cos(pl.face + 0.6) * 0.022;
+  const dx = bx - p.x, dz = bz - p.z, d = Math.hypot(dx, dz);
+  if (d > 0.003) { const st = Math.min(d, Math.max(0.02, d * 3) * dt); p.x += (dx / d) * st; p.z += (dz / d) * st; dog.g.rotation.y = Math.atan2(dx, dz); dog.t += dt * 14; }
+  if (d > 0.5) { p.x = bx; p.z = bz; }
+  p.y = Math.max(0, heightAt(p.x, p.z));
+  const sw = d > 0.003 ? Math.sin(dog.t) * 0.5 : 0; dog.legs.forEach((l, i) => { l.rotation.x = (i === 0 || i === 3 ? sw : -sw); });
+}
+function porthosStep(now) {
+  if (!porthos) return;
+  porthos.beam.material.opacity = 0.25 + Math.sin(now / 400) * 0.1;
+  const d = Math.hypot(pl.x - porthos.q.x, pl.z - porthos.q.z);
+  if (porthos.away && d > 0.15) porthos.away = false;
+  if (d < 0.08 && !porthos.fighting && !porthos.away && !busy()) porthosFight();
 }
 
 /* ---------------- Quest and fame ---------------- */
+function hud() {
+  const s = window.Spiel.get();
+  $("#whoLvl").textContent = `${window.Spiel.rank(s.level)} · Stufe ${s.level} · 🪙 ${s.gold}`;
+}
 function quest() {
   const found = window.Postcards.found(), spots = window.Postcards.spots, n = Object.keys(found).length;
   $("#whoPc").textContent = `✉ ${n} von ${spots.length} gesammelt`;
+  hud();
+  if (porthos) {
+    const d = Math.hypot(pl.x - porthos.q.x, pl.z - porthos.q.z);
+    $("#questT").textContent = `⛓ Befreie Porthos · ${d < 1 ? Math.round(d * 1000) + " m" : d.toFixed(1).replace(".", ",") + " km"}`;
+    return;
+  }
   const [lat, lon] = unP(pl.x, pl.z);
   let best = null;
   for (const s of spots) if (!found[s.id]) { const d = distKm([lat, lon], [s.lat, s.lon]); if (!best || d < best.d) best = { s, d }; }
@@ -579,13 +735,16 @@ function loop(now) {
   // walk toward the target
   if (pl.tx != null) {
     const dx = pl.tx - pl.x, dz = pl.tz - pl.z, d = Math.hypot(dx, dz);
-    const speed = gps.on && gps.onIsland ? Math.max(0.004, d * 1.5) : 0.025;     // km per second
+    const speed = aura.on ? Math.max(0.06, d * 0.8) : gps.on && gps.onIsland ? Math.max(0.004, d * 1.5) : 0.025;     // km per second
     if (d > 0.002) { const st = Math.min(d, speed * dt); pl.x += (dx / d) * st; pl.z += (dz / d) * st; pl.face = Math.atan2(dx, dz); pl.walk = Math.min(1, pl.walk + dt * 3); }
     else { pl.tx = null; tgtMark.visible = false; }
   } else pl.walk = Math.max(0, pl.walk - dt * 3);
   const y = Math.max(0, heightAt(pl.x, pl.z));
   if (avatar) { avatar.g.position.set(pl.x, y, pl.z); avatar.g.rotation.y = pl.face; avatar.update(dt, pl.walk); }
   ring.position.set(pl.x, y + 0.002, pl.z); ring.scale.setScalar(1 + Math.sin(now / 300) * 0.08);
+  if (document.querySelector("#kampf")) { requestAnimationFrame(loop); return; }      // the world holds still while you fight
+  auraStep(now, y); dogStep(dt); porthosStep(now);
+  if (aura.on && now - (loop.a || 0) > 1000 && !busy()) { loop.a = now; window.Postcards.check(here()); }
   for (const sh of ships) shipStep(sh, dt);
   panStep(dt); placeCamera(); renderer.render(scene, camera); drawLabels();
   if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); }
@@ -604,6 +763,7 @@ window.CrusadersGeo.load().then((geo) => {
   for (const s of window.Postcards.spots) if (s.kind === "postkarte") { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
   makeAvatar();
   [pl.x, pl.z] = WRECK;
+  auraSet(aura.on); if (window.Spiel.get().party.includes("porthos")) makeDog(); porthosSpawn(false); hud();
   $("#whoName").textContent = ME ? ME.name + " von " + ME.von[0] : "Namenlos";
   const d = new Date(); $(".date").textContent = `${d.getDate()}. ${["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"][d.getMonth()]} Anno Domini 1310`;
   $("#loading").hidden = true;
