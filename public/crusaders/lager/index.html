@@ -14,7 +14,7 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; min-height: 100%; background: #1c140c; color: var(--parch); font: 16px/1.4 "IM Fell English", Georgia, serif; }
 /* the camp is a place of its own: the beach of the wreck, and what you build on it */
-.scene { position: relative; height: 58vh; min-height: 300px; background: #1c140c url("../strand.jpg") center 30% / cover; overflow: hidden; }
+.scene { position: relative; height: 58vh; min-height: 300px; background: #1c140c url("../bilder/lager-wrack.jpg") center 58% / cover; transition: background-image 0.6s; overflow: hidden; }
 .scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(20,12,6,0.55), rgba(20,12,6,0) 30%, rgba(20,12,6,0) 75%, rgba(20,12,6,0.6)); pointer-events: none; }
 #px { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 55%; image-rendering: pixelated; z-index: 1; }
 .top { position: absolute; left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); display: flex; justify-content: space-between; align-items: center; z-index: 2; }
@@ -69,7 +69,7 @@ const toast = (t, ms = 4000) => { const e = $("#toast"); e.textContent = t; e.hi
 const STAGES = [
   { name: "Die Wrackstelle", sub: "Am Strand von Tsambika", what: "Was das Meer übrig ließ", cost: 0 },
   { name: "Das Lagerfeuer", sub: "Ein Feuer gegen die Nacht", what: "Treibholz und Feuerstein", cost: 30 },
-  { name: "Die Zeltplane", sub: "Ein Dach aus Segeltuch", what: "Das alte Segel, über Ruder gespannt", cost: 60 },
+  { name: "Die Zeltplane", sub: "Das Wrack ist ausgeschlachtet", what: "Das alte Segel, über Ruder gespannt; das Wrack wird geräumt", cost: 60 },
   { name: "Die Palisade", sub: "Ein Lager, das sich wehren kann", what: "Spitze Pfähle gegen Wegelagerer", cost: 120 },
   { name: "Der Holzsteg", sub: "Boote können anlegen", what: "Ein Steg ins flache Wasser", cost: 200 },
   { name: "Die Werft", sub: "Hier entsteht ein Schiff", what: "Spanten, Kiel und Teer", cost: 350 },
@@ -83,6 +83,8 @@ const QUESTS = [
 function render() {
   const s = window.Spiel.get(), at = s.camp;
   $("#purse").textContent = `🪙 ${s.gold} · ${window.Spiel.rank(s.level)} · Stufe ${s.level}`;
+  // the wreck stands until you strip it for the tarp; from then on the beach is cleared
+  $(".scene").style.backgroundImage = `url("../bilder/${at >= 2 ? "lager-geraeumt" : "lager-wrack"}.jpg")`;
   $("#campName").textContent = STAGES[at].name; $("#campSub").textContent = STAGES[at].sub;
   $("#quests").innerHTML = QUESTS.map((q) => {
     const done = s.quests[q.id] && s.quests[q.id].done;

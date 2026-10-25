@@ -616,7 +616,7 @@ window.Postcards.beforeSnap = (s, collect, later) => {
   const F = FIGHTS[s.kind] || FIGHTS.postkarte, foes = F.foes[Math.floor(Math.random() * F.foes.length)];
   const what = s.kind === "postkarte" ? "Postkarte" : window.Postcards.kinds[s.kind];
   window.Kampf.start({
-    title: `${F.who} bewachen: ${window.Postcards.title(s)}`, foes, tier: F.tier,
+    title: `${F.who} bewachen: ${window.Postcards.title(s)}`, foes, tier: F.tier, at: { lat: s.lat, lon: s.lon },
     loot: { img: window.Postcards.sceneURL(s.id), text: `1× ${F.tier > 1 ? "Seltene " : ""}${what}` },
     onWin: () => { collect(); hud(); },
     onLose: (why) => { later(); hud(); toast(why === "flucht" ? "Geflohen. Der Fund wartet, in zwei Minuten kannst du es wieder versuchen." : "Niedergeschlagen. In zwei Minuten kannst du es wieder versuchen.", 5000); },
@@ -657,7 +657,7 @@ function porthosMark(q) {
 function porthosFight() {
   porthos.fighting = true;
   window.Kampf.start({
-    title: "Sklavenhändler Kerim hält Porthos in Ketten!", foes: ["soeldner", "haendler"], tier: 1, boss: true,
+    title: "Sklavenhändler Kerim hält Porthos in Ketten!", foes: ["soeldner", "haendler"], tier: 1, boss: true, at: here(),
     loot: { img: dogPicture(), text: "Porthos ist frei! Dein Kriegshund kämpft ab jetzt an deiner Seite." },
     onWin: () => {
       const s = window.Spiel.get(); s.quests.porthos = { ...s.quests.porthos, done: today() }; if (!s.party.includes("porthos")) s.party.push("porthos"); window.Spiel.save(s);
