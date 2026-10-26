@@ -84,6 +84,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 <div class="pad side">
   <button type="button" id="auraBtn"><span>✨</span>Aura</button>
   <a href="../lager/" id="lagerBtn"><span>⛺</span>Lager</a>
+  <button type="button" id="stadtBtn"><span>🏰</span>Stadt</button>
 </div>
 <div class="date"></div>
 <div id="toast" hidden></div>
@@ -94,6 +95,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 <script src="../avatar.js"></script>
 <script src="../postcards.js"></script>
 <script src="../kampf.js"></script>
+<script src="../staedte.js"></script>
 <script src="../geo/geo.js"></script>
 <script>
 "use strict";
@@ -212,7 +214,7 @@ function buildLand(features, roads) {
     let h = 0.012 + 0.18 * smooth(0, 2.5, d);
     for (const [px, pz, ph, pr] of peaks) { const q = ((x - px) ** 2 + (z - pz) ** 2) / (pr * pr); if (q < 9) h += ph * Math.exp(-q) * smooth(0, 1.2, d); }
     h += (fbm(x * 0.35, z * 0.35) - 0.45) * 0.22 * smooth(0, 1.5, d);
-    H[k] = LAND[k] ? Math.max(0.0015, h * smooth(0, 0.6, d)) * EXAG : -Math.min(1.6, 0.05 + dout[k] * CELL * 0.32);
+    H[k] = LAND[k] ? Math.max(0.0015, h * smooth(0, 0.6, d)) * EXAG : -Math.min(0.25, 0.01 + dout[k] * CELL * 0.05);
     DIST[k] = LAND[k] ? d : dout[k] * CELL;
   }
   const grid = (heights, colorOf) => {
@@ -234,11 +236,14 @@ function buildLand(features, roads) {
   const land = new THREE.Mesh(landGeo, withMask(new THREE.MeshLambertMaterial({ vertexColors: true }),
     "vec4 mk = texture2D(uMask, vMaskUv);\nif (mk.r < 0.5) discard;\nfloat road = smoothstep(0.2, 0.45, mk.g) * (1.0 - smoothstep(0.62, 0.8, mk.g));\nfloat beach = smoothstep(0.7, 0.9, mk.g);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.80, 0.68), road);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.85, 0.65), beach);"));
   scene.add(land);
-  // the sea floor: everywhere below, turquoise near the coast, dark blue far out
-  const seaGeo = grid((k) => -Math.min(1.6, 0.05 + (LAND[k] ? 0 : DIST[k]) * 0.32), (c) => c.set("#1f6aa8"));
-  const sea = new THREE.Mesh(seaGeo, withMask(new THREE.MeshLambertMaterial({ vertexColors: true }),
-    "vec4 mk = texture2D(uMask, vMaskUv);\ndiffuseColor.rgb = mix(vec3(0.10, 0.36, 0.62), vec3(0.50, 0.90, 0.84), clamp(mk.b * 1.4, 0.0, 1.0));"));
+  /* the sea floor: shallow and plain. The turquoise of the shallows is painted on the water's surface
+     (see water below), not down here: seen at a slant through the water, a coloured floor deep below
+     slid away from the coast and the island seemed to float above its own shadow. */
+  const seaGeo = grid((k) => -Math.min(0.25, 0.01 + (LAND[k] ? 0 : DIST[k]) * 0.05), (c) => c.set("#1f5f96"));
+  const sea = new THREE.Mesh(seaGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
   scene.add(sea);
+  water.material = withMask(new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, shininess: 90, specular: 0x9fdcff }),
+    "vec4 mk = texture2D(uMask, vMaskUv);\nfloat sh = clamp(mk.b * 1.4, 0.0, 1.0);\ndiffuseColor.rgb = mix(vec3(0.13, 0.48, 0.78), vec3(0.47, 0.89, 0.85), sh);\ndiffuseColor.a = mix(0.9, 0.72, sh);");
   return land;
 }
 
@@ -600,7 +605,7 @@ function auraStep(now, y) {
 }
 function auraSet(on) { aura.on = on; const s = window.Spiel.get(); s.aura = on; window.Spiel.save(s); $("#auraBtn").classList.toggle("on", on); }
 $("#auraBtn").onclick = () => { auraSet(!aura.on); toast(aura.on ? "✨ Aura des Dev: deine Figur gilt als dein Standort. Tippen = wandern, lange drücken = springen." : "Aura aus. Jetzt zählt nur noch echtes GPS.", 5000); };
-const busy = () => !!document.querySelector("#kampf") || !$("#pcPop").hidden || (document.querySelector("#pcEd") && !document.querySelector("#pcEd").hidden);
+const busy = () => !!document.querySelector("#kampf") || (window.Staedte && window.Staedte.isOpen()) || !$("#pcPop").hidden || (document.querySelector("#pcEd") && !document.querySelector("#pcEd").hidden);
 const here = () => { const [lat, lon] = unP(pl.x, pl.z); return { lat, lon, acc: 5 }; };
 
 /* ---------------- Finds must be fought for ---------------- */
@@ -706,6 +711,50 @@ function porthosStep(now) {
   if (d < 0.08 && !porthos.fighting && !porthos.away && !busy()) porthosFight();
 }
 
+/* ---------------- Towns and their jobs ----------------
+   The board of the nearest town is always open. A job's goal appears around you; walk there. */
+const jobMarks = new Map(), jobAway = new Set();
+function landNear(at, d) {
+  const [ax, az] = P(at.lon, at.lat), rnd = Math.random;
+  for (let shrink = 1; shrink > 0.1; shrink *= 0.7) for (let i = 0; i < 48; i++) {
+    const a = rnd() * Math.PI * 2, r = d * shrink * (0.9 + rnd() * 0.2), x = ax + Math.cos(a) * r, z = az + Math.sin(a) * r;
+    if (isLand(x, z) && !isBeach(x, z)) { const [lat, lon] = unP(x, z); return { lat, lon }; }
+  }
+  return null;
+}
+function syncJobs() {
+  const jobs = window.Spiel.get().jobs, ids = new Set(jobs.map((j) => j.id));
+  for (const [id, m] of jobMarks) if (!ids.has(id)) { scene.remove(m.g); m.lb.e.remove(); labels.splice(labels.indexOf(m.lb), 1); jobMarks.delete(id); }
+  for (const j of jobs) {
+    if (jobMarks.has(j.id)) continue;
+    const [x, z] = P(j.lon, j.lat), F = window.Staedte.FACTIONS[j.fac], g = new THREE.Group();
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.014, 0.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(F.color), transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    beam.position.y = 0.3; g.add(beam);
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.05, 0.002), lmat(0x5a3a20)); flag.position.y = 0.025; g.add(flag);
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.024, 0.016), new THREE.MeshLambertMaterial({ color: new THREE.Color(F.color), side: THREE.DoubleSide })); cloth.position.set(0.012, 0.042, 0); g.add(cloth);
+    g.position.set(x, heightAt(x, z), z); scene.add(g);
+    label(`${F.icon} ${j.name}`, j.foes ? "Auftrag · Kampf" : "Auftrag", x, z, "pc");
+    jobMarks.set(j.id, { g, beam, lb: labels[labels.length - 1], x, z, job: j });
+  }
+}
+function jobsStep(now) {
+  for (const [id, m] of jobMarks) {
+    m.beam.material.opacity = 0.3 + Math.sin(now / 400 + m.x) * 0.1;
+    const d = Math.hypot(pl.x - m.x, pl.z - m.z);
+    if (jobAway.has(id) && d > 0.15) jobAway.delete(id);
+    if (d < 0.08 && !jobAway.has(id) && !busy()) {
+      jobAway.add(id);
+      window.Staedte.arrive(m.job, (ok, r) => {
+        if (ok) toast(`✔ ${m.job.name}: +${r.exp} EXP · +${r.gold} Gold`, 6000);
+        else toast(r === "flucht" ? "Geflohen. Der Auftrag wartet noch auf dich." : "Niedergeschlagen. Geh ein Stück weg, sammle dich, und komm wieder.", 6000);
+        syncJobs(); hud();
+      });
+      return;
+    }
+  }
+}
+$("#stadtBtn").onclick = () => window.Staedte.open();
+
 /* ---------------- Quest and fame ---------------- */
 function hud() {
   const s = window.Spiel.get();
@@ -720,6 +769,8 @@ function quest() {
     $("#questT").textContent = `⛓ Befreie Porthos · ${d < 1 ? Math.round(d * 1000) + " m" : d.toFixed(1).replace(".", ",") + " km"}`;
     return;
   }
+  let job = null; for (const m of jobMarks.values()) { const d = Math.hypot(pl.x - m.x, pl.z - m.z); if (!job || d < job.d) job = { m, d }; }
+  if (job) { $("#questT").textContent = `${window.Staedte.FACTIONS[job.m.job.fac].icon} ${job.m.job.name} · ${window.Staedte.fmtKm(job.d)}`; return; }
   const [lat, lon] = unP(pl.x, pl.z);
   let best = null;
   for (const s of spots) if (!found[s.id]) { const d = distKm([lat, lon], [s.lat, s.lon]); if (!best || d < best.d) best = { s, d }; }
@@ -743,7 +794,8 @@ function loop(now) {
   if (avatar) { avatar.g.position.set(pl.x, y, pl.z); avatar.g.rotation.y = pl.face; avatar.update(dt, pl.walk); }
   ring.position.set(pl.x, y + 0.002, pl.z); ring.scale.setScalar(1 + Math.sin(now / 300) * 0.08);
   if (document.querySelector("#kampf")) { requestAnimationFrame(loop); return; }      // the world holds still while you fight
-  auraStep(now, y); dogStep(dt); porthosStep(now);
+  auraStep(now, y); dogStep(dt); porthosStep(now); jobsStep(now);
+  if (now - (loop.s || 0) > 5000) { loop.s = now; const s = window.Spiel.get(); s.pos = [pl.x, pl.z]; window.Spiel.save(s); }
   if (aura.on && now - (loop.a || 0) > 1000 && !busy()) { loop.a = now; window.Postcards.check(here()); }
   for (const sh of ships) shipStep(sh, dt);
   panStep(dt); placeCamera(); renderer.render(scene, camera); drawLabels();
@@ -763,11 +815,16 @@ window.CrusadersGeo.load().then((geo) => {
   for (const s of window.Postcards.spots) if (s.kind === "postkarte") { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
   makeAvatar();
   [pl.x, pl.z] = WRECK;
+  { const sp = window.Spiel.get().pos; if (sp && isLand(sp[0], sp[1])) [pl.x, pl.z] = sp; }      // where you left off
+  window.Staedte.init({ places: TOWNS.map(([name, lat, lon]) => ({ name, lat, lon })), where: here, landNear, toast,
+    changed: () => { syncJobs(); hud(); },
+    focus: (j) => { if (!j) return; const [x, z] = P(j.lon, j.lat); pan.x = x - pl.x; pan.z = z - pl.z; camDist = Math.max(camDist, Math.min(30, Math.hypot(pan.x, pan.z) * 0.8)); } });
+  syncJobs();
   auraSet(aura.on); if (window.Spiel.get().party.includes("porthos")) makeDog(); porthosSpawn(false); hud();
-  $("#whoName").textContent = ME ? ME.name + " von " + ME.von[0] : "Namenlos";
+  $("#whoName").textContent = ME ? ME.name + " von " + ME.von[0] : "Generica";
   const d = new Date(); $(".date").textContent = `${d.getDate()}. ${["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"][d.getMonth()]} Anno Domini 1310`;
   $("#loading").hidden = true;
-  toast(ME ? `${ME.name}, gestrandet am Strand von Tsambika. Tippe auf die Insel zum Wandern, oder schalte GPS ein.` : "Gestrandet. Tippe auf die Insel zum Wandern.", 7000);
+  toast(ME ? `${ME.name}, gestrandet am Strand von Tsambika. Tippe auf die Insel zum Wandern, oder schalte GPS ein.` : "Generica, ohne Namen gestrandet. Tippe auf die Insel zum Wandern. Einen Charakter wählst du im Menü.", 7000);
   requestAnimationFrame(loop);
 });
 </script>
