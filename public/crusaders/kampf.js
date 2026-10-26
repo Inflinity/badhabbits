@@ -7,12 +7,27 @@
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
   /* ---------------- State ---------------- */
-  const KEY = "crusaders-spiel";
-  const ME_KEY = "crusaders-ich";
-  const S0 = { gold: 50, exp: 0, level: 1, figs: 3, party: [], quests: {}, camp: 0, aura: true };
-  function get() { let s = {}; try { s = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} return { ...S0, ...s, quests: { ...(s.quests || {}) } }; }
-  function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
-  const me = () => { try { return JSON.parse(localStorage.getItem(ME_KEY) || "null"); } catch (e) { return null; } };
+  /* Every character keeps its own progress. The one you play is in "crusaders-ich"; all of them are in
+     "crusaders-helden". Without a character you play Generica, a nameless pilgrim with its own save.
+     The first character ever made (from before there was a roster) keeps the old save, "crusaders-spiel". */
+  const ME_KEY = "crusaders-ich", HEROES_KEY = "crusaders-helden";
+  const S0 = { gold: 50, exp: 0, level: 1, figs: 3, wein: 1, party: [], quests: {}, camp: 0, aura: true, inv: {}, rep: {}, jobs: [], log: {} };
+  const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (e) { return d; } };
+  const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const me = () => read(ME_KEY, null);
+  const GENERICA = { id: "generica", sex: "m", name: "Generica", von: ["Nirgendwo", ""], generic: true };
+  const keyOf = (h) => (!h ? "crusaders-spiel:generica" : !h.id || h.id === "alt" ? "crusaders-spiel" : "crusaders-spiel:" + h.id);
+  function heroes() {
+    const list = read(HEROES_KEY, []), m = me();
+    // a character made before the roster existed joins it here
+    if (m && !list.some((h) => h.id === (m.id || "alt"))) { if (!m.id) { m.id = "alt"; write(ME_KEY, m); } list.push(m); write(HEROES_KEY, list); }
+    return list;
+  }
+  function choose(h) { write(ME_KEY, h && !h.generic ? h : null); }
+  function saveHero(h) { const list = heroes().filter((x) => x.id !== h.id); list.push(h); write(HEROES_KEY, list); if ((me() || {}).id === h.id) write(ME_KEY, h); }
+  function get(h) { const s = read(keyOf(h === undefined ? me() : h), {}); return { ...S0, ...s, quests: { ...(s.quests || {}) }, inv: { ...(s.inv || {}) }, rep: { ...(s.rep || {}) }, jobs: [...(s.jobs || [])], log: { ...(s.log || {}) } }; }
+  function save(s, h) { write(keyOf(h === undefined ? me() : h), s); }
+  function wipe(h) { write(keyOf(h === undefined ? me() : h), null); }
   const expFor = (lvl) => 100 * lvl;
   function reward(exp, gold) {
     const s = get(); s.exp += exp; s.gold += gold; let up = 0;
@@ -159,6 +174,9 @@
     soeldner: (t) => ({ name: "Söldner", spr: "bandit", pal: { W: "#2a2420", r: "#3a6a9a" }, hp: 34 + 18 * t, atk: 7 + 3 * t, def: 3 + t, spd: 0.95 }),
     schatten: (t) => ({ name: "Schatten", spr: "schatten", hp: 24 + 14 * t, atk: 8 + 3 * t, def: 1 + t, spd: 1.15 }),
     bulle: (t) => ({ name: "Bestie", spr: "bulle", hp: 50 + 24 * t, atk: 9 + 4 * t, def: 3 + t, spd: 0.75 }),
+    korsar: (t) => ({ name: "Korsar", spr: "bandit", pal: { W: "#b8322a", r: "#e2b04a", m: "#3a3a4a", P: "#5a4a6a" }, hp: 32 + 17 * t, atk: 7 + 3 * t, def: 2 + t, spd: 1.05 }),
+    reiter: (t) => ({ name: "Menteşe-Krieger", spr: "bandit", pal: { W: "#e8e2d0", r: "#2a6a3a", m: "#6a4a2a", P: "#8a6a3a" }, hp: 36 + 18 * t, atk: 8 + 3 * t, def: 3 + t, spd: 1.0 }),
+    wolf: (t) => ({ name: "Wildhund", spr: "hund", pal: { b: "#6a6a6a", c: "#3a3a3a" }, hp: 22 + 12 * t, atk: 6 + 3 * t, def: 1 + t, spd: 1.3 }),
     haendler: (t) => ({ name: "Sklavenhändler Kerim", spr: "bandit", pal: { W: "#7a1a14", r: "#e2b04a", m: "#5a3a2a" }, hp: 70 + 30 * t, atk: 7 + 4 * t, def: 4 + t, spd: 1.0, boss: true }),
   };
 
@@ -168,10 +186,12 @@
     const st = get(), who = me(), L = st.level;
     const look = (who && who.look) || {};
     const SK = (window.CrusaderAvatar && window.CrusaderAvatar.SKIN) || ["#e0a982"], HC = (window.CrusaderAvatar && window.CrusaderAvatar.HAIRC) || ["#3b2416"];
-    const heroes = [{ id: "held", name: who ? who.name : "Namenlos", spr: "held", pal: { s: SK[look.skin ?? 2], f: SK[look.skin ?? 2], h: HC[look.hairC ?? 1] }, ...STATS.held(L) }];
+    const heroes = [{ id: "held", name: who ? who.name : "Generica", spr: "held", pal: { s: SK[look.skin ?? 2], f: SK[look.skin ?? 2], h: HC[look.hairC ?? 1] }, ...STATS.held(L) }];
     if (st.party.includes("porthos")) heroes.push({ id: "porthos", name: "Porthos", spr: "hund", ai: true, ...STATS.porthos(L) });
     heroes.forEach((h) => { h.max = h.hp; h.maxmp = h.mp; h.atb = Math.random() * 0.5; h.side = 0; });
-    const foes = opt.foes.map((k, i) => { const f = FOES[k](opt.tier || 1); return { ...f, id: k + i, max: f.hp, atb: Math.random() * 0.3, side: 1 }; });
+    // a foe is a kind ("bandit") or a kind with its own name and colours ({ k: "korsar", name: "Korsar Dragut", boss: true })
+    const foes = opt.foes.map((o, i) => { const k = typeof o === "string" ? o : o.k, f = FOES[k](opt.tier || 1), x = typeof o === "string" ? {} : o;
+      return { ...f, ...(x.name ? { name: x.name } : {}), pal: { ...(f.pal || {}), ...(x.pal || {}) }, boss: f.boss || x.boss, hp: Math.round(f.hp * (x.hp || 1)), id: k + i, max: Math.round(f.hp * (x.hp || 1)), atb: Math.random() * 0.3, side: 1 }; });
     const all = () => [...heroes, ...foes];
     const el = document.createElement("div"); el.id = "kampf";
     el.innerHTML = `<canvas></canvas><div id="kmsg">${opt.title || "Ein Kampf!"}</div><div id="kfloat"></div>
@@ -187,7 +207,7 @@
     const ground = H * (bg ? bg.ground + 0.04 : 0.47), room = H - ground - 28;
     heroes.forEach((h, i) => { h.x = 16 + (i % 2) * 6; h.y = Math.round(ground + 6 + (room / heroes.length) * i); });
     foes.forEach((f, i) => { f.x = W - 44 + (i % 2) * 18; f.y = Math.round(ground + (room / foes.length) * i); });
-    let turn = null, picking = null, over = false, last = performance.now(), defend = {}, shake = 0, items = st.figs;
+    let turn = null, picking = null, over = false, last = performance.now(), defend = {}, shake = 0, items = st.figs, wine = st.wein || 0;
     const msg = (t) => { el.querySelector("#kmsg").textContent = t; };
     const float = (f, text, color) => {
       const r = cv.getBoundingClientRect(), d = document.createElement("div"); d.className = "kf"; d.textContent = text; d.style.color = color;
@@ -221,6 +241,7 @@
         <button type="button" data-a="spez" ${h.mp < 8 ? "disabled" : ""}>⚔ SPEZIAL <small>Treibholz-Wirbel · 8 MP</small></button>
         <button type="button" data-a="gebet" ${h.mp < 6 ? "disabled" : ""}>✚ GEBET <small>heilt · 6 MP</small></button>
         <button type="button" data-a="item" ${items <= 0 ? "disabled" : ""}>GEGENSTAND <small>Feigen ×${items}</small></button>
+        <button type="button" data-a="wein" ${wine <= 0 || !h.maxmp ? "disabled" : ""}>WEIN <small>+12 MP · ×${wine}</small></button>
         <button type="button" data-a="def">VERTEIDIGEN</button>
         <button type="button" data-a="flucht" ${opt.boss ? "disabled" : ""}>FLUCHT</button>
         <button type="button" id="kauto" ${opt.boss ? "disabled" : ""}>🪙 SIEG KAUFEN <small>${opt.boss ? "nicht im Bosskampf" : cost() + " Gold"}</small></button>`;
@@ -229,6 +250,7 @@
         if (a === "spez") { h.mp -= 8; for (const f of alive(foes)) hit(h, f, 1.25); return endTurn(h, `${h.name}: Treibholz-Wirbel!`); }
         if (a === "gebet") { h.mp -= 6; picking = { list: heroes, fn: (t) => { const v = Math.round(t.max * 0.35); t.hp = Math.min(t.max, t.hp + v); float(t, "HEAL " + v, "#5aff7a"); endTurn(h, `${h.name} betet.`); } }; return menu(); }
         if (a === "item") { items--; const s = get(); s.figs = items; save(s); h.hp = Math.min(h.max, h.hp + 40); float(h, "+40", "#5aff7a"); return endTurn(h, `${h.name} isst Feigen.`); }
+        if (a === "wein") { wine--; const s = get(); s.wein = wine; save(s); h.mp = Math.min(h.maxmp, h.mp + 12); float(h, "+12 MP", "#5ab4ff"); return endTurn(h, `${h.name} trinkt Wein.`); }
         if (a === "def") { defend[h.id] = true; return endTurn(h, `${h.name} verteidigt.`); }
         if (a === "flucht") { close(); if (opt.onLose) opt.onLose("flucht"); }
       };
@@ -309,6 +331,6 @@
     return { close };
   }
 
-  window.Spiel = { get, save, reward, rank, expFor, me, SPR, PAL, sprite };
+  window.Spiel = { get, save, wipe, reward, rank, expFor, me, heroes, choose, saveHero, keyOf, GENERICA, SPR, PAL, sprite, read, write };
   window.Kampf = { start, backdrop, BACKDROPS };
 })();
