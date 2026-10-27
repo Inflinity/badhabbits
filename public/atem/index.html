@@ -727,20 +727,30 @@ function sample(t, moving) {
    Hold (lungs empty) gives the resting position and the heartbeat jitter,
    one deep breath gives the direction and size of the movement. After that
    the tone simply follows where the chest is, with no rhythm model at all. */
-const RT = { passive: false, init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null };
+const RT = { passive: false, init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null, holdT: 0, lastS: 0, inMaxT: 0 };
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 function rtReset() {
-  Object.assign(RT, { passive: false, init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null });
+  Object.assign(RT, { passive: false, init: false, base: null, baseSum: [0, 0, 0], baseN: 0, dir: null, range: 0.05, inMax: 0, inVec: null, lo: 0, hi: 1, q: 0, hr: null, holdT: 0, lastS: 0, inMaxT: 0 });
 }
 function rtSample(t, moving) {
-  const ph = sess.phase, el = t - sess.phaseStart;
-  if (ph === "hold" && el > 2.5 && !moving) {
-    for (let i = 0; i < 3; i++) RT.baseSum[i] += sig.g2[i];
-    RT.baseN++;
+  const ph = sess.phase, el = t - sess.phaseStart, sdt = clamp(t - (RT.lastS || t), 0, 0.1); RT.lastS = t;
+  if (ph === "hold") {
+    /* The rest position is taken from your own breath, not on command: you breathe on in your
+       tempo, and in the natural pause after your next exhale (the chest no longer sinking, still)
+       the app measures. If you breathe in again before it has enough, it simply waits for the
+       next exhale. */
+    // "still" = no new turn of the breath for a moment; which way is in is only known after the deep
+    // breath, so any calm pause counts (the long one in a relaxed breath is the empty one)
+    RT.resting = el > 2 && t - det.extT > 0.6 && !moving;
+    if (RT.resting) {
+      for (let i = 0; i < 3; i++) RT.baseSum[i] += sig.g2[i];
+      RT.baseN++; RT.holdT += sdt;
+    } else if (RT.holdT > 0 && RT.holdT < 2.5) { RT.baseSum = [0, 0, 0]; RT.baseN = 0; RT.holdT = 0; }
   } else if (ph === "deep" && RT.base) {
     const d = sub(sig.g2, RT.base), n = Math.hypot(...d);
-    if (n > RT.inMax) { RT.inMax = n; RT.inVec = d; }
+    if (n > RT.inMax) { if (n > RT.inMax * 1.01 + 0.0005) RT.inMaxT = t; RT.inMax = n; RT.inVec = d; }      // a real gain, not the last creep of the smoothing
+    RT.inNow = n;
   } else if (["box", "arrive", "jb", "sleep"].includes(ph) || ((ph === "realtime" || ph === "dive") && RT.passive)) {
     // learned silently: main breathing axis from the PCA, range from what you actually do
     if (!sess.polPrior) {
@@ -2336,7 +2346,7 @@ const sess = {
   m: { xy: 0, xx: 1e-6, yy: 1e-6 }, match: 0, flipBad: 0,
   leadCycles: 0, naturalRate: null, matchSum: 0, matchN: 0, history: [],
 };
-const PLACE_SECONDS = 12, CALIB_SECONDS = 20, MATCH_SECONDS = 60, HOLD_SECONDS = 10, DEEP_SECONDS = 7, SETTLE_SECONDS = 45;
+const PLACE_SECONDS = 12, CALIB_SECONDS = 20, MATCH_SECONDS = 60, SETTLE_SECONDS = 45;
 
 function setPrompt(t) { $("#prompt").textContent = t; }
 function alignGuide() {
@@ -2612,14 +2622,16 @@ function setPhase(p) {
     setPrompt("Ein · halten · aus · halten. Atme so, wie es sich gut anfühlt.");
     boxCorner();
   } else if (p === "hold") {
-    setPrompt("Entspannt ausatmen und kurz warten …");
-    say("Atme entspannt aus und warte einen Moment. Es gibt kein Richtig oder Falsch.");
+    RT.baseSum = [0, 0, 0]; RT.baseN = 0; RT.holdT = 0;
+    setPrompt("Atme in deinem Tempo. Nach deinem nächsten Ausatmen bleib einfach kurz leer, bis ich mich melde.");
+    say("Atme ganz in deinem Tempo weiter. Wenn du das nächste Mal ausgeatmet hast, bleib einfach kurz leer, bis ich mich melde.");
   } else if (p === "deep") {
-    setPrompt("Und jetzt so tief einatmen, wie du kannst.");
-    say("Und jetzt so tief einatmen, wie du kannst.");
+    RT.inMax = 0; RT.inVec = null; RT.inMaxT = 0;
+    setPrompt("Und jetzt in Ruhe so tief einatmen, wie du kannst. Nimm dir Zeit.");
+    say("Und jetzt, ganz in Ruhe, so tief einatmen, wie du kannst. Nimm dir Zeit.");
   } else if (p === "realtime") {
     setPrompt("Hebt sich dein Brustkorb, wird der Ton heller. Senkt er sich, wird er tiefer.");
-    say("Und ausatmen. Ab jetzt folgt der Ton deinem Brustkorb.");
+    say("Und lass ihn wieder los. Ab jetzt folgt der Ton deinem Brustkorb.");
   } else if (p === "place" && isJB()) {
     sess.cueIdx = 0; sess.cap = null; sess.inSum = [0, 0, 0]; sess.inN = 0; sess.flowEng = null;
     setPrompt("Leg das Handy flach auf deine Brust und atme ganz in deinem Tempo.");
@@ -2632,7 +2644,7 @@ function setPhase(p) {
         say(S.mode === "box"
           ? "Gleich hörst du die Klangschale. Sie steigt beim Einatmen, bleibt stehen beim Halten und sinkt beim Ausatmen. Es gibt kein Richtig oder Falsch."
           : S.mode !== "lead"
-          ? "Gleich atmest du aus und hältst kurz die Luft an. So lerne ich deine Ruhelage."
+          ? "Atme einfach weiter. Gleich bleibst du nach einem deiner Ausatmer kurz leer, so lerne ich deine Ruhelage."
           : "Gleich atmest du zweimal mit dem Klang. Schwillt er an, atme ein. Ebbt er ab, atme aus.");
     }, 4500);
   } else if (p === "calib") {
@@ -2774,9 +2786,12 @@ function tick() {
     if (isJB()) jbIntro(t, el);
     else if (el > PLACE_SECONDS) setPhase(S.mode === "box" ? "box" : !(sess.hasSensor && sig.seen) ? "lead" : S.mode === "lead" ? "calib" : "hold");
   } else if (ph === "hold") {
-    if (el >= HOLD_SECONDS) { rtEndHold(); setPhase("deep"); }
+    // enough still, empty chest: go on as soon as you breathe in again by yourself, or after 4 s of pause
+    if ((RT.holdT >= 2.5 && (!RT.resting || RT.holdT >= 4)) || el >= 40) { rtEndHold(); setPhase("deep"); }
   } else if (ph === "deep") {
-    if (el >= DEEP_SECONDS) { rtEndDeep(); setPhase("realtime"); }
+    // the deep breath is yours: it ends when you are at the top (no deeper for a moment) or on your way out
+    const atTop = t - RT.inMaxT > 1.2, goingOut = t - RT.inMaxT > 0.3 && RT.inNow < RT.inMax * 0.93;
+    if ((el > 3 && RT.inMax >= 0.008 && (atTop || goingOut)) || el >= 25) { rtEndDeep(); setPhase("realtime"); }
   } else if (ph === "realtime") {
     level = RT.q * 2 - 1;
     if (!sess.naturalRate && el > 40 && userPeriod()) sess.naturalRate = 60 / userPeriod();
