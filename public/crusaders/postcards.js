@@ -113,6 +113,14 @@ const SCENES = {
     Array.from({ length: 5 }, (_, i) => `<rect x="${244 + i * 26}" y="215" width="10" height="75" fill="#fff"/>`).join("") +
     [[120, 290], [480, 290]].map(([x, y]) => `<path d="M${x} ${y} q8 -80 4 -140" stroke="#7a5a33" stroke-width="10" fill="none"/>` +
       [-60, -25, 15, 50].map((a) => `<path d="M${x + 4} ${y - 140} q${a} -20 ${a * 1.6} 20" stroke="#3f8a3c" stroke-width="12" fill="none" stroke-linecap="round"/>`).join("")).join(""),
+  // Agia Agathi: a pale bay of sand, turquoise water, the ruin of Feraklos on its headland
+  agathi: () => sky("#86cff3", "#eaf7fd") + `<rect y="230" width="600" height="170" fill="#1f7fc4"/>` +
+    `<path d="M0 300 Q200 250 420 285 Q520 300 600 290 V400 H0 Z" fill="#3fc4cf"/>` +
+    `<path d="M0 340 Q220 300 420 330 Q520 345 600 336 V400 H0 Z" fill="#f2e2b4"/>` +
+    `<path d="M380 236 Q430 150 520 160 Q580 170 600 200 V250 Q520 250 380 236 Z" fill="#b08a5c"/>` +
+    `<path d="M440 172 h22 v-22 h10 v12 h12 v-12 h10 v22 h30 v-14 h10 v14 h14 v26 h-108 Z" fill="#c9a873" stroke="#8a6a44" stroke-width="2"/>` +
+    `<path d="M120 236 Q170 200 240 232 Z" fill="#9a7a50"/><circle cx="168" cy="226" r="6" fill="#3a2a1a"/>` +
+    [[60, 350], [140, 345], [250, 342]].map(([x, y]) => `<line x1="${x}" y1="${y}" x2="${x}" y2="${y - 34}" stroke="#6b4a2a" stroke-width="3"/><path d="M${x - 22} ${y - 30} Q${x} ${y - 54} ${x + 22} ${y - 30} Z" fill="#f4f0e6"/>`).join(""),
   faliraki: () => sky("#ff9e6b", "#ffe2a8") + sunC(300, 210, 70, "#ffd06a") + sea(250) + `<path d="M0 320 Q300 290 600 320 V400 H0 Z" fill="#f0d39a"/>` +
     [[120, 320, "#e34a3a"], [250, 312, "#2a86d1"], [400, 316, "#f2b33a"], [520, 324, "#e34a3a"]].map(([x, y, c]) => `<line x1="${x}" y1="${y}" x2="${x}" y2="${y - 60}" stroke="#6b4a2a" stroke-width="4"/><path d="M${x - 40} ${y - 56} Q${x} ${y - 96} ${x + 40} ${y - 56} Z" fill="${c}"/>`).join(""),
   prasonisi: () => sky("#8fd3f5", "#eaf7fd") + sea(220) + `<path d="M0 260 Q300 300 600 250 V280 Q300 330 0 290 Z" fill="#f1dfae"/>` +
@@ -220,6 +228,7 @@ const SPOTS = [
   { id: "rhodos", name: "Rhodos", lat: 36.4495, lon: 28.2265, r: 1.5 },
   { id: "lindos", name: "Lindos", lat: 36.0915, lon: 28.0875, r: 1.2 },
   { id: "kallithea", name: "Kallithea", lat: 36.3795, lon: 28.2415, r: 0.8 },
+  { id: "agathi", name: "Agia Agathi", title: "Grüße aus Agia Agathi", lat: 36.1758, lon: 28.0978, r: 0.45 },
   { id: "faliraki", name: "Faliraki", lat: 36.338, lon: 28.205, r: 1.2 },
   { id: "prasonisi", name: "Prasonisi", lat: 35.883, lon: 27.765, r: 1.5 },
   { id: "petaloudes", name: "Petaloudes", lat: 36.335, lon: 28.063, r: 0.9 },

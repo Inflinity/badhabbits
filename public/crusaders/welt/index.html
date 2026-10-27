@@ -86,6 +86,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   <button type="button" id="auraBtn"><span>✨</span>Aura</button>
   <a href="../lager/" id="lagerBtn"><span>⛺</span>Lager</a>
   <button type="button" id="stadtBtn"><span>🏰</span>Stadt</button>
+  <button type="button" id="routeBtn"><span>🚗</span>Route</button>
 </div>
 <div class="date"></div>
 <div id="toast" hidden></div>
@@ -249,7 +250,7 @@ function buildLand(features, roads) {
      col = mix(col, vec3(0.72, 0.62, 0.40), smoothstep(0.55, 0.75, n1 * 0.6 + n2 * 0.4) * 0.55);
      vec2 fp = mat2(0.88, -0.47, 0.47, 0.88) * wp * 6.5; fp.y += floor(fp.x) * 0.37;
      vec2 cell = floor(fp), fr = fract(fp); float hc = hs(cell);
-     float flat_ = smoothstep(0.93, 0.985, vUp) * (1.0 - smoothstep(0.12, 0.4, vH)) * smoothstep(0.38, 0.5, vn(wp * 0.5 + 7.0));
+     float flat_ = smoothstep(0.93, 0.985, vUp) * (1.0 - smoothstep(0.12, 0.4, vH)) * smoothstep(0.5, 0.62, vn(wp * 0.5 + 7.0));
      vec3 field = hc < 0.28 ? vec3(0.86, 0.73, 0.42) : hc < 0.52 ? vec3(0.42, 0.53, 0.26) : hc < 0.74 ? vec3(0.56, 0.70, 0.30) : hc < 0.9 ? vec3(0.62, 0.46, 0.30) : vec3(0.78, 0.66, 0.38);
      field *= 0.92 + n3 * 0.16;
      float hedge = 1.0 - smoothstep(0.0, 0.05, min(min(fr.x, 1.0 - fr.x), min(fr.y, 1.0 - fr.y)));
@@ -887,7 +888,7 @@ function loop(now) {
   if (now - (loop.s || 0) > 5000) { loop.s = now; const s = window.Spiel.get(); s.pos = [pl.x, pl.z]; window.Spiel.save(s); }
   if (aura.on && now - (loop.a || 0) > 1000 && !busy()) { loop.a = now; window.Postcards.check(here()); }
   for (const sh of ships) shipStep(sh, dt);
-  panStep(dt); placeCamera(); window.Himmel.step(dt, now); window.Himmel.render(); drawLabels();
+  panStep(dt); placeCamera(); window.Himmel.step(dt, now); window.Route.step(now); window.Himmel.render(); drawLabels();
   if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); companions(); if (!busy()) storyStep(); }
   requestAnimationFrame(loop);
 }
@@ -899,6 +900,8 @@ window.CrusadersGeo.load().then((geo) => {
   terrain = buildLand(feats, geo.roads);
   $("#src").textContent = "Küste © OpenStreetMap-Mitwirkende (ODbL) · Natural Earth";
   landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes); window.Himmel.init();
+  window.SIGHTS = geo.regions.flatMap((r) => r.data.sights || []); window.Route.build(geo.roads);
+  $("#routeBtn").onclick = () => window.Route.pick();
   for (const [name, lat, lon] of TOWNS) { const [x, z] = P(lon, lat); label(name, "", x, z); }
   for (const r of geo.regions) for (const st of r.data.sights || []) { const [x, z] = P(st.lon, st.lat); label(st.name, st.sub, x, z, "sight"); }
   for (const s of window.Postcards.spots) if (s.kind === "postkarte") { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
@@ -918,5 +921,6 @@ window.CrusadersGeo.load().then((geo) => {
 });
 </script>
 <script src="himmel.js"></script>
+<script src="route.js"></script>
 </body>
 </html>
