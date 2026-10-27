@@ -180,9 +180,11 @@ function withMask(material, frag) {
   material.onBeforeCompile = (sh) => {
     sh.uniforms.uMask = { value: maskTex };
     sh.uniforms.uMaskBox = { value: new THREE.Vector4(W0, D0, W1 - W0, D1 - D0) };
-    sh.vertexShader = "varying vec2 vMaskUv;\nuniform vec4 uMaskBox;\n" + sh.vertexShader.replace("#include <worldpos_vertex>",
-      "#include <worldpos_vertex>\nvec4 mwp = modelMatrix * vec4(transformed, 1.0);\nvMaskUv = vec2((mwp.x - uMaskBox.x) / uMaskBox.z, 1.0 - (mwp.z - uMaskBox.y) / uMaskBox.w);");
-    sh.fragmentShader = "varying vec2 vMaskUv;\nuniform sampler2D uMask;\n" + sh.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n" + frag);
+    sh.vertexShader = "varying vec2 vMaskUv;\nvarying float vH, vUp;\nuniform vec4 uMaskBox;\n" + sh.vertexShader.replace("#include <worldpos_vertex>",
+      "#include <worldpos_vertex>\nvec4 mwp = modelMatrix * vec4(transformed, 1.0);\nvMaskUv = vec2((mwp.x - uMaskBox.x) / uMaskBox.z, 1.0 - (mwp.z - uMaskBox.y) / uMaskBox.w);\nvH = mwp.y; vUp = normalize(objectNormal).y;");
+    sh.fragmentShader = "varying vec2 vMaskUv;\nvarying float vH, vUp;\nuniform sampler2D uMask;\nuniform vec4 uMaskBox;\n" +
+      "float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n" +
+      "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }\n" + sh.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n" + frag);
   };
   return material;
 }
@@ -236,7 +238,30 @@ function buildLand(features, roads) {
     else c.set(n > 0.56 ? "#3f7a34" : n > 0.45 ? "#5f9445" : "#8eaa5a");
   });
   const land = new THREE.Mesh(landGeo, withMask(new THREE.MeshLambertMaterial({ vertexColors: true }),
-    "vec4 mk = texture2D(uMask, vMaskUv);\nif (mk.r < 0.5) discard;\nfloat road = smoothstep(0.2, 0.45, mk.g) * (1.0 - smoothstep(0.62, 0.8, mk.g));\nfloat beach = smoothstep(0.7, 0.9, mk.g);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.80, 0.68), road);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.85, 0.65), beach);"));
+    /* like a landscape on a model railway: a patchwork of fields in the flat lowlands (wheat, olive
+       groves, green, ploughed), dry ochre scrub between, bare rock on the steep slopes, and a coast
+       that changes between sandy bays and rocky shore */
+    `vec4 mk = texture2D(uMask, vMaskUv);
+     if (mk.r < 0.5) discard;
+     vec2 wp = vMaskUv * uMaskBox.zw;
+     vec3 col = diffuseColor.rgb;
+     float n1 = vn(wp * 1.1), n2 = vn(wp * 6.0), n3 = vn(wp * 23.0);
+     col = mix(col, vec3(0.72, 0.62, 0.40), smoothstep(0.55, 0.75, n1 * 0.6 + n2 * 0.4) * 0.55);
+     vec2 fp = mat2(0.88, -0.47, 0.47, 0.88) * wp * 6.5; fp.y += floor(fp.x) * 0.37;
+     vec2 cell = floor(fp), fr = fract(fp); float hc = hs(cell);
+     float flat_ = smoothstep(0.93, 0.985, vUp) * (1.0 - smoothstep(0.12, 0.4, vH)) * smoothstep(0.38, 0.5, vn(wp * 0.5 + 7.0));
+     vec3 field = hc < 0.28 ? vec3(0.86, 0.73, 0.42) : hc < 0.52 ? vec3(0.42, 0.53, 0.26) : hc < 0.74 ? vec3(0.56, 0.70, 0.30) : hc < 0.9 ? vec3(0.62, 0.46, 0.30) : vec3(0.78, 0.66, 0.38);
+     field *= 0.92 + n3 * 0.16;
+     float hedge = 1.0 - smoothstep(0.0, 0.05, min(min(fr.x, 1.0 - fr.x), min(fr.y, 1.0 - fr.y)));
+     field = mix(field, vec3(0.30, 0.40, 0.20), hedge * 0.7);
+     col = mix(col, field, flat_ * 0.75);
+     float steep = smoothstep(0.86, 0.62, vUp);
+     col = mix(col, mix(vec3(0.58, 0.53, 0.45), vec3(0.74, 0.69, 0.60), n3), steep * 0.85);
+     float road = smoothstep(0.2, 0.45, mk.g) * (1.0 - smoothstep(0.62, 0.8, mk.g));
+     col = mix(col, vec3(0.86, 0.80, 0.68), road);
+     float beach = smoothstep(0.7, 0.9, mk.g), rocky = smoothstep(0.52, 0.62, vn(wp * 0.8 + 3.1));
+     col = mix(col, mix(vec3(0.94, 0.87, 0.68), mix(vec3(0.55, 0.51, 0.46), vec3(0.70, 0.66, 0.58), n3), rocky * 0.85), beach);
+     diffuseColor.rgb = col;`));
   scene.add(land);
   /* the sea floor: shallow and plain. The turquoise of the shallows is painted on the water's surface
      (the sea's shader in himmel.js), not down here: seen at a slant through the water, a coloured floor deep below
@@ -593,7 +618,7 @@ function onFix(p) {
 const aura = { on: window.Spiel.get().aura !== false };
 const auraFx = new THREE.Group();
 {
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 0.06, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: true, opacity: 0.09, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 0.06, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.045, side: THREE.DoubleSide, depthWrite: false }));
   glow.position.y = 0.035; auraFx.add(glow);
   const motes = new THREE.Group();
   for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.0025), new THREE.MeshBasicMaterial({ color: 0xfff1b0 })); m.userData = { a: i * 0.63, h: (i * 0.37) % 1 }; motes.add(m); }
@@ -651,7 +676,7 @@ function porthosSpawn(fromGps) {
 function porthosMark(q) {
   if (!porthos) {
     const g = new THREE.Group();
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.014, 0.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xff7a3a, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.014, 0.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xff7a3a, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
     beam.position.y = 0.3; g.add(beam);
     const cage = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.02), new THREE.MeshLambertMaterial({ color: 0x6a4a2a, flatShading: true })); cage.position.y = 0.0125; g.add(cage);
     for (let i = -2; i <= 2; i++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.028, 0.022), new THREE.MeshLambertMaterial({ color: 0x2a2a2a })); bar.position.set(i * 0.007, 0.014, 0); g.add(bar); }
@@ -729,7 +754,7 @@ function syncJobs() {
   for (const j of jobs) {
     if (jobMarks.has(j.id)) continue;
     const [x, z] = P(j.lon, j.lat), F = window.Staedte.FACTIONS[j.fac], g = new THREE.Group();
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.014, 0.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(F.color), transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.014, 0.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(F.color), transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }));
     beam.position.y = 0.3; g.add(beam);
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.05, 0.002), lmat(0x5a3a20)); flag.position.y = 0.025; g.add(flag);
     const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.024, 0.016), new THREE.MeshLambertMaterial({ color: new THREE.Color(F.color), side: THREE.DoubleSide })); cloth.position.set(0.012, 0.042, 0); g.add(cloth);
@@ -738,16 +763,66 @@ function syncJobs() {
     jobMarks.set(j.id, { g, beam, lb: labels[labels.length - 1], x, z, job: j });
   }
 }
-/* The first enemy behind the enemies: the Sisters of Mitra. Once Porthos is free and you have
-   grown a little (level 3), the sign of the serpent calls you, about a kilometre away. */
+/* Character quests that open up as you go. Each appears about a kilometre away once its time has come:
+   - the brawler brothers Helgen and Theoderich, once Porthos is free (level 2): beat them, they follow you
+   - the loot chest, once you have a companion: without it, those you send away bring nothing home
+   - the first enemy behind the enemies, the Sisters of Mitra (level 3) */
+const STORIES = [
+  { id: "brueder", when: (s) => s.party.includes("porthos") && s.level >= 2 && !s.party.includes("helgen"), km: 0.8,
+    job: (town) => ({ boss: true, fac: "griechen", town, join: ["helgen", "theoderich"],
+      name: "Die Raufboldbrüder", text: `In der Taverne von ${town} prügeln sich zwei Nordmänner mit jedem, der hinschaut: Helgen und Theoderich, Söldner ohne Herrn. Wer sie beide im Faustkampf schlägt, dem folgen sie.`,
+      foes: [{ k: "raufbold", name: "Helgen", pal: window.Spiel.COMP.helgen.pal }, { k: "raufbold", name: "Theoderich", pal: window.Spiel.COMP.theoderich.pal }], exp: 140, gold: 30 }),
+    say: "🍺 Aus einer Taverne dringt Lärm. Zwei Brüder suchen Streit." },
+  { id: "truhe", when: (s) => s.party.length > 0 && !s.chest, km: 1.2,
+    job: (town) => ({ fac: "griechen", town, grant: "truhe",
+      name: "Die Truhe aus dem Wrack", text: "Eine eisenbeschlagene Truhe aus deinem Wrack wurde an Land gespült. Strandräuber schleppen sie gerade fort. Hol sie dir zurück, dann steht im Lager eine Beutetruhe.",
+      foes: ["bandit", "korsar"], exp: 80, gold: 20 }),
+    say: "🧰 Ein Fischer erzählt von einer Truhe aus deinem Wrack." },
+  { id: "mitra", when: (s) => s.party.includes("porthos") && s.level >= 3, km: 1,
+    job: () => ({ boss: true, fac: "telchinen", town: "den Telchinen",
+      name: "Das Zeichen der Schlange", text: "Das Amulett des Sklavenhändlers führt zu einem Brunnen, an dem nachts Frauen in grünen Schleiern singen. Die Telchinen warnen dich: Dort wartet die Hohepriesterin der Mitra.",
+      foes: ["adeptin", { k: "hohepriesterin", boss: true }, "schlange"], exp: 320, gold: 150 }),
+    say: "🐍 Das Amulett wird warm in deiner Hand. Das Zeichen der Schlange ruft dich." },
+];
 function storyStep() {
   const s = window.Spiel.get();
-  if (!s.party.includes("porthos") || s.level < 3 || (s.quests.mitra && s.quests.mitra.done) || s.jobs.some((j) => j.story === "mitra")) return;
-  const spot = landNear(here(), 1); if (!spot) return;
-  s.jobs.unshift({ id: "story:mitra", story: "mitra", boss: true, fac: "telchinen", town: "den Telchinen", km: 1, mult: 1, ...spot,
-    name: "Das Zeichen der Schlange", text: "Das Amulett des Sklavenhändlers führt zu einem Brunnen, an dem nachts Frauen in grünen Schleiern singen. Die Telchinen warnen dich: Dort wartet die Hohepriesterin der Mitra.",
-    foes: ["adeptin", { k: "hohepriesterin", boss: true }, "schlange"], exp: 320, gold: 150 });
-  window.Spiel.save(s); syncJobs(); toast("🐍 Das Amulett wird warm in deiner Hand. Das Zeichen der Schlange ruft dich.", 8000);
+  for (const st of STORIES) {
+    if ((s.quests[st.id] && s.quests[st.id].done) || s.jobs.some((j) => j.story === st.id) || !st.when(s)) continue;
+    const spot = landNear(here(), st.km); if (!spot) continue;
+    const town = window.Staedte.nearest(here())[0].name;
+    s.jobs.unshift({ id: "story:" + st.id, story: st.id, km: st.km, mult: 1, ...spot, ...st.job(town) });
+    window.Spiel.save(s); syncJobs(); companions(); toast(st.say, 8000);
+    return;
+  }
+}
+/* The brothers walk with you, like Porthos, unless they are away on an excursion. */
+let AWAY = new Set();
+const followers = [];
+const LOOKS = {
+  helgen: { sex: "m", skin: 1, hairC: 7, build: 0.8, muscle: 0.95, height: 193, hair: "wild", beard: "voll" },
+  theoderich: { sex: "m", skin: 0, hairC: 4, build: 0.6, muscle: 0.85, height: 187, hair: "lang", beard: "wild" },
+};
+function companions() {
+  const s = window.Spiel.get();
+  AWAY = new Set(s.excursions.filter((e) => e.end > Date.now()).flatMap((e) => e.who));
+  for (const id of ["helgen", "theoderich"]) {
+    if (!s.party.includes(id) || followers.some((f) => f.id === id)) continue;
+    const av = window.CrusaderAvatar.build(THREE, LOOKS[id]), g = new THREE.Group(); g.add(av.root); g.scale.setScalar(AVS); scene.add(g);
+    g.position.set(pl.x + 0.02, heightAt(pl.x, pl.z), pl.z + 0.02);
+    followers.push({ id, g, av, side: id === "helgen" ? -1.9 : 1.9 });
+  }
+  if (dog) dog.g.visible = !AWAY.has("porthos");
+  for (const f of followers) f.g.visible = !AWAY.has(f.id);
+}
+function followStep(dt) {
+  for (const f of followers) {
+    if (!f.g.visible) continue;
+    const p = f.g.position, bx = pl.x - Math.sin(pl.face + f.side * 0.5) * 0.03, bz = pl.z - Math.cos(pl.face + f.side * 0.5) * 0.03;
+    const dx = bx - p.x, dz = bz - p.z, d = Math.hypot(dx, dz), moving = d > 0.004;
+    if (moving) { const st = Math.min(d, Math.max(0.02, d * 2.5) * dt); p.x += (dx / d) * st; p.z += (dz / d) * st; f.g.rotation.y = Math.atan2(dx, dz); }
+    if (d > 0.5) { p.x = bx; p.z = bz; }
+    p.y = Math.max(0, heightAt(p.x, p.z)); f.av.update(dt, moving ? 1 : 0);
+  }
 }
 function jobsStep(now) {
   for (const [id, m] of jobMarks) {
@@ -759,7 +834,9 @@ function jobsStep(now) {
       window.Staedte.arrive(m.job, (ok, r) => {
         if (ok) toast(`✔ ${m.job.name}: +${r.exp} EXP · +${r.gold} Gold`, 6000);
         else toast(r === "flucht" ? "Geflohen. Der Auftrag wartet noch auf dich." : "Niedergeschlagen. Geh ein Stück weg, sammle dich, und komm wieder.", 6000);
-        syncJobs(); hud();
+        syncJobs(); hud(); companions();
+        if (ok && m.job.join) toast("⚔ Helgen spuckt Blut, Theoderich lacht: „Endlich einer, der zuschlagen kann.“ Die Raufboldbrüder ziehen mit dir.", 8000);
+        if (ok && m.job.grant === "truhe") toast("🧰 Die Truhe ist dein. Sie steht jetzt im Lager: schick deine Gefährten auf Exkursion, ihre Beute landet darin.", 8000);
       });
       return;
     }
@@ -806,12 +883,12 @@ function loop(now) {
   if (avatar) { avatar.g.position.set(pl.x, y, pl.z); avatar.g.rotation.y = pl.face; avatar.update(dt, pl.walk); }
   ring.position.set(pl.x, y + 0.002, pl.z); ring.scale.setScalar(1 + Math.sin(now / 300) * 0.08);
   if (document.querySelector("#kampf")) { requestAnimationFrame(loop); return; }      // the world holds still while you fight
-  auraStep(now, y); dogStep(dt); porthosStep(now); jobsStep(now);
+  auraStep(now, y); dogStep(dt); followStep(dt); porthosStep(now); jobsStep(now);
   if (now - (loop.s || 0) > 5000) { loop.s = now; const s = window.Spiel.get(); s.pos = [pl.x, pl.z]; window.Spiel.save(s); }
   if (aura.on && now - (loop.a || 0) > 1000 && !busy()) { loop.a = now; window.Postcards.check(here()); }
   for (const sh of ships) shipStep(sh, dt);
-  panStep(dt); placeCamera(); window.Himmel.step(dt, now); renderer.render(scene, camera); drawLabels();
-  if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); if (!busy()) storyStep(); }
+  panStep(dt); placeCamera(); window.Himmel.step(dt, now); window.Himmel.render(); drawLabels();
+  if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); companions(); if (!busy()) storyStep(); }
   requestAnimationFrame(loop);
 }
 window.CrusadersGeo.load().then((geo) => {

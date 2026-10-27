@@ -11,7 +11,7 @@
      "crusaders-helden". Without a character you play Generica, a nameless pilgrim with its own save.
      The first character ever made (from before there was a roster) keeps the old save, "crusaders-spiel". */
   const ME_KEY = "crusaders-ich", HEROES_KEY = "crusaders-helden";
-  const S0 = { gold: 50, exp: 0, level: 1, figs: 3, wein: 1, party: [], quests: {}, camp: 0, aura: true, inv: {}, rep: {}, jobs: [], log: {} };
+  const S0 = { gold: 50, exp: 0, level: 1, figs: 3, wein: 1, party: [], quests: {}, camp: 0, aura: true, inv: {}, rep: {}, jobs: [], log: {}, excursions: [], chest: null };
   const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const me = () => read(ME_KEY, null);
@@ -25,7 +25,7 @@
   }
   function choose(h) { write(ME_KEY, h && !h.generic ? h : null); }
   function saveHero(h) { const list = heroes().filter((x) => x.id !== h.id); list.push(h); write(HEROES_KEY, list); if ((me() || {}).id === h.id) write(ME_KEY, h); }
-  function get(h) { const s = read(keyOf(h === undefined ? me() : h), {}); return { ...S0, ...s, quests: { ...(s.quests || {}) }, inv: { ...(s.inv || {}) }, rep: { ...(s.rep || {}) }, jobs: [...(s.jobs || [])], log: { ...(s.log || {}) } }; }
+  function get(h) { const s = read(keyOf(h === undefined ? me() : h), {}); return { ...S0, ...s, quests: { ...(s.quests || {}) }, inv: { ...(s.inv || {}) }, rep: { ...(s.rep || {}) }, jobs: [...(s.jobs || [])], log: { ...(s.log || {}) }, excursions: [...(s.excursions || [])] }; }
   function save(s, h) { write(keyOf(h === undefined ? me() : h), s); }
   function wipe(h) { write(keyOf(h === undefined ? me() : h), null); }
   const expFor = (lvl) => 100 * lvl;
@@ -75,7 +75,13 @@
     "..........kkkk......", ".........kgggyk.....", "........kgggggkr....", "........kggkkk.r....", "...kkk...kggk.......", "..kgggk...kggk......",
     ".kggkggk...kggk.....", ".kgk.kggkkkggk......", "kggk..kggggggk......", "kggk...kkkkkk.......", ".kggkkkkkkkkkkkkk...", "..kgggggggggggggggk.",
     "...kkkkkkkkkkkkkkk.."];
-  const PAL = { G: "#6a7060", k: "#1a120c", b: "#8a5a32", c: "#b8322a", W: "#f2ede2", r: "#b8322a", m: "#8e939a", P: "#c9b48a", B: "#5a3a22",
+  // a brawler: broad shoulders, bare arms, a big beard (Helgen and Theoderich)
+  SPR.raufbold = [
+    "......kkkk......", ".....khhhhk.....", "....khhhhhhk....", "....khsssshk....", "....kskssksk....", "....keesseek....",
+    "....keeeeeek....", ".....keeeek.....", "...kkkttttkkk...", "..kssttttttssk..", ".kssktttttkkssk.", ".kss.kttttk.ssk.",
+    ".kss.kbbbbk.ssk.", ".kkk.kttttk.kkk.", ".....kttttk.....", ".....kppkppk....", ".....kppkppk....", ".....kppkppk....",
+    ".....kpk.kpk....", ".....ksk.ksk....", ".....ksk.ksk....", "....kffk.kffk...", "....kkkk.kkkk...", "................"];
+  const PAL = { e: "#8e3a22", G: "#6a7060", k: "#1a120c", b: "#8a5a32", c: "#b8322a", W: "#f2ede2", r: "#b8322a", m: "#8e939a", P: "#c9b48a", B: "#5a3a22",
     v: "#4b2a6b", y: "#e8d84a", g: "#c9b84a", H: "#d8c9a8", u: "#6a4a6e", L: "#7a5a3a", t: "#b9a582", T: "#a08a62", p: "#7d6a50" };
   function sprite(ctx, name, x, y, pal, flip = false, alpha = 1) {
     const rows = SPR[name], P = { ...PAL, ...pal };
@@ -175,9 +181,17 @@
     ctx.fillStyle = "#6a4a2a"; for (const [x, y] of [[W * 0.15, H * 0.62], [W * 0.5, H * 0.85], [W * 0.85, H * 0.55]]) for (let i = 0; i < 6; i++) ctx.fillRect((x + i * 2 - 6) | 0, (y - (i % 3) * 3) | 0, 1, 5 + (i % 3) * 2);
   }
 
+  // the companions you can win: who they are and how they look in a fight
+  const COMP = {
+    porthos: { name: "Porthos", icon: "🐕", spr: "hund", power: 3, desc: "Dein Kriegshund. Schnell, treu, beißt." },
+    helgen: { name: "Helgen", icon: "🪓", spr: "raufbold", pal: { h: "#a8432a", e: "#8e3a22", t: "#5a6a8a" }, power: 4, desc: "Der ältere der Raufboldbrüder. Rote Mähne, harte Fäuste, schläft nie vor dem letzten Krug." },
+    theoderich: { name: "Theoderich", icon: "🔨", spr: "raufbold", pal: { h: "#d9b56e", e: "#c9a050", t: "#7a4a3a" }, power: 4, desc: "Der jüngere. Blond, schneller als sein Bruder, und überzeugt, dass er der Klügere ist." },
+  };
   const STATS = {
     held: (L) => ({ hp: 60 + 15 * L, mp: 20 + 4 * L, atk: 10 + 3 * L, def: 4 + L, spd: 1 }),
     porthos: (L) => ({ hp: 50 + 10 * L, mp: 0, atk: 9 + 2 * L, def: 3 + L, spd: 1.35 }),
+    helgen: (L) => ({ hp: 70 + 12 * L, mp: 0, atk: 11 + 2 * L, def: 4 + L, spd: 0.9 }),
+    theoderich: (L) => ({ hp: 62 + 12 * L, mp: 0, atk: 10 + 3 * L, def: 3 + L, spd: 1.05 }),
   };
   const FOES = {
     bandit: (t) => ({ name: "Wegelagerer", spr: "bandit", hp: 28 + 16 * t, atk: 6 + 3 * t, def: 2 + t, spd: 0.9 + Math.random() * 0.2 }),
@@ -191,6 +205,7 @@
     adeptin: (t) => ({ name: "Schwester der Mitra", spr: "schatten", pal: { v: "#2a5a3a", y: "#e2b04a", g: "#c9b84a" }, hp: 30 + 15 * t, atk: 9 + 3 * t, def: 2 + t, spd: 1.2 }),
     schlange: (t) => ({ name: "Tempelschlange", spr: "schlange", pal: { g: "#4a7a3a", y: "#e8d84a", r: "#c8321e" }, hp: 55 + 22 * t, atk: 10 + 4 * t, def: 3 + t, spd: 0.85 }),
     hohepriesterin: (t) => ({ name: "Hohepriesterin der Mitra", spr: "schatten", pal: { v: "#183a28", y: "#ff5a3a", g: "#e2b04a" }, hp: 110 + 35 * t, atk: 10 + 4 * t, def: 5 + t, spd: 1.05, boss: true }),
+    raufbold: (t) => ({ name: "Raufbold", spr: "raufbold", hp: 55 + 16 * t, atk: 8 + 3 * t, def: 3 + t, spd: 0.95 }),
     wolf: (t) => ({ name: "Wildhund", spr: "hund", pal: { b: "#6a6a6a", c: "#3a3a3a" }, hp: 22 + 12 * t, atk: 6 + 3 * t, def: 1 + t, spd: 1.3 }),
     haendler: (t) => ({ name: "Sklavenhändler Kerim", spr: "bandit", pal: { W: "#7a1a14", r: "#e2b04a", m: "#5a3a2a" }, hp: 70 + 30 * t, atk: 7 + 4 * t, def: 4 + t, spd: 1.0, boss: true }),
   };
@@ -202,7 +217,9 @@
     const look = (who && who.look) || {};
     const SK = (window.CrusaderAvatar && window.CrusaderAvatar.SKIN) || ["#e0a982"], HC = (window.CrusaderAvatar && window.CrusaderAvatar.HAIRC) || ["#3b2416"];
     const heroes = [{ id: "held", name: who ? who.name : "Generica", spr: "held", pal: { s: SK[look.skin ?? 2], f: SK[look.skin ?? 2], h: HC[look.hairC ?? 1] }, ...STATS.held(L) }];
-    if (st.party.includes("porthos")) heroes.push({ id: "porthos", name: "Porthos", spr: "hund", ai: true, ...STATS.porthos(L) });
+    // companions fight with you, unless they are away on an excursion
+    const away = new Set((st.excursions || []).filter((e) => e.end > Date.now()).flatMap((e) => e.who));
+    for (const c of st.party) if (COMP[c] && !away.has(c)) heroes.push({ id: c, name: COMP[c].name, spr: COMP[c].spr, pal: COMP[c].pal, ai: true, ...STATS[c](L) });
     heroes.forEach((h) => { h.max = h.hp; h.maxmp = h.mp; h.atb = Math.random() * 0.5; h.side = 0; });
     // a foe is a kind ("bandit") or a kind with its own name and colours ({ k: "korsar", name: "Korsar Dragut", boss: true })
     const foes = opt.foes.map((o, i) => { const k = typeof o === "string" ? o : o.k, f = FOES[k](opt.tier || 1), x = typeof o === "string" ? {} : o;
@@ -308,7 +325,7 @@
     function ai(f) {
       const targets = alive(f.side ? heroes : foes); if (!targets.length) return;
       const t = targets[Math.floor(Math.random() * targets.length)];
-      if (f.side) msg(`${f.name} greift an!`); else msg(`${f.name} beißt zu!`);
+      if (f.side) msg(`${f.name} greift an!`); else msg(f.spr === "hund" ? `${f.name} beißt zu!` : `${f.name} schlägt zu!`);
       f.lunge = 0.3; hit(f, t); defend[t.id] = defend[t.id] && t.side === 0 ? defend[t.id] : false; f.atb = 0; panels(); check();
     }
     let raf = 0;
@@ -346,6 +363,6 @@
     return { close };
   }
 
-  window.Spiel = { get, save, wipe, reward, rank, expFor, me, heroes, choose, saveHero, keyOf, GENERICA, SPR, PAL, sprite, read, write };
+  window.Spiel = { COMP, get, save, wipe, reward, rank, expFor, me, heroes, choose, saveHero, keyOf, GENERICA, SPR, PAL, sprite, read, write };
   window.Kampf = { start, backdrop, BACKDROPS };
 })();

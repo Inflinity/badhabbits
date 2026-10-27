@@ -274,7 +274,7 @@ function codex(el) {
   const s = S.get(), PCs = window.Postcards, found = PCs.found(), spots = PCs.spots;
   const diary = S.read("atemlotse-tagebuch", []), fast = S.read("crusaders-fasten", { hist: [] }), tr = S.read("crusaders-training", { hist: [] });
   const node = (got, text, extra = "", part = false) => `<li><span class="node ${got ? "got" : part ? "part" : ""}"><i>${got ? "✓" : ""}</i>${text}${extra ? " <em>" + extra + "</em>" : ""}</span></li>`;
-  const ONE = { "Übungen": "Übung", "Einheiten": "Einheit", "Stunden": "Stunde", "Aufträge": "Auftrag" };
+  const ONE = { "Übungen": "Übung", "Einheiten": "Einheit", "Stunden": "Stunde", "Aufträge": "Auftrag", "Exkursionen": "Exkursion" };
   const ms = (n, steps, word) => steps.map((k) => node(n >= k, `${k} ${k === 1 && ONE[word] ? ONE[word] : word}`, n < k ? `${n}/${k}` : "")).join("");
   // Kultur: kinds, then works, then the places each work is found in
   const kinds = {}; for (const sp of spots) { const k = sp.kind, it = sp.kind === "postkarte" ? sp.name : sp.item || sp.title || sp.name; ((kinds[k] = kinds[k] || {})[it] = kinds[k][it] || []).push(sp); }
@@ -302,7 +302,7 @@ function codex(el) {
     <div class="br"><div class="head"><div class="orb">🥣</div><div><b>Fasten</b><small>${fast.hist.length}× · ${Math.round(fastH)} Stunden</small></div><button type="button" class="btn ghost" id="cFast">Mensa</button></div>
       <ul class="tree">${FAST.map((x) => node(fastMax >= x.h, `${x.name} (${x.h} h)`)).join("")}${ms(fast.hist.filter((x) => x.h >= 12).length, [5, 20], "Fasten")}</ul></div>
     <div class="br"><div class="head"><div class="orb">🛡</div><div><b>Taten</b><small>${S.me() ? S.me().name : "Generica"} · Stufe ${s.level}</small></div></div>
-      <ul class="tree">${node(s.party.includes("porthos"), "Porthos befreit")}${ms(s.level, [3, 5, 10], "Stufen").replace(/(\d+) Stufen/g, "Stufe $1")}${ms(s.log.jobsDone || 0, [1, 10, 25], "Aufträge")}
+      <ul class="tree">${node(s.party.includes("porthos"), "Porthos befreit")}${node(s.party.includes("helgen"), "Die Raufboldbrüder gewonnen")}${node(!!s.chest, "Die Beutetruhe geborgen")}${ms((s.log || {}).exDone || 0, [1, 10], "Exkursionen")}${ms(s.level, [3, 5, 10], "Stufen").replace(/(\d+) Stufen/g, "Stufe $1")}${ms(s.log.jobsDone || 0, [1, 10, 25], "Aufträge")}
       ${node(s.camp >= 6, "Ein Kreuzfahrerhafen", s.camp < 6 ? `${s.camp}/6` : "")}${node(!!(s.quests.mitra && s.quests.mitra.done), "Die Hohepriesterin der Mitra bezwungen")}${fac ? Object.entries(fac).filter(([, f]) => !f.noJobs).map(([k, f]) => node((s.rep[k] || 0) >= 50, `Freund: ${f.name}`, (s.rep[k] || 0) < 50 ? `Ruf ${s.rep[k] || 0}/50` : "")).join("") : ""}</ul></div>`;
   $("#cSam").onclick = () => { $("#sh").hidden = true; current = null; window.Postcards.open(); };
   $("#cFast").onclick = () => { current = "mensa"; render(); };
