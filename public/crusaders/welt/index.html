@@ -57,6 +57,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   position: fixed; left: 50%; top: 70px; transform: translateX(-50%); max-width: 92%; background: rgba(241,228,196,0.96); border: 2px solid #d9b56e; border-radius: 10px;
   padding: 8px 14px; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
 }
+#wx { position: fixed; left: 14px; top: calc(max(10px, env(safe-area-inset-top)) + 74px); font: 600 12px "Figtree", sans-serif; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; pointer-events: none; }
 #src { position: fixed; left: 14px; top: calc(max(10px, env(safe-area-inset-top)) + 58px); font: 10px "Figtree", sans-serif; color: rgba(255,255,255,0.85); text-shadow: 0 0 3px #000; pointer-events: none; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1c140c url("../strand.jpg") center / cover; color: #fff; font: italic 22px "IM Fell English", serif; text-shadow: 0 2px 8px #000; z-index: 50; }
 </style>
@@ -89,6 +90,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 <div class="date"></div>
 <div id="toast" hidden></div>
 <div id="src"></div>
+<div id="wx"></div>
 <div id="loading">Die Insel erhebt sich aus dem Meer …</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -237,13 +239,11 @@ function buildLand(features, roads) {
     "vec4 mk = texture2D(uMask, vMaskUv);\nif (mk.r < 0.5) discard;\nfloat road = smoothstep(0.2, 0.45, mk.g) * (1.0 - smoothstep(0.62, 0.8, mk.g));\nfloat beach = smoothstep(0.7, 0.9, mk.g);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.80, 0.68), road);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.85, 0.65), beach);"));
   scene.add(land);
   /* the sea floor: shallow and plain. The turquoise of the shallows is painted on the water's surface
-     (see water below), not down here: seen at a slant through the water, a coloured floor deep below
+     (the sea's shader in himmel.js), not down here: seen at a slant through the water, a coloured floor deep below
      slid away from the coast and the island seemed to float above its own shadow. */
   const seaGeo = grid((k) => -Math.min(0.25, 0.01 + (LAND[k] ? 0 : DIST[k]) * 0.05), (c) => c.set("#1f5f96"));
   const sea = new THREE.Mesh(seaGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
   scene.add(sea);
-  water.material = withMask(new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, shininess: 90, specular: 0x9fdcff }),
-    "vec4 mk = texture2D(uMask, vMaskUv);\nfloat sh = clamp(mk.b * 1.4, 0.0, 1.0);\ndiffuseColor.rgb = mix(vec3(0.13, 0.48, 0.78), vec3(0.47, 0.89, 0.85), sh);\ndiffuseColor.a = mix(0.9, 0.72, sh);");
   return land;
 }
 
@@ -255,11 +255,11 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color("#8fd0f5");
 scene.fog = new THREE.Fog("#a9dcf5", 30, 120);
 const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 400);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x6a8a6a, 0.75));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x6a8a6a, 0.75); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2dc, 0.8); sun.position.set(-30, 60, 20); scene.add(sun);
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
-// the sea: a glassy sheet over the coloured sea floor, so the shallows shine turquoise
+// the sea: a sheet over the sea floor; its look (waves, sky, shallows, foam) comes from himmel.js
 const water = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshPhongMaterial({ color: 0x2a8fd0, transparent: true, opacity: 0.55, shininess: 90, specular: 0x9fdcff }));
 water.rotation.x = -Math.PI / 2; water.position.set(35, 0, 40); scene.add(water);
 
@@ -285,7 +285,7 @@ function trees() {
 }
 // towns: white cubes with flat roofs, a few with red tiles, around each place
 // towns and villages come from the coast data (OpenStreetMap places); their size from their kind
-let TOWNS = [];
+let TOWNS = [], HOUSES = [];
 const SIZE = { city: [1.3, 260], town: [0.55, 70], village: [0.3, 24] };
 function towns() {
   const walls = [], roofs = [], red = [];
@@ -301,6 +301,7 @@ function towns() {
   const wg = new THREE.BoxGeometry(0.022, 0.018, 0.018); wg.translate(0, 0.009, 0);
   const rg = new THREE.BoxGeometry(0.024, 0.004, 0.02); rg.translate(0, 0.019, 0);
   const rr = new THREE.ConeGeometry(0.018, 0.012, 4); rr.rotateY(Math.PI / 4); rr.translate(0, 0.024, 0);
+  HOUSES = walls;
   instanced(wg, "#f6f1e4", walls); instanced(rg, "#e8dcc4", roofs); instanced(rr, "#b8502e", red);
 }
 /* Landmarks from the coast data: each a short list of parts in metres, built here the same way for
@@ -667,7 +668,7 @@ function porthosFight() {
     onWin: () => {
       const s = window.Spiel.get(); s.quests.porthos = { ...s.quests.porthos, done: today() }; if (!s.party.includes("porthos")) s.party.push("porthos"); window.Spiel.save(s);
       scene.remove(porthos.g); porthos.lb.e.remove(); labels.splice(labels.indexOf(porthos.lb), 1); porthos = null;
-      makeDog(); hud(); toast("🐕 Porthos bellt vor Freude und weicht dir nicht mehr von der Seite. Im Lager wartet Arbeit.", 7000);
+      makeDog(); hud(); toast("🐕 Porthos ist frei. Bei Kerim findest du ein Amulett: eine grüne Schlange, die sich in den Schwanz beißt. Wer hat ihn bezahlt?", 9000);
     },
     onLose: () => { porthos.fighting = false; porthos.away = true; hud(); toast("Kerim lacht dich aus. Geh ein Stück weg, sammle dich, und komm wieder.", 6000); },
   });
@@ -737,6 +738,17 @@ function syncJobs() {
     jobMarks.set(j.id, { g, beam, lb: labels[labels.length - 1], x, z, job: j });
   }
 }
+/* The first enemy behind the enemies: the Sisters of Mitra. Once Porthos is free and you have
+   grown a little (level 3), the sign of the serpent calls you, about a kilometre away. */
+function storyStep() {
+  const s = window.Spiel.get();
+  if (!s.party.includes("porthos") || s.level < 3 || (s.quests.mitra && s.quests.mitra.done) || s.jobs.some((j) => j.story === "mitra")) return;
+  const spot = landNear(here(), 1); if (!spot) return;
+  s.jobs.unshift({ id: "story:mitra", story: "mitra", boss: true, fac: "telchinen", town: "den Telchinen", km: 1, mult: 1, ...spot,
+    name: "Das Zeichen der Schlange", text: "Das Amulett des Sklavenhändlers führt zu einem Brunnen, an dem nachts Frauen in grünen Schleiern singen. Die Telchinen warnen dich: Dort wartet die Hohepriesterin der Mitra.",
+    foes: ["adeptin", { k: "hohepriesterin", boss: true }, "schlange"], exp: 320, gold: 150 });
+  window.Spiel.save(s); syncJobs(); toast("🐍 Das Amulett wird warm in deiner Hand. Das Zeichen der Schlange ruft dich.", 8000);
+}
 function jobsStep(now) {
   for (const [id, m] of jobMarks) {
     m.beam.material.opacity = 0.3 + Math.sin(now / 400 + m.x) * 0.1;
@@ -798,8 +810,8 @@ function loop(now) {
   if (now - (loop.s || 0) > 5000) { loop.s = now; const s = window.Spiel.get(); s.pos = [pl.x, pl.z]; window.Spiel.save(s); }
   if (aura.on && now - (loop.a || 0) > 1000 && !busy()) { loop.a = now; window.Postcards.check(here()); }
   for (const sh of ships) shipStep(sh, dt);
-  panStep(dt); placeCamera(); renderer.render(scene, camera); drawLabels();
-  if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); }
+  panStep(dt); placeCamera(); window.Himmel.step(dt, now); renderer.render(scene, camera); drawLabels();
+  if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); if (!busy()) storyStep(); }
   requestAnimationFrame(loop);
 }
 window.CrusadersGeo.load().then((geo) => {
@@ -809,7 +821,7 @@ window.CrusadersGeo.load().then((geo) => {
   TOWNS = geo.regions.flatMap((r) => (r.data.places || []).map((p) => [p.name, p.lat, p.lon, ...(SIZE[p.kind] || SIZE.village)]));
   terrain = buildLand(feats, geo.roads);
   $("#src").textContent = "Küste © OpenStreetMap-Mitwirkende (ODbL) · Natural Earth";
-  landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes);
+  landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes); window.Himmel.init();
   for (const [name, lat, lon] of TOWNS) { const [x, z] = P(lon, lat); label(name, "", x, z); }
   for (const r of geo.regions) for (const st of r.data.sights || []) { const [x, z] = P(st.lon, st.lat); label(st.name, st.sub, x, z, "sight"); }
   for (const s of window.Postcards.spots) if (s.kind === "postkarte") { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
@@ -828,5 +840,6 @@ window.CrusadersGeo.load().then((geo) => {
   requestAnimationFrame(loop);
 });
 </script>
+<script src="himmel.js"></script>
 </body>
 </html>
