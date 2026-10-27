@@ -192,6 +192,8 @@
     const rival = FACTIONS[job.fac].rival; if (rival) s.rep[rival] = clamp((s.rep[rival] || 0) - 3, -100, 100);
     if (job.hurt) s.rep[job.hurt] = clamp((s.rep[job.hurt] || 0) - 6, -100, 100);
     if (job.story) s.quests[job.story] = { ...(s.quests[job.story] || {}), done: today() };
+    for (const c of job.join || []) if (!s.party.includes(c)) s.party.push(c);       // they follow you now
+    if (job.grant === "truhe") s.chest = { since: today() };                         // the loot chest stands in the camp
     s.log.jobsDone = (s.log.jobsDone || 0) + 1; s.log["fac:" + job.fac] = (s.log["fac:" + job.fac] || 0) + 1;
     delete s.up; window.Spiel.save(s); ctx.changed();
     return { exp, gold, up: s.level };
@@ -207,6 +209,30 @@
       onLose: (why) => done(false, why),
     });
   }
+
+  /* ---------------- Excursions: send your companions on a job ----------------
+     They set off on their own and come back after an hour or two (with the dev aura, a minute or two).
+     Whether it goes well is decided when they leave; what they bring waits in the loot chest in the camp. */
+  const awayNow = (s) => new Set(s.excursions.filter((e) => e.end > Date.now()).flatMap((e) => e.who));
+  const homeNow = (s) => s.party.filter((c) => window.Spiel.COMP[c] && !awayNow(s).has(c));
+  function chance(s, offer, who) {
+    const power = who.reduce((a, c) => a + window.Spiel.COMP[c].power, 0) + s.level * 0.5, diff = (offer.foes ? offer.foes.length : 0) * 3 + 1;
+    return clamp(0.45 + (power - diff) * 0.07, 0.15, 0.95);
+  }
+  const minutes = (s, offer) => (offer.foes ? 120 : 60) * (s.aura ? 1 / 60 : 1);
+  function send(offer, who) {
+    const s = window.Spiel.get();
+    if (!s.chest) return "Ohne Beutetruhe im Lager bringt keiner Beute heim.";
+    if (!who.length) return "Wähle mindestens einen Gefährten.";
+    const p = chance(s, offer, who), ok = Math.random() < p, k = ok ? 1 : 0.35, pf = profile(offer.town);
+    const goods = ok ? [pf.make[Math.floor(Math.random() * pf.make.length)]].filter((g) => GOODS[g] && !GOODS[g].use) : [];
+    const start = Date.now(), end = start + minutes(s, offer) * 60000;
+    s.excursions.push({ id: offer.id, name: offer.name, fac: offer.fac, facName: FACTIONS[offer.fac].name, town: offer.town, who, start, end, ok,
+      exp: Math.round(offer.exp * k), gold: Math.round(offer.gold * k), goods });
+    s.log["job:" + offer.id] = 1; window.Spiel.save(s); ctx.changed(); return null;
+  }
+  const pick = {};
+  const clockOf = (t) => new Date(t).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 
   /* ---------------- Market ---------------- */
   function prices(town) {
@@ -264,6 +290,11 @@
   #stadt .goods button { width: 34px; height: 30px; border-radius: 7px; border: 1px solid #b9925a; background: #fff8e6; font: 700 15px "Figtree", sans-serif; }
   #stadt .act { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font: 14px "Figtree", sans-serif; }
   #stadt .act button { border: 1px solid #8e2a1c; color: #8e2a1c; background: none; border-radius: 8px; padding: 5px 10px; font: 600 13px "Figtree", sans-serif; }
+  #stadt .ex { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #c9a873; font: 13px "Figtree", sans-serif; color: #5a4024; }
+  #stadt .exc { border: 1px solid #b9925a; background: #fff8e6; border-radius: 14px; padding: 4px 9px; font: 600 13px "Figtree", sans-serif; }
+  #stadt .exc.on { background: #8e2a1c; color: #fff; border-color: #8e2a1c; }
+  #stadt .exgo { margin-left: auto; border: 0; background: linear-gradient(#c9963c, #8a5a1c); color: #fff6dc; border-radius: 8px; padding: 6px 10px; font: 700 13px "Figtree", sans-serif; }
+  #stadt .exgo:disabled { opacity: 0.5; }
   #stadt .purse { font: 700 14px "Figtree", sans-serif; color: #6a3a14; }`;
   let tab = "auftraege", town = null, el = null;
   function build() {
@@ -295,7 +326,20 @@
     });
     el.querySelectorAll("[data-drop]").forEach((b) => b.onclick = () => { if (confirm("Diesen Auftrag aufgeben?")) { drop(b.dataset.drop); render(); } });
     el.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => { close(); ctx.focus(s.jobs.find((j) => j.id === b.dataset.go)); });
+    el.querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => { const l = pick[b.dataset.pick] || [], c = b.dataset.c; pick[b.dataset.pick] = l.includes(c) ? l.filter((x) => x !== c) : [...l, c]; render(); });
+    el.querySelectorAll("[data-send]").forEach((b) => b.onclick = () => {
+      const o = offers(town).find((x) => x.id === b.dataset.send), err = send(o, pick[o.id] || []);
+      if (err) ctx.toast(err); else { ctx.toast(`Deine Streiter ziehen los: ${o.name}.`); tab = "unterwegs"; render(); }
+    });
     el.querySelectorAll("[data-buy],[data-sell]").forEach((b) => b.onclick = () => { const err = trade(town, b.dataset.buy || b.dataset.sell, b.dataset.buy ? 1 : -1); if (err) ctx.toast(err); render(); });
+  }
+  function exRow(o, s) {
+    const home = homeNow(s); if (!s.party.some((c) => window.Spiel.COMP[c])) return "";
+    if (!s.chest) return `<div class="rw" style="color:#6a5030;font-weight:400;font-style:italic">Mit einer Beutetruhe im Lager könntest du deine Gefährten allein losschicken.</div>`;
+    if (!home.length) return `<div class="rw" style="color:#6a5030;font-weight:400">Deine Gefährten sind alle unterwegs.</div>`;
+    const sel = (pick[o.id] = (pick[o.id] || home.slice(0, 1)).filter((c) => home.includes(c)));
+    return `<div class="ex"><span>Oder schick deine Streiter:</span> ${home.map((c) => `<button type="button" class="exc ${sel.includes(c) ? "on" : ""}" data-pick="${o.id}" data-c="${c}">${window.Spiel.COMP[c].icon} ${window.Spiel.COMP[c].name}</button>`).join("")}
+      <button type="button" class="exgo" data-send="${o.id}" ${sel.length ? "" : "disabled"}>⚑ Losschicken · ${Math.round(chance(s, o, sel) * 100)} % · ${minutes(s, o) >= 60 ? minutes(s, o) / 60 + " h" : Math.round(minutes(s, o) * 60) + " s"}</button></div>`;
   }
   function body(d, pf, s) {
     if (tab === "auftraege") {
@@ -303,13 +347,16 @@
       return `<p class="note">Das Auftragsbrett von ${town}. Das Ziel erscheint in deiner Nähe, so weit weg, wie du wählst. Je weiter du gehst, desto mehr zahlt es.${d < 2 ? " Vor Ort angenommen: ×1,25." : ""}</p>` +
         (list.length ? list.map((o) => `<div class="card">${facTag(o.fac)}<div><b>${o.name}</b></div><div>${o.text}</div>
           <div class="rw">${o.foes ? "⚔ Kampf" : "🧭 Weg"} · ab ${o.exp} EXP · ${o.gold} Gold${s.rep[o.fac] > 0 ? ` · Ruf +${Math.round(clamp(s.rep[o.fac], 0, 100) / 2)} %` : ""}</div>
-          <div class="dist">${DIST.map((c, i) => `<button type="button" data-take="${o.id}" data-d="${i}">${fmtKm(c.km)}<span>×${String(c.m).replace(".", ",")}</span></button>`).join("")}</div></div>`).join("")
+          <div class="dist">${DIST.map((c, i) => `<button type="button" data-take="${o.id}" data-d="${i}">${fmtKm(c.km)}<span>×${String(c.m).replace(".", ",")}</span></button>`).join("")}</div>${exRow(o, s)}</div>`).join("")
           : `<p class="note">Für heute ist das Brett leer. Morgen gibt es neue Aufträge, oder schau in einem anderen Ort.</p>`);
     }
     if (tab === "unterwegs") {
-      if (!s.jobs.length) return `<p class="note">Du hast keine Aufträge angenommen.</p>`;
+      const exs = s.excursions.filter((e) => !e.claimed).map((e) => `<div class="card"><span class="fac" style="background:${FACTIONS[e.fac].color}">⚑ Exkursion</span><div><b>${e.name}</b></div>
+        <div>${e.who.map((c) => window.Spiel.COMP[c].icon + " " + window.Spiel.COMP[c].name).join(", ")} · für ${e.facName} in ${e.town}</div>
+        <div class="rw">${e.end > Date.now() ? "Zurück um " + clockOf(e.end) : "Zurück! Die Beute liegt in der Truhe im Lager."}</div></div>`).join("");
+      if (!s.jobs.length) return exs || `<p class="note">Du hast keine Aufträge angenommen.</p>`;
       const at = ctx.where();
-      return s.jobs.map((j) => `<div class="card">${facTag(j.fac)}<div><b>${j.name}</b></div><div>${j.text}</div>
+      return exs + s.jobs.map((j) => `<div class="card">${facTag(j.fac)}<div><b>${j.name}</b></div><div>${j.text}</div>
         <div class="rw">Ziel in ${fmtKm(km(at, j))} · ${j.foes ? "⚔ Kampf" : "🧭 Weg"} · ×${j.mult.toString().replace(".", ",")} · von ${j.town}</div>
         <div class="act"><button type="button" data-go="${j.id}" style="border-color:#1d4f7c;color:#1d4f7c">Zeigen</button><button type="button" data-drop="${j.id}">Aufgeben</button></div></div>`).join("");
     }

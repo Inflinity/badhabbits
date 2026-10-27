@@ -31,6 +31,7 @@ main { padding: 14px 14px max(20px, env(safe-area-inset-bottom)); max-width: 560
 .q .ic { font-size: 26px; width: 36px; text-align: center; }
 .q b { display: block; font: 700 16px "Cinzel", serif; }
 .q small { display: block; color: #6a5030; }
+.openBtn { display: block; width: 100%; margin-top: 8px; font: 700 16px "Pixelify Sans", monospace; padding: 10px; border-radius: 8px; border: 2px solid #e6b44a; background: linear-gradient(#c9963c, #8a5a1c); color: #fff6dc; cursor: pointer; }
 .q .st { margin-left: auto; font: 600 14px "Pixelify Sans", monospace; white-space: nowrap; }
 .q.done b { text-decoration: line-through; opacity: 0.6; }
 .stage { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px dashed #b9925a; }
@@ -55,6 +56,8 @@ main { padding: 14px 14px max(20px, env(safe-area-inset-bottom)); max-width: 560
 </div>
 <main>
   <section class="board"><h2>Questbrett</h2><div id="quests"></div></section>
+  <section class="board"><h2>Gefährten</h2><div id="comps"></div></section>
+  <section class="board" id="chestBox"><h2>Die Beutetruhe</h2><div id="chest"></div></section>
   <section class="board"><h2>Vom Wrack zum Kreuzfahrerhafen</h2><div id="stages"></div></section>
   <a class="go" href="../welt/">⚔ Hinaus in die Welt</a>
 </main>
@@ -77,19 +80,49 @@ const STAGES = [
 ];
 // character quests: they belong to you, not to the world
 const QUESTS = [
-  { id: "porthos", icon: "🐕", name: "Befreie Porthos", sub: "Sklavenhändler Kerim hält deinen Kriegshund in Ketten. Er ist heute etwa 1 km von dir entfernt.", lvl: 1 },
+  { id: "porthos", icon: "🐕", name: "Befreie Porthos", sub: "Sklavenhändler Kerim hält deinen Kriegshund in Ketten. Er ist heute etwa 1 km von dir entfernt.", lvl: 1, done: "Porthos weicht dir nicht mehr von der Seite." },
+  { id: "brueder", icon: "🍺", name: "Die Raufboldbrüder", sub: "Nach Porthos: zwei Nordmänner prügeln sich in einer Taverne. Schlag sie beide, dann folgen sie dir.", lvl: 2, done: "Helgen und Theoderich ziehen mit dir." },
+  { id: "truhe", icon: "🧰", name: "Die Truhe aus dem Wrack", sub: "Sobald du einen Gefährten hast: Strandräuber schleppen eine Truhe aus deinem Wrack fort.", lvl: 1, done: "Die Beutetruhe steht im Lager." },
+  { id: "mitra", icon: "🐍", name: "Das Zeichen der Schlange", sub: "Kerims Amulett führt zu den Schwestern der Mitra.", lvl: 3, done: "Die Hohepriesterin ist geschlagen. Vorerst." },
 ];
+const clockOf = (t) => new Date(t).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+let ST = window.Spiel.get();
 
 function render() {
-  const s = window.Spiel.get(), at = s.camp;
+  const s = (ST = window.Spiel.get()), at = s.camp, C = window.Spiel.COMP, now = Date.now();
   $("#purse").textContent = `🪙 ${s.gold} · ${window.Spiel.rank(s.level)} · Stufe ${s.level}`;
   // the wreck stands until you strip it for the tarp; from then on the beach is cleared
   $(".scene").style.backgroundImage = `url("../bilder/${at >= 2 ? "lager-geraeumt" : "lager-wrack"}.jpg")`;
   $("#campName").textContent = STAGES[at].name; $("#campSub").textContent = STAGES[at].sub;
   $("#quests").innerHTML = QUESTS.map((q) => {
     const done = s.quests[q.id] && s.quests[q.id].done;
-    return `<div class="q ${done ? "done" : ""}"><div class="ic">${q.icon}</div><div><b>${q.name}</b><small>${done ? "Erledigt. Porthos weicht dir nicht mehr von der Seite." : q.sub}</small></div><div class="st">${done ? "✓" : "Stufe " + q.lvl}</div></div>`;
+    return `<div class="q ${done ? "done" : ""}"><div class="ic">${q.icon}</div><div><b>${q.name}</b><small>${done ? "Erledigt. " + q.done : q.sub}</small></div><div class="st">${done ? "✓" : "Stufe " + q.lvl}</div></div>`;
   }).join("");
+  // who is with you, and who is away
+  const ex = s.excursions.filter((e) => !e.claimed), away = (c) => ex.find((e) => e.who.includes(c) && e.end > now);
+  $("#comps").innerHTML = s.party.filter((c) => C[c]).map((c) => { const a = away(c);
+    return `<div class="q"><div class="ic">${C[c].icon}</div><div><b>${C[c].name}</b><small>${C[c].desc}</small></div><div class="st">${a ? "unterwegs<br>bis " + clockOf(a.end) : "im Lager"}</div></div>`; }).join("")
+    || `<p style="margin:0;font-style:italic">Noch bist du allein. Befreie Porthos.</p>`;
+  // the loot chest: what the companions bring home from their excursions
+  const back = ex.filter((e) => e.end <= now), out = ex.filter((e) => e.end > now);
+  $("#chest").innerHTML = !s.chest ? `<p style="margin:0;font-style:italic">Noch keine Truhe. Sobald du einen Gefährten hast, findest du in der Welt die Quest „Die Truhe aus dem Wrack“.</p>`
+    : `<p style="margin:0 0 6px">Schick deine Gefährten im Auftragsbrett einer Stadt (🏰 in der Welt) auf Exkursion. Was sie heimbringen, landet hier.</p>
+      ${out.map((e) => `<div class="q"><div class="ic">⚑</div><div><b>${e.name}</b><small>${e.who.map((c) => C[c].name).join(" und ")} · für ${e.facName} in ${e.town}</small></div><div class="st">zurück<br>${clockOf(e.end)}</div></div>`).join("")}
+      ${back.map((e) => `<div class="q"><div class="ic">${e.ok ? "💰" : "🩹"}</div><div><b>${e.name}</b><small>${e.ok ? "Geschafft!" : "Mit blauen Flecken zurück, nur ein Teil der Beute."} +${e.exp} EXP · +${e.gold} Gold${e.goods.length ? " · " + e.goods.join(", ") : ""}</small></div><div class="st">${e.who.map((c) => C[c].icon).join("")}</div></div>`).join("")}
+      ${back.length ? `<button type="button" id="open" class="openBtn">🧰 Truhe öffnen</button>` : !out.length ? `<p style="margin:6px 0 0;font-style:italic">Die Truhe ist leer.</p>` : ""}`;
+  if ($("#open")) $("#open").onclick = () => {
+    let exp = 0, gold = 0; const t0 = window.Spiel.get();
+    for (const e of t0.excursions) if (!e.claimed && e.end <= Date.now()) { exp += e.exp; gold += e.gold; }
+    const t = window.Spiel.reward(exp, gold);
+    for (const e of t.excursions) if (!e.claimed && e.end <= Date.now()) {
+      e.claimed = true; for (const g of e.goods) t.inv[g] = (t.inv[g] || 0) + 1;
+      if (e.ok) t.rep[e.fac] = Math.min(100, (t.rep[e.fac] || 0) + 4);
+      t.log.exDone = (t.log.exDone || 0) + 1;
+    }
+    t.excursions = t.excursions.filter((e) => !e.claimed || Date.now() - e.end < 864e5);
+    delete t.up; window.Spiel.save(t);
+    toast(`Die Truhe: +${exp} EXP · +${gold} Gold${t.level > s.level ? " · Stufe " + t.level + "!" : ""}`); render();
+  };
   $("#stages").innerHTML = STAGES.map((g, i) => `<div class="stage ${i <= at ? "built" : ""}"><div class="n"><span>${i + 1}</span></div>
     <div><b>${g.name}</b><small>${g.what}</small></div>
     ${i === at + 1 ? `<button type="button" data-i="${i}" ${s.gold < g.cost ? "disabled" : ""}>🪙 ${g.cost}</button>` : i > at + 1 ? `<small style="margin-left:auto">🪙 ${g.cost}</small>` : ""}</div>`).join("");
@@ -107,7 +140,7 @@ let W = 200, H = 90;
 function size() { W = 200; H = Math.round((W * cv.clientHeight) / Math.max(1, cv.clientWidth)); cv.width = W; cv.height = H; }
 const R = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
 function draw(now) {
-  const at = window.Spiel.get().camp, party = window.Spiel.get().party, g = H - 14;      // g: the sand line where things stand
+  const at = ST.camp, party = ST.party, g = H - 14, home = (c) => party.includes(c) && !ST.excursions.some((e) => e.who.includes(c) && e.end > Date.now());      // g: the sand line where things stand
   ctx.clearRect(0, 0, W, H);
   // the wreck is the painting behind; what you build stands in front of it
   // 3 the palisade, at the back, so the rest stands in front of it
@@ -129,7 +162,14 @@ function draw(now) {
   if (at >= 6) { const hx = 10; R("#b8a07a", hx, g - 44, 16, 44); for (let i = 0; i < 4; i++) R("#b8a07a", hx - 1 + i * 5, g - 48, 3, 4); R("#3a2414", hx + 6, g - 12, 4, 12); R("#2a1a0c", hx + 6, g - 34, 3, 5);
     R("#5a3a20", hx + 8, g - 62, 1, 14); const w = Math.sin(now / 300) > 0 ? 1 : 0; R("#f2ede2", hx + 9, g - 62, 10, 7 + w); R("#b8322a", hx + 13, g - 62, 2, 7 + w); R("#b8322a", hx + 9, g - 59, 10, 2); }
   // Porthos, once he's free, by the fire
-  if (party.includes("porthos")) window.Spiel.sprite(ctx, "hund", 78 + Math.round(Math.sin(now / 1500) * 2), g - 12, {});
+  if (home("porthos")) window.Spiel.sprite(ctx, "hund", 78 + Math.round(Math.sin(now / 1500) * 2), g - 12, {});
+  // the brothers, arguing by the fire
+  if (home("helgen")) window.Spiel.sprite(ctx, "raufbold", 58, g - 24, window.Spiel.COMP.helgen.pal);
+  if (home("theoderich")) window.Spiel.sprite(ctx, "raufbold", 96, g - 24, window.Spiel.COMP.theoderich.pal, true);
+  // the loot chest
+  if (ST.chest) { const cx = 112, open = ST.excursions.some((e) => !e.claimed && e.end <= Date.now());
+    R("#3a2414", cx - 1, g - 9, 14, 10); R("#8a5a32", cx, g - 8, 12, 8); R("#5a3a20", cx, g - 5, 12, 1); R("#c9a04a", cx + 5, g - 6, 2, 3); R("#6a6a6a", cx, g - 8, 1, 8); R("#6a6a6a", cx + 11, g - 8, 1, 8);
+    if (open && Math.floor(now / 400) % 2) { R("#ffd24a", cx + 2, g - 11, 2, 2); R("#ffd24a", cx + 8, g - 12, 2, 2); } }
   else { // his empty bowl, a reminder
     R("#6a4a2a", 80, g - 2, 7, 2); R("#3a2414", 81, g - 3, 5, 1);
   }
@@ -137,6 +177,7 @@ function draw(now) {
 }
 size(); addEventListener("resize", size);
 render(); requestAnimationFrame(draw);
+setInterval(render, 15000);      // companions come home while you look
 </script>
 </body>
 </html>

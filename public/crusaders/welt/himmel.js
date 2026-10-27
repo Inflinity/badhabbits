@@ -83,6 +83,9 @@
     vertexShader: `varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: `precision highp float; varying vec3 vW;
       uniform float uT, uFogN, uFogF, uLight, uRough, uFlash; uniform vec3 uSun, uSunCol, uZen, uHor, uCam; uniform sampler2D uMask; uniform vec4 uBox;
+      float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hsh(i), hsh(i + vec2(1.0, 0.0)), f.x), mix(hsh(i + vec2(0.0, 1.0)), hsh(i + vec2(1.0, 1.0)), f.x), f.y); }
       // a few trains of waves, long to short; the short ones fade with distance so nothing shimmers
       vec2 slope(vec2 p, float dist) {
         vec2 s = vec2(0.0);
@@ -106,9 +109,18 @@
         vec3 R = reflect(-V, N); R.y = abs(R.y);
         vec3 skyc = mix(uHor, uZen, pow(clamp(R.y, 0.0, 1.0), 0.45));
         float up = max(uSun.y, 0.0);
-        vec3 deep = vec3(0.02, 0.10, 0.20), shal = vec3(0.16, 0.55, 0.58);
-        vec3 body = mix(deep, shal, sh * sh) * (0.25 + 0.75 * uLight) + uHor * 0.04;
-        vec3 col = mix(body, skyc, clamp(fres * (1.0 - sh * 0.45), 0.0, 1.0));
+        /* the colour of the water by its depth, as seen from a plane over the Aegean: pale sand-turquoise
+           at the shore, clear turquoise, azure, then deep ultramarine. In the shallows dark patches of
+           seagrass and the net of light that the waves throw on the sand. */
+        float dep = 1.0 - clamp(mk.b * 1.75, 0.0, 1.0);
+        vec3 c0 = vec3(0.60, 0.90, 0.80), c1 = vec3(0.10, 0.74, 0.80), c2 = vec3(0.04, 0.47, 0.78), c3 = vec3(0.015, 0.16, 0.45);
+        vec3 body = dep < 0.18 ? mix(c0, c1, dep / 0.18) : dep < 0.5 ? mix(c1, c2, (dep - 0.18) / 0.32) : mix(c2, c3, smoothstep(0.5, 0.95, dep));
+        float grass = smoothstep(0.55, 0.75, vn(vW.xz * 9.0) * 0.7 + vn(vW.xz * 31.0) * 0.3) * smoothstep(0.08, 0.2, dep) * (1.0 - smoothstep(0.45, 0.7, dep));
+        body = mix(body, vec3(0.03, 0.27, 0.36), grass * 0.7);
+        float ca = pow(0.5 + 0.5 * sin(vW.x * 150.0 + sin(vW.z * 130.0 + uT * 1.3) * 2.2), 10.0) + pow(0.5 + 0.5 * sin(vW.z * 160.0 + sin(vW.x * 110.0 - uT * 1.1) * 2.2), 10.0);
+        body += vec3(0.6, 0.95, 0.9) * ca * 0.16 * (1.0 - smoothstep(0.0, 0.25, dep)) / (1.0 + dist * 2.0);
+        body *= (0.22 + 0.78 * uLight);
+        vec3 col = mix(body, skyc, clamp(fres * (0.55 + 0.45 * dep), 0.0, 1.0));
         float rs = max(dot(R, uSun), 0.0);
         col += uSunCol * (pow(rs, 500.0) * 4.0 + pow(rs, 40.0) * 0.12) * smoothstep(-0.02, 0.05, uSun.y) * uLight;
         // foam where the sea meets the land, running up the shore
@@ -116,7 +128,7 @@
         float wv = sin(mk.b * 46.0 - uT * 1.4 + sin(vW.x * 23.0 + vW.z * 17.0) * 1.5) * 0.5 + 0.5;
         col = mix(col, vec3(0.92, 0.95, 0.96) * (0.3 + 0.7 * uLight), shore * smoothstep(0.6, 0.95, wv) * 0.65 * (1.0 / (1.0 + dist * 0.3)));
         col += vec3(0.7, 0.75, 0.9) * uFlash * 0.35;
-        float a = mix(0.97, 0.78, sh);
+        float a = mix(0.99, 0.93, sh);
         float fg = smoothstep(uFogN, uFogF, dist);
         col = mix(col, uHor, fg); a = mix(a, 1.0, fg);
         gl_FragColor = vec4(col, a);
@@ -201,7 +213,7 @@
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     const cv = document.createElement("canvas"); cv.width = cv.height = 32; const c = cv.getContext("2d"), gr = c.createRadialGradient(16, 16, 0, 16, 16, 16);
     gr.addColorStop(0, "rgba(255,230,170,1)"); gr.addColorStop(0.3, "rgba(255,180,90,0.6)"); gr.addColorStop(1, "rgba(255,150,60,0)"); c.fillStyle = gr; c.fillRect(0, 0, 32, 32);
-    lamps = new THREE.Points(g, new THREE.PointsMaterial({ size: 10 * Math.min(2, devicePixelRatio || 1), sizeAttenuation: false, map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true }));
+    lamps = new THREE.Points(g, new THREE.PointsMaterial({ size: 10 * Math.min(2, devicePixelRatio || 1), sizeAttenuation: false, map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, fog: true }));
     scene.add(lamps);
   }
 
@@ -252,7 +264,8 @@
     water.position.set(Math.round(camera.position.x), 0, Math.round(camera.position.z));
     sky.position.copy(camera.position);
     if (lamps) lamps.material.opacity = Math.min(1, night * 1.3 + ov * 0.2 * night);
-    cloudStep(dt, fx, fz); rainStep(dt, fx, fz); lightning(dt, fx, fz);
+    cloudStep(dt, fx, fz); rainStep(dt, fx, fz); lightning(dt, fx, fz); shadowStep(fx, fz);
+    if (now - (step.m || 0) > 3000) { step.m = now; markShadows(); }
   }
 
   function init() {
@@ -261,7 +274,80 @@
     water.geometry.dispose(); water.geometry = new THREE.PlaneGeometry(4000, 4000);
     seaU.uMask.value = maskTex; seaU.uBox.value.set(W0, D0, W1 - W0, D1 - D0);
     water.material = seaMat; water.renderOrder = 1;
-    makeLamps(); weather(); setInterval(weather, 30 * 60 * 1000);
+    makeLamps(); shadows(); weather(); setInterval(weather, 30 * 60 * 1000);
   }
-  window.Himmel = { init, step, weather: W, sunNow };
+  /* ---------------- The miniature look ----------------
+     Like a photo of a model railway: sharp where your figure stands, softly blurred above and below
+     (tilt-shift), colours a little richer, the corners a little darker. One extra pass, 12 samples.
+     Off with welt/?mini=0. */
+  const MINI = q.get("mini") !== "0";
+  let rt = null, post = null, postScene = null, postCam = null, focusY = 0.5;
+  function makePost() {
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    const opt = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat };
+    rt = renderer.capabilities.isWebGL2 && THREE.WebGLMultisampleRenderTarget ? new THREE.WebGLMultisampleRenderTarget(size.x, size.y, opt) : new THREE.WebGLRenderTarget(size.x, size.y, opt);
+    if (rt.samples !== undefined) rt.samples = 4;
+    post = new THREE.ShaderMaterial({
+      uniforms: { tD: { value: rt.texture }, uPx: { value: new THREE.Vector2(1 / size.x, 1 / size.y) }, uFocus: { value: 0.5 }, uBand: { value: 0.1 }, uR: { value: 8 }, uK: { value: 1 } },
+      vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+      fragmentShader: `varying vec2 vUv; uniform sampler2D tD; uniform vec2 uPx; uniform float uFocus, uBand, uR, uK;
+        void main() {
+          float dy = abs(vUv.y - uFocus), r = smoothstep(uBand, uBand + 0.32, dy) * uR * uK;
+          vec3 col = texture2D(tD, vUv).rgb;
+          if (r > 0.3) {
+            vec3 acc = col; float w = 1.0;
+            for (int i = 0; i < 12; i++) { float fi = float(i), a = fi * 2.39996, rr = sqrt((fi + 0.5) / 12.0) * r;
+              acc += texture2D(tD, vUv + vec2(cos(a), sin(a)) * rr * uPx).rgb; w += 1.0; }
+            col = acc / w;
+          }
+          float l = dot(col, vec3(0.299, 0.587, 0.114));
+          col = mix(vec3(l), col, 1.22);                                   // richer colours
+          col = (col - 0.5) * 1.07 + 0.5;                                  // a little more contrast
+          col *= vec3(1.025, 1.0, 0.975);                                  // warm light
+          vec2 v = vUv - 0.5; col *= 1.0 - 0.32 * pow(length(v * vec2(0.9, 1.1)) * 1.25, 2.4);   // vignette
+          gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    postScene = new THREE.Scene(); postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+  }
+  function render() {
+    if (!MINI) { renderer.render(scene, camera); return; }
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    if (!rt || rt.width !== size.x || rt.height !== size.y) { if (rt) rt.dispose(); makePost(); }
+    // focus on the figure; more miniature the farther you zoom out, less when looking straight down
+    v3.set(pl.x, Math.max(0, heightAt(pl.x, pl.z)) + 0.02, pl.z).project(camera); focusY = focusY + (THREE.MathUtils.clamp(v3.y * 0.5 + 0.5, 0.15, 0.85) - focusY) * 0.2;
+    post.uniforms.uFocus.value = focusY;
+    post.uniforms.uK.value = THREE.MathUtils.clamp(0.55 + Math.log(camDist / 0.38) * 0.22, 0.4, 1.1) * (camPitch > 1.25 ? 0.6 : 1);
+    post.uniforms.uR.value = 7 * Math.min(2, renderer.getPixelRatio());
+    renderer.setRenderTarget(rt); renderer.render(scene, camera);
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  }
+
+  /* ---------------- Shadows: the sun casts them, like light on a model ---------------- */
+  function shadows() {
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0004; if ("normalBias" in sun.shadow) sun.shadow.normalBias = 0.0008;
+    scene.add(sun.target); markShadows();
+  }
+  // everything solid on the land casts a shadow; the land receives them. Runs again now and then for new things.
+  function markShadows() {
+    scene.traverse((o) => {
+      if (!o.isMesh || o.userData.sh || o === water || o === sky || o === clouds) return;
+      o.userData.sh = 1;
+      if (o.isInstancedMesh) o.frustumCulled = false;
+      if (o === terrain) { o.receiveShadow = true; return; }
+      if (o.geometry && o.geometry.attributes.position && o.geometry.attributes.position.count > 20000) return;      // the sea floor
+      const m = o.material; if (!m || m.transparent || m.type === "MeshBasicMaterial") return;
+      o.castShadow = true; o.receiveShadow = true;
+    });
+  }
+  function shadowStep(fx, fz) {
+    const S = Math.min(8, Math.max(0.35, camDist * 1.8)), c = sun.shadow.camera, dir = sun.position.clone().normalize();
+    c.left = -S; c.right = S; c.top = S; c.bottom = -S; c.near = 0.05; c.far = 60; c.updateProjectionMatrix();
+    const y = Math.max(0, heightAt(fx, fz));
+    sun.target.position.set(fx, y, fz); sun.position.copy(dir).multiplyScalar(25).add(sun.target.position);
+  }
+  window.Himmel = { init, step, render, weather: W, sunNow, };
 })();
