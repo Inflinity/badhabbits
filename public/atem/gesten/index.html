@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1214">
+<title>Changes · Gesten lernen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&family=Figtree:wght@400;500;600&display=swap">
+<style>
+:root { --bg: #0a1214; --surface: #111d20; --line: #1f3236; --fg: #dce8e5; --muted: #7d9894; --breath: #7fd1c1; --guide: #e9c27f; --warn: #e59a7a;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif; --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); }
+main { max-width: 560px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); }
+h1 { font: 600 30px var(--display); margin: 8px 0 4px; display: flex; align-items: center; gap: 10px; }
+h1 a { color: var(--muted); text-decoration: none; font-size: 28px; }
+h1 span { color: var(--breath); }
+p { color: var(--muted); margin: 6px 0 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 12px 0; }
+.card b { color: var(--fg); }
+ol { margin: 6px 0 0; padding-left: 22px; color: var(--muted); } ol li { margin: 3px 0; } ol li b { color: var(--fg); }
+button, .btn { font: 600 17px var(--body); border-radius: 12px; border: 0; padding: 14px 18px; background: var(--breath); color: #08201b; cursor: pointer; text-decoration: none; display: inline-block; }
+button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+#now { font: 600 22px var(--display); color: var(--guide); min-height: 34px; }
+#trial { color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+td, th { padding: 7px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+th { color: var(--muted); font-weight: 500; }
+td.ok { color: var(--breath); font-weight: 600; } td.bad { color: var(--warn); font-weight: 600; }
+.trials { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.trials span { font-size: 12px; padding: 2px 6px; border-radius: 6px; background: var(--line); }
+.trials span.ok { background: #1e4a40; } .trials span.bad { background: #4a2a22; }
+canvas { width: 100%; height: 120px; display: block; background: #081012; border-radius: 10px; }
+label.tog { display: flex; gap: 8px; align-items: center; color: var(--muted); margin: 8px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1><a href="../" id="back" aria-label="Zurück">‹</a>Gesten <span>lernen</span></h1>
+  <p>Der erste Schritt zur blinden Steuerung: Das Handy liegt mit dem Bildschirm nach unten auf deiner Brust, du siehst es nicht und tippst nicht auf den Bildschirm. Die App spürt nur über ihre Sensoren, was du auf der Rückseite tust. Hier messen wir, welche Gesten sie sicher erkennt.</p>
+
+  <section class="card" id="intro">
+    <b>So geht es</b>
+    <ol>
+      <li>Kopfhörer rein oder laut stellen, dann <b>Starten</b>.</li>
+      <li>Handy <b>mit dem Bildschirm nach unten</b> auf die Brust legen, oben Richtung Kinn. Ruhig atmen.</li>
+      <li>Die Stimme sagt dir, welche Geste dran ist. Jedes Mal, wenn du das <b>Ding</b> hörst, machst du sie einmal, auf der Rückseite des Handys:
+        <ol>
+          <li><b>Ruhe</b> (4×): nichts tun, einfach weiteratmen</li>
+          <li><b>Klopfen</b> (7×): einmal leicht mit einem Finger</li>
+          <li><b>Doppeltipp</b> (7×): zweimal kurz hintereinander</li>
+          <li><b>Nach unten wischen</b> (7×): Richtung Bauch</li>
+          <li><b>Nach oben wischen</b> (7×): Richtung Kinn</li>
+        </ol></li>
+      <li>Die Dings kommen unregelmäßig, damit du nicht vorab im Takt klopfst. Etwa vier Minuten.</li>
+      <li>Am Ende sagt die Stimme, wie viel erkannt wurde. Dann das Log teilen.</li>
+    </ol>
+    <label class="tog"><input type="checkbox" id="feedback" checked> Nach jeder Geste ein kurzes Signal: hell = erkannt, dumpf = nicht</label>
+    <div class="row" style="margin-top:10px"><button type="button" id="go">Starten</button></div>
+  </section>
+
+  <section class="card" id="live" hidden>
+    <div id="now">…</div>
+    <div id="trial"></div>
+    <canvas id="scope" aria-label="Sensor live"></canvas>
+    <div class="row" style="margin-top:10px"><button type="button" class="ghost" id="stop">Abbrechen</button></div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <b>Ergebnis</b>
+    <table id="tab"></table>
+    <div id="per"></div>
+    <p id="note" style="margin-top:12px"></p>
+    <div class="row"><button type="button" id="share">Log teilen</button><button type="button" class="ghost" id="save">Log speichern</button><button type="button" class="ghost" id="again">Nochmal</button></div>
+  </section>
+</main>
+<script>
+"use strict";
+/* Gesten lernen: blind communication between you and the phone, step one.
+   The screen faces your chest, so touch is out; everything the phone knows comes from the
+   accelerometer and gyroscope. A tap is a sharp jolt, a double tap two of them close together,
+   a swipe along the back a short, smooth rocking of the phone (the pressure point moves).
+   Around every "Ding" the raw sensor data is kept, a first simple detector guesses what you did,
+   and the log goes back to us to make the detection better. */
+const $ = (s) => document.querySelector(s);
+const now = () => performance.now() / 1000;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const q = new URLSearchParams(location.search);
+if (q.get("von") === "crusaders") { $("#back").href = "/crusaders/?zu=spiritus"; }
+
+const BLOCKS = [
+  { id: "ruhe", name: "Ruhe", n: 4, say: "Zuerst die Ruhe. Bei jedem Ding tust du nichts, atme einfach weiter. So lerne ich, wie still du bist." },
+  { id: "tipp", name: "Klopfen", n: 7, say: "Jetzt klopfen. Jedes Mal, wenn du das Ding hörst, klopfst du einmal leicht mit einem Finger auf die Rückseite." },
+  { id: "doppel", name: "Doppeltipp", n: 7, say: "Jetzt der Doppeltipp. Bei jedem Ding zweimal kurz hintereinander klopfen." },
+  { id: "runter", name: "Nach unten wischen", n: 7, say: "Jetzt wischen. Bei jedem Ding streichst du mit einem Finger über die Rückseite nach unten, Richtung Bauch." },
+  { id: "hoch", name: "Nach oben wischen", n: 7, say: "Und jetzt andersherum. Bei jedem Ding nach oben wischen, Richtung Kinn." },
+];
+const PRE = 1.5, POST = 3.2;          // seconds of sensor data kept before and after each Ding
+
+/* ---------------- Sound and voice ---------------- */
+let ctx = null;
+function audio() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === "suspended") ctx.resume(); }
+function tone(freq, dur, vol = 0.3, type = "sine", partials = [1]) {
+  if (!ctx) return; const t = ctx.currentTime;
+  for (const [i, m] of partials.entries()) {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = freq * m;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol / (i + 1), t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+}
+const ding = () => tone(1046, 1.4, 0.35, "sine", [1, 2.76, 5.4]);
+const yes = () => { tone(784, 0.18, 0.18); setTimeout(() => tone(1175, 0.25, 0.18), 120); };
+const no = () => tone(196, 0.3, 0.2, "triangle");
+let voiceName = ""; try { voiceName = (JSON.parse(localStorage.getItem("atemlotse8") || "{}").voiceName) || ""; } catch (e) {}
+function say(text) {
+  return new Promise((res) => {
+    if (!("speechSynthesis" in window)) return res();
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.lang = "de-DE"; u.rate = 0.9; u.pitch = 0.95;
+      const v = speechSynthesis.getVoices(), de = v.find((x) => x.name === voiceName) || v.find((x) => x.lang && x.lang.startsWith("de")); if (de) u.voice = de;
+      let done = false; const fin = () => { if (!done) { done = true; res(); } };
+      u.onend = fin; u.onerror = fin; setTimeout(fin, 400 + text.length * 95);      // never hang if the voice stays silent
+      speechSynthesis.speak(u);
+    } catch (e) { res(); }
+  });
+}
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+
+/* ---------------- Sensors ---------------- */
+const RING = []; let lastG = null, hpL = [0, 0, 0], prevRaw = null, hasLin = null, rate = [];
+function onMotion(e) {
+  const t = now(), g = e.accelerationIncludingGravity, l = e.acceleration, r = e.rotationRate || {};
+  if (!g || g.x == null) return;
+  if (hasLin === null) hasLin = !!(l && l.x != null);
+  // linear acceleration: from the sensor if it has it, else the gravity-included value high-passed
+  let lin;
+  if (hasLin && l && l.x != null) lin = [l.x, l.y, l.z];
+  else { const raw = [g.x, g.y, g.z]; if (!prevRaw) prevRaw = raw; for (let k = 0; k < 3; k++) hpL[k] = 0.9 * (hpL[k] + raw[k] - prevRaw[k]); prevRaw = raw; lin = hpL.slice(); }
+  RING.push([t, g.x, g.y, g.z, lin[0], lin[1], lin[2], r.alpha || 0, r.beta || 0, r.gamma || 0]);
+  if (rate.length < 200) rate.push(t);
+  while (RING.length && t - RING[0][0] > 12) RING.shift();
+}
+const windowOf = (t0, a, b) => RING.filter((s) => s[0] >= t0 - a && s[0] <= t0 + b);
+
+/* ---------------- A first, simple detector ----------------
+   Jolts: the magnitude of the linear acceleration, its quiet level taken from the second before
+   the Ding. A tap is one short jolt, a double tap two within 0.1–0.6 s. A swipe has no hard jolt
+   but a smooth rocking of the phone: rotation energy over a few tenths of a second, its direction
+   from the sign of the summed rotation about the phone's short axis (beta) and, as a second vote,
+   the push along its long axis (y). */
+function analyse(t0) {
+  const pre = windowOf(t0, PRE, 0), post = RING.filter((s) => s[0] > t0 + 0.15 && s[0] <= t0 + POST);
+  const mag = (s) => Math.hypot(s[4], s[5], s[6]), rot = (s) => Math.hypot(s[7], s[8], s[9]);
+  const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
+  const quietA = Math.max(0.12, med(pre.map(mag)) * 4), quietR = Math.max(4, med(pre.map(rot)) * 4);
+  const thr = Math.max(0.6, quietA * 2.2);
+  // jolts
+  // a jolt starts above the threshold and ends once it has died down to half (its ringing is part of it)
+  const peaks = []; let inPk = false;
+  for (const s of post) {
+    const m = mag(s), p = peaks[peaks.length - 1];
+    if (!inPk && m > thr) { peaks.push({ t: s[0], m }); inPk = true; }
+    else if (inPk) { if (m > p.m) p.m = m; if (m < thr * 0.5 && s[0] - p.t > 0.05) inPk = false; }
+  }
+  // smooth rocking
+  let rotE = 0, rotT = 0, sumB = 0, sumA = 0, sumY = 0, first = null, last = null;
+  for (let i = 1; i < post.length; i++) { const s = post[i], dt = s[0] - post[i - 1][0]; if (rot(s) > quietR) { rotE += rot(s) * dt; rotT += dt; sumB += s[8] * dt; sumA += s[7] * dt; sumY += s[5] * dt; first = first || s[0]; last = s[0]; } }
+  const span = first ? last - first : 0;
+  let label = "nichts";
+  if (peaks.length >= 2 && peaks[1].t - peaks[0].t >= 0.08 && peaks[1].t - peaks[0].t <= 0.65) label = "doppel";
+  else if (peaks.length === 1) label = "tipp";
+  if ((label === "nichts" || (label === "tipp" && span > 0.35)) && rotE > 3 && span >= 0.2) {
+    const v = Math.abs(sumB) > Math.abs(sumA) * 0.6 ? sumB : sumA;
+    label = v + sumY * 4 > 0 ? "runter" : "hoch";      // which sign is which is learned from your log; this is a first guess
+  }
+  return { label, peaks: peaks.map((p) => [+(p.t - t0).toFixed(3), +p.m.toFixed(2)]), thr: +thr.toFixed(2), rotE: +rotE.toFixed(2), rotT: +rotT.toFixed(2), span: +span.toFixed(2),
+    sumA: +sumA.toFixed(2), sumB: +sumB.toFixed(2), sumY: +sumY.toFixed(3), quietA: +quietA.toFixed(3), quietR: +quietR.toFixed(2) };
+}
+
+/* ---------------- The session ---------------- */
+let run = null, wake = null;
+async function start() {
+  audio();
+  if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") { try { await DeviceMotionEvent.requestPermission(); } catch (e) {} }
+  window.addEventListener("devicemotion", onMotion);
+  try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) {}
+  run = { id: Date.now(), started: new Date().toISOString(), trials: [], stop: false, feedback: $("#feedback").checked };
+  $("#intro").hidden = true; $("#result").hidden = true; $("#live").hidden = false;
+  scope();
+  status("Handy auflegen …", "");
+  await say("Leg das Handy jetzt mit dem Bildschirm nach unten auf deine Brust, oben Richtung Kinn. Atme ruhig. Wir fangen gleich an.");
+  await wait(5);
+  if (!RING.length) { await say("Ich spüre keine Sensoren. Auf diesem Gerät geht es leider nicht."); status("Keine Bewegungssensoren gefunden.", ""); return; }
+  for (const B of BLOCKS) {
+    if (run.stop) return;
+    status(B.name, "Die Stimme erklärt …");
+    await say(B.say); await wait(2.5);
+    for (let i = 0; i < B.n; i++) {
+      if (run.stop) return;
+      status(B.name, `${i + 1} von ${B.n}`);
+      await wait(0.6 + Math.random() * 4.2);           // unregelmäßig: 0,6–4,8 s Pause, dazu das Antwortfenster
+      const t0 = now(); ding();
+      await wait(POST + 0.2);
+      const a = analyse(t0), ok = a.label === B.id || (B.id === "ruhe" && a.label === "nichts");
+      run.trials.push({ block: B.id, i, t: +(t0 - RING[0][0]).toFixed(2), expected: B.id, got: a.label, ok, a,
+        samples: windowOf(t0, PRE, POST).map((s) => [+(s[0] - t0).toFixed(3), ...s.slice(1).map((v) => +v.toFixed(3))]) });
+      if (run.feedback) ok ? yes() : no();
+    }
+  }
+  finish();
+}
+function status(a, b) { $("#now").textContent = a; $("#trial").textContent = b; }
+async function finish() {
+  window.removeEventListener("devicemotion", onMotion);
+  try { if (wake) wake.release(); } catch (e) {}
+  const byB = BLOCKS.map((B) => { const l = run.trials.filter((t) => t.block === B.id); return { B, n: l.length, ok: l.filter((t) => t.ok).length, l }; });
+  $("#live").hidden = true; $("#result").hidden = false;
+  $("#tab").innerHTML = `<tr><th>Geste</th><th>erkannt</th><th>verwechselt mit</th></tr>` + byB.map(({ B, n, ok, l }) => {
+    const wrong = {}; for (const t of l) if (!t.ok) wrong[t.got] = (wrong[t.got] || 0) + 1;
+    return `<tr><td>${B.name}</td><td class="${ok >= n * 0.8 ? "ok" : "bad"}">${ok} / ${n}</td><td>${Object.entries(wrong).map(([k, v]) => `${v}× ${k}`).join(", ") || "–"}</td></tr>`; }).join("");
+  $("#per").innerHTML = byB.map(({ B, l }) => `<div style="margin-top:8px;color:var(--muted);font-size:14px">${B.name}</div><div class="trials">${l.map((t) => `<span class="${t.ok ? "ok" : "bad"}">${t.got}</span>`).join("")}</div>`).join("");
+  const r = rate.length > 20 ? Math.round((rate.length - 1) / (rate[rate.length - 1] - rate[0])) : 0;
+  $("#note").textContent = `Sensor: ${r} Messungen pro Sekunde · ${hasLin ? "lineare Beschleunigung vom Gerät" : "Beschleunigung selbst gefiltert"}. Schick mir das Log, dann schärfe ich die Erkennung an deinen echten Gesten.`;
+  run.device = { ua: navigator.userAgent, hz: r, hasLin };
+  const said = byB.filter((x) => x.B.id !== "ruhe").map(({ B, n, ok }) => `${B.name} ${ok} von ${n}`).join(", ");
+  const still = byB[0];
+  await say(`Fertig. ${said}. In der Ruhe ${still.n - still.ok === 0 ? "keine falschen Meldungen" : still.n - still.ok + " falsche Meldungen"}. Du kannst das Handy jetzt umdrehen.`);
+}
+function logFile() {
+  const name = `gesten-${new Date(run.id).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
+  const head = { format: "changes-gesten/1", about: "samples: [t s relative to the Ding, g.x, g.y, g.z (incl. gravity), lin.x, lin.y, lin.z (m/s²), rot.alpha, rot.beta, rot.gamma (°/s)]", started: run.started, device: run.device };
+  return new File([JSON.stringify({ ...head, trials: run.trials })], name, { type: "application/json" });
+}
+$("#share").onclick = async () => { const f = logFile(); try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: f.name }); return; } } catch (e) { if (e.name === "AbortError") return; } $("#save").click(); };
+$("#save").onclick = () => { const f = logFile(), a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(f), download: f.name }); document.body.append(a); a.click(); a.remove(); };
+$("#again").onclick = () => { $("#result").hidden = true; $("#intro").hidden = false; };
+$("#stop").onclick = () => { if (run) run.stop = true; speechSynthesis.cancel(); window.removeEventListener("devicemotion", onMotion); $("#live").hidden = true; $("#intro").hidden = false; };
+$("#go").onclick = start;
+
+/* a small live view: jolts (sea glass) and rocking (gold), for when you look */
+function scope() {
+  const cv = $("#scope"), c = cv.getContext("2d");
+  const draw = () => {
+    if ($("#live").hidden) return;
+    const W = (cv.width = cv.clientWidth * 2), H = (cv.height = cv.clientHeight * 2), t = now();
+    c.clearRect(0, 0, W, H);
+    for (const [k, col, sc] of [[4, "#7fd1c1", H / 8], [8, "#e9c27f", H / 400]]) {
+      c.strokeStyle = col; c.lineWidth = 2; c.beginPath();
+      RING.forEach((s, i) => { const x = W - ((t - s[0]) / 6) * W, v = k === 4 ? Math.hypot(s[4], s[5], s[6]) : Math.hypot(s[7], s[8], s[9]); const y = H - 6 - v * sc; i ? c.lineTo(x, y) : c.moveTo(x, y); });
+      c.stroke();
+    }
+    requestAnimationFrame(draw);
+  };
+  requestAnimationFrame(draw);
+}
+if ("speechSynthesis" in window) speechSynthesis.getVoices();
+</script>
+</body>
+</html>
