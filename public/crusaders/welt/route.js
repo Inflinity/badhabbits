@@ -146,12 +146,16 @@
   #navPick .list button { display: flex; width: 100%; justify-content: space-between; border: 0; border-bottom: 1px dashed #c9a873; background: none; padding: 10px 4px; font: 600 16px "Figtree", sans-serif; color: #2b1d12; text-align: left; }
   #navPick .list button small { color: #6a5030; font-weight: 400; }`;
   function style() { if ($("#navCss")) return; const s = document.createElement("style"); s.id = "navCss"; s.textContent = css; document.head.append(s); }
+  // a few more places to drive to that have no label on the map (positions from OpenStreetMap)
+  const ZIELE = [{ name: "Kallithea Mare Palace", sub: "Hotel bei den Thermen", lat: 36.38684, lon: 28.24068 }];
+  // search forgives accents, case and doubled letters: "kalithea" finds "Kallithea"
+  const norm = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/(.)\1+/g, "$1");
   const fmt = (km) => (km < 1 ? Math.round(km * 100) * 10 + " m" : (km < 20 ? km.toFixed(1).replace(".", ",") : Math.round(km)) + " km");
   const fmtT = (h) => { const m = Math.max(1, Math.round(h * 60)); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0"); };
   function places() {
     const [lat, lon] = unP(pl.x, pl.z), out = [];
     for (const [name, plat, plon] of TOWNS) out.push({ name, lat: plat, lon: plon, d: distKm([lat, lon], [plat, plon]) });
-    for (const s of (window.SIGHTS || [])) out.push({ name: s.name, sub: s.sub, lat: s.lat, lon: s.lon, d: distKm([lat, lon], [s.lat, s.lon]) });
+    for (const s of (window.SIGHTS || []).concat(ZIELE)) out.push({ name: s.name, sub: s.sub, lat: s.lat, lon: s.lon, d: distKm([lat, lon], [s.lat, s.lon]) });
     return out.sort((a, b) => a.d - b.d);
   }
   function pick() {
@@ -160,7 +164,7 @@
     el.innerHTML = `<div class="sh"><h2><span>🚗 Wohin?</span><button type="button">✕</button></h2><input type="search" placeholder="Ort oder Sehenswürdigkeit …"><div class="list"></div></div>`;
     document.body.append(el);
     const list = el.querySelector(".list"), all = places();
-    const show = (q) => { list.innerHTML = all.filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 60).map((p, i) => `<button type="button" data-i="${all.indexOf(p)}"><span>${p.name}${p.sub ? ` <small>· ${p.sub}</small>` : ""}</span><small>${fmt(p.d)} Luftlinie</small></button>`).join(""); };
+    const show = (q) => { list.innerHTML = all.filter((p) => !q || norm(p.name + " " + (p.sub || "")).includes(norm(q))).slice(0, 60).map((p, i) => `<button type="button" data-i="${all.indexOf(p)}"><span>${p.name}${p.sub ? ` <small>· ${p.sub}</small>` : ""}</span><small>${fmt(p.d)} Luftlinie</small></button>`).join(""); };
     show(""); el.querySelector("input").oninput = (e) => show(e.target.value);
     el.querySelector("h2 button").onclick = () => el.remove(); el.addEventListener("click", (e) => { if (e.target === el) el.remove(); });
     list.onclick = (e) => { const b = e.target.closest("[data-i]"); if (!b) return; el.remove(); go(all[+b.dataset.i]); };
