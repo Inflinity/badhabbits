@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1f2a">
+<title>Crusaders · Feste</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=IM+Fell+English:ital@0;1&family=Pixelify+Sans:wght@400;600;700&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --ink: #2b1d12; --parch: #f1e4c4; --gold: #e2b04a; --rim: #8d929c; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; min-height: 100%; background: #14161e; color: var(--parch); font: 16px/1.4 "IM Fell English", Georgia, serif; }
+.head { position: relative; padding: max(12px, env(safe-area-inset-top)) 12px 14px; background: linear-gradient(#2a3a5a, #14161e); text-align: center; }
+.head .back { position: absolute; left: 12px; top: max(12px, env(safe-area-inset-top)); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--parch); border: 2px solid #d9b56e; color: var(--ink); text-decoration: none; font-size: 24px; }
+.head h1 { margin: 52px 0 0; font: 800 28px "Cinzel", serif; text-shadow: 0 2px 8px #000; }
+.head p { margin: 2px 0 0; font-style: italic; color: #ffe9b8; }
+#keepPx { width: 100%; max-width: 420px; height: 150px; image-rendering: pixelated; display: block; margin: 8px auto 0; }
+main { padding: 14px 14px max(20px, env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; display: grid; gap: 14px; }
+.board { background: linear-gradient(#f3e6c6, #e6d3a6); color: var(--ink); border-radius: 6px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.5), inset 0 0 0 2px #b9925a; }
+.board h2 { margin: 0 0 8px; font: 800 15px "Cinzel", serif; letter-spacing: 0.08em; color: #6a3a14; }
+.bld { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px dashed #b9925a; }
+.bld:first-of-type { border-top: 0; }
+.bld .ic { font-size: 26px; width: 34px; text-align: center; }
+.bld b { display: block; font: 700 15px "Cinzel", serif; } .bld small { color: #6a5030; }
+.btn { margin-left: auto; font: 700 15px "Pixelify Sans", monospace; padding: 8px 12px; border-radius: 7px; border: 2px solid #e6b44a; background: linear-gradient(#c9963c, #8a5a1c); color: #fff6dc; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.btn:disabled { filter: grayscale(0.8); opacity: 0.6; }
+.btn.wide { display: block; width: 100%; margin: 8px 0 0; text-align: center; font-size: 18px; padding: 12px; }
+.btn.red { border-color: #ff8a6a; background: linear-gradient(#c8321e, #7a1a10); }
+#toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 92%; z-index: 90; background: rgba(241,228,196,0.97); color: var(--ink); border: 2px solid #d9b56e; border-radius: 10px; padding: 8px 14px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35); font-family: "Figtree", sans-serif; }
+
+/* ---------------- Tower defense ---------------- */
+#td { position: fixed; inset: 0; z-index: 50; background: #0e1014; display: flex; flex-direction: column; font-family: "Pixelify Sans", monospace; color: #f3ead6; }
+#td .bar { display: flex; align-items: center; gap: 10px; padding: max(8px, env(safe-area-inset-top)) 10px 8px; background: #1b1f2a; border-bottom: 3px solid var(--rim); font-size: 17px; }
+#td .bar span { white-space: nowrap; } #td .bar .sp { flex: 1; }
+#td .bar button { font: 700 15px "Pixelify Sans", monospace; color: #f3ead6; background: #3a4152; border: 2px solid var(--rim); border-radius: 6px; padding: 5px 10px; }
+#td .field { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
+#td canvas { height: 100%; max-width: 100%; aspect-ratio: 240 / 400; image-rendering: pixelated; display: block; touch-action: manipulation; }
+#td .foot { display: flex; gap: 8px; align-items: center; padding: 8px 10px max(8px, env(safe-area-inset-bottom)); background: #1b1f2a; border-top: 3px solid var(--rim); }
+#td .foot .msg { flex: 1; font-size: 14px; color: #c9cfd8; }
+#td .go { font: 700 17px "Pixelify Sans", monospace; padding: 9px 14px; border-radius: 7px; border: 2px solid #e6b44a; background: linear-gradient(#c9963c, #8a5a1c); color: #fff6dc; }
+#tdMenu { position: absolute; z-index: 3; background: #262c3a; border: 3px solid var(--rim); border-radius: 8px; padding: 6px; display: grid; gap: 4px; min-width: 190px; box-shadow: 0 6px 16px rgba(0,0,0,0.6); }
+#tdMenu button { display: flex; justify-content: space-between; gap: 10px; font: 600 15px "Pixelify Sans", monospace; color: #f3ead6; background: #3a4152; border: 0; border-radius: 5px; padding: 7px 9px; text-align: left; }
+#tdMenu button:disabled { opacity: 0.4; }
+#tdMenu small { color: var(--gold); }
+#tdEnd { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(10,6,4,0.72); text-align: center; padding: 20px; }
+#tdEnd h1 { margin: 0; font: 700 44px "Pixelify Sans", monospace; color: #ffb030; text-shadow: 0 3px 0 #5a1a06; }
+#tdEnd p { margin: 0; font-size: 19px; }
+</style>
+</head>
+<body>
+<div class="head">
+  <a class="back" href="../lager/" aria-label="Zum Lager">‹</a>
+  <h1 id="fName">Deine Feste</h1><p id="fSub"></p>
+  <canvas id="keepPx"></canvas>
+</div>
+<main id="main"></main>
+<div id="toast" hidden></div>
+<script src="../kampf.js"></script>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const toast = (t, ms = 4000) => { const e = $("#toast"); e.textContent = t; e.hidden = false; clearTimeout(toast.tm); toast.tm = setTimeout(() => { e.hidden = true; }, ms); };
+const S = window.Spiel;
+const open = (s) => s.level >= 50 || s.aura;
+
+/* Your fortress: founded by you somewhere in the world (from level 50), built up here,
+   and defended against wave after wave of hordes and bosses. */
+const BUILD = [
+  { id: "mauer", icon: "🧱", name: "Mauern", sub: "Jede Stufe: +5 Leben für den Bergfried", costs: [300, 600, 1000, 1600, 2400] },
+  { id: "schatz", icon: "💰", name: "Schatzkammer", sub: "Jede Stufe: +40 Gold zu Beginn der Verteidigung", costs: [250, 500, 900, 1400, 2000] },
+  { id: "schmiede", icon: "⚒", name: "Schmiede", sub: "Jede Stufe: +10 % Schaden aller Türme", costs: [400, 800, 1300, 1900, 2600] },
+  { id: "bergfried", icon: "🏰", name: "Bergfried", sub: "Stufe 1: Pechnasen · Stufe 2: Schmiede der Telchinen", costs: [500, 1500] },
+];
+function render() {
+  const s = S.get(), f = s.feste;
+  if (!open(s)) {
+    $("#fName").textContent = "Eine eigene Feste"; $("#fSub").textContent = "Ab Stufe 50";
+    $("#main").innerHTML = `<section class="board"><h2>Noch nicht</h2><p>Ab Stufe 50 gründest du irgendwo in der Welt deine eigene Feste, eine Stadt mit Türmen und Mauern, die du ausbaust und gegen Horden verteidigst. Noch ${50 - s.level} Stufen.</p></section>`;
+    return;
+  }
+  if (!f) {
+    $("#fName").textContent = "Eine eigene Feste"; $("#fSub").textContent = s.level < 50 ? "Freigeschaltet durch die Aura des Dev" : "Wo soll sie stehen?";
+    $("#main").innerHTML = `<section class="board"><h2>Gründe deine Feste</h2><p>Geh in der Welt an den Ort, an dem deine Feste stehen soll: auf einen Hügel, an eine Bucht, wohin du willst. Tippe dort auf <b>🏯 Feste</b>, und sie erhebt sich aus dem Boden.</p>
+      <a class="btn wide" href="../welt/">🌍 In die Welt</a></section>`;
+    return;
+  }
+  $("#fName").textContent = f.name; $("#fSub").textContent = `Gegründet ${new Date(f.since).toLocaleDateString("de-DE")} · beste Verteidigung: Welle ${f.best || 0}`;
+  $("#main").innerHTML = `<section class="board"><h2>Verteidigung</h2><p>Horden ziehen den Weg herauf zu deinem Bergfried, Welle um Welle, und jede fünfte bringt einen Boss. Stell Türme an den Weg und halte so lange aus, wie du kannst.</p>
+      <p style="font-size:15px;margin:6px 0 0">Start: ${150 + 40 * f.b.schatz} Gold · Bergfried ${20 + 5 * f.b.mauer} Leben · Turmschaden +${10 * f.b.schmiede} %</p>
+      <button type="button" class="btn wide red" id="defend">⚔ Die Horden kommen</button></section>
+    <section class="board"><h2>Ausbau</h2>${BUILD.map((b) => { const lv = f.b[b.id] || 0, c = b.costs[lv];
+      return `<div class="bld"><div class="ic">${b.icon}</div><div><b>${b.name} · Stufe ${lv}/${b.costs.length}</b><small>${b.sub}</small></div>
+        ${c ? `<button type="button" class="btn" data-up="${b.id}" ${s.gold < c ? "disabled" : ""}>🪙 ${c}</button>` : `<small style="margin-left:auto">fertig</small>`}</div>`; }).join("")}
+      <p style="margin:8px 0 0;font-size:14px">🪙 ${s.gold} Gold</p></section>
+    <section class="board"><h2>In der Welt</h2><p>Deine Feste steht bei ${f.lat.toFixed(4)}° N, ${f.lon.toFixed(4)}° O.</p><a class="btn wide" href="../welt/">🌍 Zur Feste in der Welt</a></section>`;
+  $("#defend").onclick = () => TD.start();
+  document.querySelectorAll("[data-up]").forEach((b) => b.onclick = () => {
+    const t = S.get(), B = BUILD.find((x) => x.id === b.dataset.up), lv = t.feste.b[B.id] || 0, c = B.costs[lv]; if (!c || t.gold < c) return;
+    t.gold -= c; t.feste.b[B.id] = lv + 1; S.save(t); toast(`${B.name}: Stufe ${lv + 1}.`); render();
+  });
+}
+
+/* a small pixel picture of the keep at the top */
+function keepPic() {
+  const cv = $("#keepPx"), c = cv.getContext("2d"), W = 140, H = 50; cv.width = W; cv.height = H;
+  const R = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  const f = S.get().feste, lv = f ? f.b : { mauer: 0, bergfried: 0 };
+  R("#3a5a2a", 0, 42, W, 8);
+  const wallH = 8 + (lv.mauer || 0) * 2;
+  R("#8a8478", 10, 42 - wallH, 120, wallH); for (let x = 10; x < 130; x += 6) R("#8a8478", x, 40 - wallH, 3, 2);
+  for (const x of [8, 40, 92, 124]) { R("#9a9488", x, 42 - wallH - 8, 10, wallH + 8); c.fillStyle = "#2a4a8a"; c.beginPath(); c.moveTo(x - 1, 42 - wallH - 8); c.lineTo(x + 5, 42 - wallH - 18); c.lineTo(x + 11, 42 - wallH - 8); c.fill(); }
+  const kh = 22 + (lv.bergfried || 0) * 4; R("#aaa49a", 62, 42 - kh, 16, kh); c.fillStyle = "#b8322a"; c.beginPath(); c.moveTo(60, 42 - kh); c.lineTo(70, 42 - kh - 14); c.lineTo(80, 42 - kh); c.fill();
+  R("#5a3a20", 69, 42 - kh - 22, 1, 8); R("#e2b04a", 70, 42 - kh - 22, 6, 3); R("#3a2414", 66, 34, 8, 8);
+}
+
+/* ================= Tower defense ================= */
+const TD = (() => {
+  const W = 240, H = 400;
+  // the way up to the keep, and the places where towers can stand
+  const PATH = [[40, -12], [40, 80], [196, 80], [196, 172], [56, 172], [56, 262], [184, 262], [184, 330], [120, 330], [120, 366]];
+  const SLOTS = [[80, 50], [150, 50], [226, 120], [160, 122], [96, 122], [20, 140], [100, 210], [160, 210], [24, 230], [100, 300], [150, 300], [214, 300], [80, 350], [160, 360]];
+  const segs = []; let total = 0;
+  for (let i = 0; i < PATH.length - 1; i++) { const [ax, ay] = PATH[i], [bx, by] = PATH[i + 1], L = Math.hypot(bx - ax, by - ay); segs.push({ ax, ay, bx, by, L, s0: total }); total += L; }
+  const at = (d) => { for (const g of segs) if (d <= g.s0 + g.L) { const t = (d - g.s0) / g.L; return [g.ax + (g.bx - g.ax) * t, g.ay + (g.by - g.ay) * t, g.bx - g.ax]; } const g = segs[segs.length - 1]; return [g.bx, g.by, 0]; };
+
+  const TOWERS = {
+    bogen: { name: "Bogenschützen", icon: "🏹", cost: 50, range: 54, dmg: 7, rate: 0.55, col: "#c9a873", shot: "pfeil" },
+    balliste: { name: "Balliste", icon: "🎯", cost: 90, range: 86, dmg: 24, rate: 1.5, col: "#8a6a3a", shot: "bolzen" },
+    pech: { name: "Pechnase", icon: "🔥", cost: 80, range: 36, dmg: 9, rate: 1.1, col: "#5a4a3a", shot: "feuer", need: 1 },
+    telchin: { name: "Schmiede der Telchinen", icon: "🔱", cost: 110, range: 50, dmg: 5, rate: 0.8, col: "#1f6a7a", shot: "magie", need: 2 },
+  };
+  // the hordes: sprites from the battles
+  const FOES = {
+    bandit: { name: "Wegelagerer", spr: "bandit", hp: 30, spd: 22, gold: 5 },
+    wolf: { name: "Wildhund", spr: "hund", pal: { b: "#6a6a6a", c: "#3a3a3a" }, hp: 18, spd: 40, gold: 4 },
+    korsar: { name: "Korsar", spr: "bandit", pal: { W: "#b8322a", r: "#e2b04a", m: "#3a3a4a", P: "#5a4a6a" }, hp: 45, spd: 24, gold: 6 },
+    soeldner: { name: "Söldner", spr: "bandit", pal: { W: "#2a2420", r: "#3a6a9a" }, hp: 65, spd: 18, gold: 7 },
+    schatten: { name: "Schatten", spr: "schatten", hp: 42, spd: 27, gold: 6 },
+    adeptin: { name: "Schwester der Mitra", spr: "schatten", pal: { v: "#2a5a3a", y: "#e2b04a", g: "#c9b84a" }, hp: 55, spd: 25, gold: 7 },
+    soldat: { name: "Soldat", spr: "soldat", hp: 85, spd: 19, gold: 8 },
+    bulle: { name: "Bestie", spr: "bulle", hp: 160, spd: 12, gold: 12 },
+    schlange: { name: "Tempelschlange", spr: "schlange", pal: { g: "#4a7a3a", y: "#e8d84a", r: "#c8321e" }, hp: 120, spd: 15, gold: 10 },
+    // bosses
+    kerim: { name: "Sklavenhändler Kerim", spr: "bandit", pal: { W: "#7a1a14", r: "#e2b04a", m: "#5a3a2a" }, hp: 700, spd: 13, gold: 80, boss: true },
+    bestie: { name: "Die Bestie vom Attavyros", spr: "bulle", pal: { u: "#4a2a3e", y: "#ff3a2a" }, hp: 1300, spd: 9, gold: 120, boss: true, big: 1.6 },
+    priesterin: { name: "Hohepriesterin der Mitra", spr: "schatten", pal: { v: "#183a28", y: "#ff5a3a", g: "#e2b04a" }, hp: 1000, spd: 14, gold: 100, boss: true },
+    helgen: { name: "Ein Riese aus dem Norden", spr: "raufbold", pal: { h: "#e8e2d0", e: "#c9c2b0", t: "#3a3a4a" }, hp: 1600, spd: 10, gold: 140, boss: true, big: 1.5 },
+  };
+  const BOSSES = ["kerim", "bestie", "priesterin", "helgen"];
+  // sprites drawn once into small canvases
+  const cache = {};
+  function spr(k) {
+    if (cache[k]) return cache[k];
+    const F = FOES[k], rows = S.SPR[F.spr], c = document.createElement("canvas"); c.width = Math.max(...rows.map((r) => r.length)); c.height = rows.length;
+    S.sprite(c.getContext("2d"), F.spr, 0, 0, F.pal || {}); const f = document.createElement("canvas"); f.width = c.width; f.height = c.height;
+    const g = f.getContext("2d"); g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(c, 0, 0);
+    return (cache[k] = { r: c, l: f });
+  }
+  function wave(n) {
+    const pool = ["bandit", "wolf", "korsar", "bandit"].concat(n > 2 ? ["soeldner", "schatten"] : [], n > 4 ? ["adeptin", "korsar"] : [], n > 6 ? ["soldat", "bulle"] : [], n > 9 ? ["schlange", "soldat"] : []);
+    const list = [], count = 6 + Math.floor(n * 1.8);
+    for (let i = 0; i < count; i++) list.push(pool[Math.floor(Math.random() * pool.length)]);
+    if (n % 5 === 0) list.push(BOSSES[(n / 5 - 1) % BOSSES.length]);
+    return list;
+  }
+  const hpMul = (n) => (1 + 0.16 * (n - 1)) * (n > 10 ? 1 + 0.06 * (n - 10) : 1);
+
+  let G = null, el, cv, ctx, raf = 0, last = 0;
+  function start() {
+    const s = S.get(), f = s.feste;
+    G = { n: 0, gold: 150 + 40 * f.b.schatz, hp: 20 + 5 * f.b.mauer, maxhp: 20 + 5 * f.b.mauer, dmgMul: 1 + 0.1 * f.b.schmiede, berg: f.b.bergfried || 0,
+      towers: [], foes: [], shots: [], fx: [], queue: [], spawnT: 0, running: false, speed: 1, over: false, kills: 0, auto: false, seed: Math.random() * 100 };
+    el = document.createElement("div"); el.id = "td";
+    el.innerHTML = `<div class="bar"><span id="tHp">❤ </span><span id="tGold">🪙 </span><span id="tWave">Welle 0</span><span class="sp"></span><button type="button" id="tSpd">×1</button><button type="button" id="tX">✕</button></div>
+      <div class="field"><canvas></canvas></div>
+      <div class="foot"><div class="msg" id="tMsg">Tippe auf einen Steinplatz am Weg, um einen Turm zu bauen.</div><button type="button" class="go" id="tGo">⚔ Welle 1</button></div>`;
+    document.body.append(el);
+    cv = el.querySelector("canvas"); cv.width = W; cv.height = H; ctx = cv.getContext("2d");
+    el.querySelector("#tSpd").onclick = (e) => { G.speed = G.speed === 1 ? 2 : G.speed === 2 ? 3 : 1; e.target.textContent = "×" + G.speed; };
+    el.querySelector("#tX").onclick = () => { if (G.over || confirm("Aufgeben? Für die geschafften Wellen gibt es trotzdem Lohn.")) end(true); };
+    el.querySelector("#tGo").onclick = next;
+    cv.addEventListener("click", tap);
+    bg = null; last = performance.now(); raf = requestAnimationFrame(frame);
+  }
+  function next() {
+    if (G.running || G.over) return;
+    G.n++; G.queue = wave(G.n); G.spawnT = 0; G.running = true;
+    el.querySelector("#tGo").disabled = true; msg(G.n % 5 === 0 ? `Welle ${G.n}: ein Boss!` : `Welle ${G.n} zieht herauf.`);
+  }
+  const msg = (t) => { el.querySelector("#tMsg").textContent = t; };
+
+  /* ---------- building ---------- */
+  function tap(e) {
+    const r = cv.getBoundingClientRect(), x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
+    closeMenu();
+    const i = SLOTS.findIndex(([sx, sy]) => Math.hypot(sx - x, sy - y) < 14); if (i < 0) return;
+    const t = G.towers.find((q) => q.slot === i), m = document.createElement("div"); m.id = "tdMenu";
+    if (!t) m.innerHTML = Object.entries(TOWERS).map(([k, T]) => `<button type="button" data-b="${k}" ${G.gold < T.cost || (T.need && G.berg < T.need) ? "disabled" : ""}><span>${T.icon} ${T.name}</span><small>${T.need && G.berg < T.need ? "Bergfried " + T.need : "🪙 " + T.cost}</small></button>`).join("");
+    else { const T = TOWERS[t.type], up = Math.round(T.cost * 0.75 * t.lvl);
+      m.innerHTML = `<button type="button" disabled><span>${T.icon} ${T.name} · Stufe ${t.lvl}</span></button>` + (t.lvl < 3 ? `<button type="button" data-u ${G.gold < up ? "disabled" : ""}><span>⬆ Verbessern</span><small>🪙 ${up}</small></button>` : "") + `<button type="button" data-s><span>Abreißen</span><small>+🪙 ${Math.round(t.paid * 0.6)}</small></button>`; }
+    el.querySelector(".field").append(m);
+    const fr = el.querySelector(".field").getBoundingClientRect(), px = r.left - fr.left + (SLOTS[i][0] / W) * r.width, py = r.top - fr.top + (SLOTS[i][1] / H) * r.height;
+    m.style.left = Math.max(4, Math.min(fr.width - m.offsetWidth - 4, px - m.offsetWidth / 2)) + "px"; m.style.top = Math.max(4, Math.min(fr.height - m.offsetHeight - 4, py + 16)) + "px";
+    m.querySelectorAll("[data-b]").forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); const T = TOWERS[b.dataset.b]; if (G.gold < T.cost) return; G.gold -= T.cost; G.towers.push({ slot: i, type: b.dataset.b, lvl: 1, cd: 0, paid: T.cost, x: SLOTS[i][0], y: SLOTS[i][1], aim: 0 }); closeMenu(); });
+    const u = m.querySelector("[data-u]"); if (u) u.onclick = (ev) => { ev.stopPropagation(); const c = Math.round(TOWERS[t.type].cost * 0.75 * t.lvl); if (G.gold < c) return; G.gold -= c; t.paid += c; t.lvl++; closeMenu(); };
+    const sl = m.querySelector("[data-s]"); if (sl) sl.onclick = (ev) => { ev.stopPropagation(); G.gold += Math.round(t.paid * 0.6); G.towers = G.towers.filter((q) => q !== t); closeMenu(); };
+  }
+  const closeMenu = () => { const m = el && el.querySelector("#tdMenu"); if (m) m.remove(); };
+
+  /* ---------- the fight ---------- */
+  function step(dt) {
+    if (G.running) {
+      G.spawnT -= dt;
+      if (G.queue.length && G.spawnT <= 0) {
+        const k = G.queue.shift(), F = FOES[k], hp = Math.round(F.hp * hpMul(G.n));
+        G.foes.push({ k, d: -Math.random() * 8, hp, max: hp, spd: F.spd * (0.9 + Math.random() * 0.2), slow: 0, boss: !!F.boss });
+        G.spawnT = F.boss ? 1.6 : Math.max(0.35, 0.9 - G.n * 0.02);
+        if (F.boss) msg(`⚠ ${F.name} kommt!`);
+      }
+      if (!G.queue.length && !G.foes.length) {
+        G.running = false; const bonus = 20 + 5 * G.n; G.gold += bonus;
+        msg(`Welle ${G.n} gehalten! +${bonus} Gold.`); const b = el.querySelector("#tGo"); b.disabled = false; b.textContent = `⚔ Welle ${G.n + 1}`;
+      }
+    }
+    for (const f of G.foes) {
+      f.slow = Math.max(0, f.slow - dt); f.d += f.spd * (f.slow > 0 ? 0.55 : 1) * dt;
+      if (f.d >= total) { f.dead = true; G.hp -= f.boss ? 5 : 1; G.fx.push({ t: 0.4, x: 120, y: 368, kind: "hit" }); }
+    }
+    for (const t of G.towers) {
+      const T = TOWERS[t.type], range = T.range + (t.lvl - 1) * 6, dmg = T.dmg * Math.pow(1.45, t.lvl - 1) * G.dmgMul;
+      t.cd -= dt; if (t.cd > 0) continue;
+      const inR = G.foes.filter((f) => !f.dead && f.d > 0 && Math.hypot(at(f.d)[0] - t.x, at(f.d)[1] - t.y) <= range);
+      if (!inR.length) continue;
+      t.cd = T.rate;
+      if (T.shot === "feuer") { for (const f of inR) hurt(f, dmg); G.fx.push({ t: 0.5, x: t.x, y: t.y, r: range, kind: "feuer" }); continue; }
+      const f = inR.reduce((a, b) => (b.d > a.d ? b : a));      // the one nearest the keep
+      const [fx, fy] = at(f.d); t.aim = Math.atan2(fy - t.y, fx - t.x);
+      G.shots.push({ x: t.x, y: t.y - 6, f, dmg, kind: T.shot, v: T.shot === "bolzen" ? 260 : 200 });
+    }
+    for (const p of G.shots) {
+      if (p.f.dead) { p.done = true; continue; }
+      const [fx, fy] = at(p.f.d), dx = fx - p.x, dy = fy - 8 - p.y, L = Math.hypot(dx, dy), st = p.v * dt;
+      if (L <= st) { hurt(p.f, p.dmg); if (p.kind === "magie") p.f.slow = 1.5; p.done = true; } else { p.x += (dx / L) * st; p.y += (dy / L) * st; }
+    }
+    G.shots = G.shots.filter((p) => !p.done); G.foes = G.foes.filter((f) => !f.dead);
+    for (const x of G.fx) x.t -= dt; G.fx = G.fx.filter((x) => x.t > 0);
+    if (G.hp <= 0 && !G.over) { G.hp = 0; end(false); }
+  }
+  function hurt(f, d) {
+    f.hp -= d; if (f.hp <= 0 && !f.dead) { f.dead = true; G.kills++; G.gold += FOES[f.k].gold; const [x, y] = at(f.d); G.fx.push({ t: 0.6, x, y: y - 8, kind: "gold", v: FOES[f.k].gold }); }
+  }
+
+  /* ---------- drawing ---------- */
+  let bg = null;
+  function background() {
+    bg = document.createElement("canvas"); bg.width = W; bg.height = H; const c = bg.getContext("2d");
+    let h = Math.floor(G.seed * 1e5) || 1; const rnd = () => ((h = (h * 16807) % 2147483647) / 2147483647);
+    c.fillStyle = "#4a7a32"; c.fillRect(0, 0, W, H);
+    for (let i = 0; i < 1400; i++) { c.fillStyle = ["#558a3a", "#3f6a2a", "#5e9440", "#6a8a3a"][i % 4]; c.fillRect(rnd() * W | 0, rnd() * H | 0, 2, 1); }
+    // the road up, dusty, with a darker edge
+    c.lineCap = "round"; c.lineJoin = "round";
+    c.strokeStyle = "#6a5030"; c.lineWidth = 22; c.beginPath(); PATH.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
+    c.strokeStyle = "#b8955e"; c.lineWidth = 18; c.stroke();
+    for (let i = 0; i < 500; i++) { const [x, y] = at(rnd() * total); c.fillStyle = rnd() < 0.5 ? "#c9a670" : "#a8844e"; c.fillRect(x + (rnd() - 0.5) * 16 | 0, y + (rnd() - 0.5) * 16 | 0, 1, 1); }
+    // trees and rocks away from the road
+    for (let i = 0; i < 60; i++) {
+      const x = rnd() * W, y = rnd() * (H - 60); let near = false;
+      for (let d = 0; d < total; d += 8) { const [px, py] = at(d); if (Math.hypot(px - x, py - y) < 22) { near = true; break; } }
+      if (near || SLOTS.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 16)) continue;
+      if (rnd() < 0.75) { c.fillStyle = "#2a4a1e"; c.fillRect(x - 4, y - 2, 9, 4); c.fillStyle = "#3a6a2a"; c.fillRect(x - 3, y - 9, 7, 8); c.fillStyle = "#4a8a34"; c.fillRect(x - 2, y - 11, 4, 3); c.fillStyle = "#5a3a20"; c.fillRect(x, y + 1, 1, 3); }
+      else { c.fillStyle = "#8a8478"; c.fillRect(x - 3, y - 2, 7, 4); c.fillStyle = "#aaa49a"; c.fillRect(x - 2, y - 3, 4, 2); }
+    }
+    // the keep at the end of the road
+    const kx = 120, ky = 384;
+    c.fillStyle = "#6a6458"; c.fillRect(70, ky - 10, 100, 26); for (let x = 70; x < 170; x += 6) c.fillRect(x, ky - 13, 3, 3);
+    c.fillStyle = "#9a9488"; c.fillRect(kx - 14, ky - 40, 28, 40); for (let x = kx - 14; x < kx + 14; x += 6) c.fillRect(x, ky - 44, 3, 4);
+    c.fillStyle = "#3a2414"; c.fillRect(kx - 5, ky - 12, 10, 12); c.fillStyle = "#2a4a8a"; c.beginPath(); c.moveTo(kx - 16, ky - 44); c.lineTo(kx, ky - 64); c.lineTo(kx + 16, ky - 44); c.fill();
+    c.fillStyle = "#5a3a20"; c.fillRect(kx, ky - 76, 1, 12); c.fillStyle = "#b8322a"; c.fillRect(kx + 1, ky - 76, 8, 5);
+    // the stone places for towers
+    for (const [x, y] of SLOTS) { c.fillStyle = "#5a5448"; c.fillRect(x - 9, y - 6, 18, 12); c.fillStyle = "#8a8478"; c.fillRect(x - 8, y - 7, 16, 11); c.fillStyle = "#9a9488"; c.fillRect(x - 6, y - 6, 4, 3); }
+  }
+  function drawTower(t, now) {
+    const T = TOWERS[t.type], x = t.x, y = t.y, h = 12 + t.lvl * 4;
+    ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(x - 8, y + 2, 18, 4);
+    ctx.fillStyle = T.col; ctx.fillRect(x - 7, y - h, 14, h + 3); ctx.fillStyle = "#2a1a0c"; ctx.fillRect(x - 7, y - h, 14, 1);
+    for (let i = -7; i < 7; i += 4) { ctx.fillStyle = T.col; ctx.fillRect(x + i, y - h - 3, 2, 3); }
+    if (t.type === "bogen") { ctx.fillStyle = "#f2ede2"; ctx.fillRect(x - 2, y - h - 7, 4, 4); ctx.fillStyle = "#6b4a2a"; ctx.fillRect(x + Math.round(Math.cos(t.aim) * 5), y - h - 6 + Math.round(Math.sin(t.aim) * 3), 2, 4); }
+    if (t.type === "balliste") { ctx.fillStyle = "#5a3a20"; ctx.fillRect(x - 6, y - h - 4, 12, 3); ctx.fillStyle = "#d8dde2"; ctx.fillRect(x + Math.round(Math.cos(t.aim) * 6) - 1, y - h - 4 + Math.round(Math.sin(t.aim) * 4), 3, 2); }
+    if (t.type === "pech") { ctx.fillStyle = "#2a2420"; ctx.fillRect(x - 4, y - h - 5, 8, 5); ctx.fillStyle = Math.sin(now / 120) > 0 ? "#ff8a2a" : "#ffd24a"; ctx.fillRect(x - 2, y - h - 7, 4, 2); }
+    if (t.type === "telchin") { ctx.fillStyle = "#7fe0e8"; ctx.fillRect(x - 1, y - h - 10 + Math.round(Math.sin(now / 300) * 1.5), 3, 6); ctx.fillRect(x - 3, y - h - 8, 7, 1); }
+    for (let i = 0; i < t.lvl; i++) { ctx.fillStyle = "#e2b04a"; ctx.fillRect(x - 5 + i * 4, y - 2, 2, 2); }
+  }
+  function draw(now) {
+    if (!bg) background();
+    ctx.drawImage(bg, 0, 0);
+    // walkers, from the back of the road to the front
+    const list = [...G.foes].filter((f) => f.d > -2).sort((a, b) => at(a.d)[1] - at(b.d)[1]);
+    const items = list.map((f) => ({ y: at(f.d)[1], f })).concat(G.towers.map((t) => ({ y: t.y, t })));
+    items.sort((a, b) => a.y - b.y);
+    for (const it of items) {
+      if (it.t) { drawTower(it.t, now); continue; }
+      const f = it.f, F = FOES[f.k], [x, y, dx] = at(f.d), im = spr(f.k), big = F.big || (f.boss ? 1.2 : 1), w = im.r.width * 0.7 * big, h = im.r.height * 0.7 * big;
+      const bob = Math.round(Math.sin(now / 120 + f.d) * 0.8);
+      ctx.drawImage(dx < 0 ? im.l : im.r, Math.round(x - w / 2), Math.round(y - h + 3 + bob), Math.round(w), Math.round(h));
+      if (f.slow > 0) { ctx.fillStyle = "rgba(127,224,232,0.5)"; ctx.fillRect(Math.round(x - w / 2), Math.round(y + 1), Math.round(w), 2); }
+      ctx.fillStyle = "#1a120c"; ctx.fillRect(Math.round(x - 7), Math.round(y - h), 14, 3); ctx.fillStyle = f.boss ? "#ffb030" : "#d83a2a"; ctx.fillRect(Math.round(x - 6), Math.round(y - h + 1), Math.max(1, Math.round((12 * f.hp) / f.max)), 1);
+    }
+    for (const p of G.shots) {
+      if (p.kind === "magie") { ctx.fillStyle = "#7fe0e8"; ctx.fillRect(p.x - 1, p.y - 1, 3, 3); }
+      else { ctx.fillStyle = p.kind === "bolzen" ? "#e8e2d0" : "#f2ede2"; ctx.fillRect(p.x, p.y, p.kind === "bolzen" ? 3 : 2, p.kind === "bolzen" ? 2 : 1); }
+    }
+    for (const x of G.fx) {
+      if (x.kind === "feuer") { ctx.fillStyle = `rgba(255,${120 + Math.round(Math.random() * 80)},40,${x.t})`; for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, r = Math.random() * x.r; ctx.fillRect(x.x + Math.cos(a) * r, x.y + Math.sin(a) * r * 0.7, 2, 2); } }
+      if (x.kind === "gold") { ctx.fillStyle = `rgba(255,210,74,${x.t / 0.6})`; ctx.font = "8px monospace"; ctx.fillText("+" + x.v, x.x - 4, x.y - (0.6 - x.t) * 20); }
+      if (x.kind === "hit") { ctx.fillStyle = `rgba(255,60,40,${x.t})`; ctx.fillRect(70, 370, 100, 30); }
+    }
+  }
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000) * (G.over ? 0 : G.speed); last = now;
+    step(dt); draw(now);
+    el.querySelector("#tHp").textContent = `❤ ${G.hp}/${G.maxhp}`; el.querySelector("#tGold").textContent = `🪙 ${G.gold}`; el.querySelector("#tWave").textContent = `Welle ${G.n}`;
+    raf = requestAnimationFrame(frame);
+  }
+  function end(gaveUp) {
+    G.over = true; G.running = false;
+    const held = gaveUp && !G.foes.length && !G.queue.length ? G.n : Math.max(0, G.n - 1), exp = held * 40, gold = held * 20;
+    const s0 = S.get(), best = Math.max(s0.feste.best || 0, held);
+    const r = S.reward(exp, gold); r.feste.best = best; r.log.tdBest = Math.max(r.log.tdBest || 0, held); delete r.up; S.save(r);
+    const d = document.createElement("div"); d.id = "tdEnd";
+    d.innerHTML = `<h1>${gaveUp ? "RÜCKZUG" : "GEFALLEN"}</h1><p>${held} Welle${held === 1 ? "" : "n"} gehalten · ${G.kills} Feinde besiegt</p><p style="color:#8fe3ff">+${exp} EXP · <span style="color:#ffd24a">+${gold} Gold</span>${r.level > s0.level ? `<br>Stufe ${r.level}!` : ""}</p><p>Beste Verteidigung: Welle ${best}</p><button type="button" class="go">Zurück zur Feste</button>`;
+    el.querySelector(".field").append(d);
+    d.querySelector("button").onclick = () => { cancelAnimationFrame(raf); el.remove(); render(); keepPic(); };
+  }
+  return { start };
+})();
+
+render(); keepPic();
+if (new URLSearchParams(location.search).has("verteidigen") && S.get().feste) TD.start();
+</script>
+</body>
+</html>

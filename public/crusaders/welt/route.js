@@ -214,5 +214,5 @@
     if (now - tick > 1000) { tick = now; panel(); }
   }
 
-  window.Route = { build, go, stop, pick, step, route: () => R };
+  window.Route = { build, go, stop, pick, step, style, route: () => R };
 })();

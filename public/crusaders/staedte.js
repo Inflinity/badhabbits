@@ -217,7 +217,7 @@
   const homeNow = (s) => s.party.filter((c) => window.Spiel.COMP[c] && !awayNow(s).has(c));
   function chance(s, offer, who) {
     const power = who.reduce((a, c) => a + window.Spiel.COMP[c].power, 0) + s.level * 0.5, diff = (offer.foes ? offer.foes.length : 0) * 3 + 1;
-    return clamp(0.45 + (power - diff) * 0.07, 0.15, 0.95);
+    return clamp(0.45 + (power - diff) * 0.07 + (s.ship ? s.ship.stage * 0.03 : 0), 0.15, 0.95);
   }
   const minutes = (s, offer) => (offer.foes ? 120 : 60) * (s.aura ? 1 / 60 : 1);
   function send(offer, who) {
@@ -245,14 +245,16 @@
     }
     return out;
   }
-  const CAP = 20;
+  // your bundle holds 20; a ship carries more (fishing boat 5 … galleon 60)
+  const SHIP_CARGO = [5, 10, 20, 25, 40, 60];
+  const capOf = (s) => 20 + (s.ship ? SHIP_CARGO[s.ship.stage] || 0 : 0);
   const have = (s, k) => (GOODS[k].use ? s[GOODS[k].use] || 0 : s.inv[k] || 0);
   const load = (s) => Object.values(s.inv).reduce((a, b) => a + b, 0);
   function trade(town, k, n) {
     const s = window.Spiel.get(), p = prices(town)[k], g = GOODS[k];
     if (n > 0) {
       if (s.gold < p.buy) return "Zu wenig Gold.";
-      if (!g.use && load(s) >= CAP) return `Dein Bündel ist voll (${CAP} Stück).`;
+      if (!g.use && load(s) >= capOf(s)) return `Dein Bündel ist voll (${capOf(s)} Stück).`;
       s.gold -= p.buy; if (g.use) s[g.use] = (s[g.use] || 0) + 1; else s.inv[k] = (s.inv[k] || 0) + 1;
     } else {
       if (have(s, k) <= 0) return "Davon hast du nichts.";
@@ -363,7 +365,7 @@
     if (tab === "markt") {
       if (d > 2) return `<p class="note">Der Markt von ${town} ist nur vor Ort offen. Noch ${fmtKm(d)} bis dorthin.</p><p class="note">Was hier billig ist (erzeugt): ${pf.make.map((k) => GOODS[k] ? GOODS[k].name : k).join(", ")}.<br>Was hier teuer bezahlt wird (gesucht): ${pf.want.map((k) => GOODS[k] ? GOODS[k].name : k).join(", ")}.</p>`;
       const pr = prices(town);
-      return `<p class="note">Kaufe, wo etwas gemacht wird, verkaufe, wo es gesucht wird. Dein Bündel fasst ${CAP} Stück (jetzt ${load(s)}). Feigen und Wein trägst du extra, für den Kampf.</p>
+      return `<p class="note">Kaufe, wo etwas gemacht wird, verkaufe, wo es gesucht wird. Dein Bündel fasst ${capOf(s)} Stück${s.ship ? " mit Schiff" : ""} (jetzt ${load(s)}). Feigen und Wein trägst du extra, für den Kampf.</p>
         <table class="goods">${Object.entries(GOODS).map(([k, g]) => `<tr><td>${g.icon}</td><td class="n">${g.name}${pr[k].make ? ' <small>erzeugt</small>' : pr[k].want ? ' <small class="w">gesucht</small>' : ""}<br><span style="font-weight:400">Kauf ${pr[k].buy} · Verkauf ${pr[k].sell} · du hast ${have(s, k)}</span></td>
           <td><button type="button" data-sell="${k}">−</button></td><td><button type="button" data-buy="${k}">+</button></td></tr>`).join("")}</table>`;
     }

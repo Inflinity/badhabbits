@@ -220,13 +220,16 @@
     // companions fight with you, unless they are away on an excursion
     const away = new Set((st.excursions || []).filter((e) => e.end > Date.now()).flatMap((e) => e.who));
     for (const c of st.party) if (COMP[c] && !away.has(c)) heroes.push({ id: c, name: COMP[c].name, spr: COMP[c].spr, pal: COMP[c].pal, ai: true, ...STATS[c](L) });
+    // a tea from the herbarium still working: its effect on you
+    const tea = st.buff && st.buff.until > Date.now() ? st.buff : null, me0 = heroes[0];
+    if (tea) { if (tea.kind === "hp") me0.hp = Math.round(me0.hp * (1 + tea.v / 100)); else if (tea.kind === "mp") me0.mp = Math.round(me0.mp * (1 + tea.v / 100)); else if (tea.kind === "spd") me0.spd += tea.v; else me0[tea.kind] += tea.v; }
     heroes.forEach((h) => { h.max = h.hp; h.maxmp = h.mp; h.atb = Math.random() * 0.5; h.side = 0; });
     // a foe is a kind ("bandit") or a kind with its own name and colours ({ k: "korsar", name: "Korsar Dragut", boss: true })
     const foes = opt.foes.map((o, i) => { const k = typeof o === "string" ? o : o.k, f = FOES[k](opt.tier || 1), x = typeof o === "string" ? {} : o;
       return { ...f, ...(x.name ? { name: x.name } : {}), pal: { ...(f.pal || {}), ...(x.pal || {}) }, boss: f.boss || x.boss, hp: Math.round(f.hp * (x.hp || 1)), id: k + i, max: Math.round(f.hp * (x.hp || 1)), atb: Math.random() * 0.3, side: 1 }; });
     const all = () => [...heroes, ...foes];
     const el = document.createElement("div"); el.id = "kampf";
-    el.innerHTML = `<canvas></canvas><div id="kmsg">${opt.title || "Ein Kampf!"}</div><div id="kfloat"></div>
+    el.innerHTML = `<canvas></canvas><div id="kmsg">${opt.title || "Ein Kampf!"}${tea ? `<br><small style="font-size:14px;color:#c9e06a">🍵 ${tea.name}: ${tea.text}</small>` : ""}</div><div id="kfloat"></div>
       <div class="kpanels"><div class="kbox" id="kparty"></div><div class="kbox kmenu" id="kmenu"></div></div>`;
     document.body.append(el);
     const cv = el.querySelector("canvas"), ctx = cv.getContext("2d");

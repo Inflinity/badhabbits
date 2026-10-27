@@ -87,6 +87,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   <a href="../lager/" id="lagerBtn"><span>⛺</span>Lager</a>
   <button type="button" id="stadtBtn"><span>🏰</span>Stadt</button>
   <button type="button" id="routeBtn"><span>🚗</span>Route</button>
+  <button type="button" id="sailBtn" hidden><span>⛵</span>Segeln</button>
+  <button type="button" id="festeBtn" hidden><span>🏯</span>Feste</button>
 </div>
 <div class="date"></div>
 <div id="toast" hidden></div>
@@ -902,6 +904,7 @@ window.CrusadersGeo.load().then((geo) => {
   landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes); window.Himmel.init();
   window.SIGHTS = geo.regions.flatMap((r) => r.data.sights || []); window.Route.build(geo.roads);
   $("#routeBtn").onclick = () => window.Route.pick();
+  window.Besitz.init(geo);
   for (const [name, lat, lon] of TOWNS) { const [x, z] = P(lon, lat); label(name, "", x, z); }
   for (const r of geo.regions) for (const st of r.data.sights || []) { const [x, z] = P(st.lon, st.lat); label(st.name, st.sub, x, z, "sight"); }
   for (const s of window.Postcards.spots) if (s.kind === "postkarte") { const [x, z] = P(s.lon, s.lat); label("✉", "", x + 0.15, z, "pc"); }
@@ -922,5 +925,6 @@ window.CrusadersGeo.load().then((geo) => {
 </script>
 <script src="himmel.js"></script>
 <script src="route.js"></script>
+<script src="besitz.js"></script>
 </body>
 </html>

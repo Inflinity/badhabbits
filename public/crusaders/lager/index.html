@@ -57,6 +57,7 @@ main { padding: 14px 14px max(20px, env(safe-area-inset-bottom)); max-width: 560
 <main>
   <section class="board"><h2>Questbrett</h2><div id="quests"></div></section>
   <section class="board"><h2>Gefährten</h2><div id="comps"></div></section>
+  <section class="board"><h2>Besitz</h2><div id="besitz"></div></section>
   <section class="board" id="chestBox"><h2>Die Beutetruhe</h2><div id="chest"></div></section>
   <section class="board"><h2>Vom Wrack zum Kreuzfahrerhafen</h2><div id="stages"></div></section>
   <a class="go" href="../welt/">⚔ Hinaus in die Welt</a>
@@ -98,6 +99,10 @@ function render() {
     const done = s.quests[q.id] && s.quests[q.id].done;
     return `<div class="q ${done ? "done" : ""}"><div class="ic">${q.icon}</div><div><b>${q.name}</b><small>${done ? "Erledigt. " + q.done : q.sub}</small></div><div class="st">${done ? "✓" : "Stufe " + q.lvl}</div></div>`;
   }).join("");
+  // what you own beyond the camp: a ship from level 10, a fortress from level 50 (open early with the dev aura)
+  const SHIPN = ["Fischerboot", "Kaiki", "Kogge", "Galeere", "Karacke", "Galeone"];
+  $("#besitz").innerHTML = `<a class="q" href="../schiff/" style="color:inherit;text-decoration:none"><div class="ic">⛵</div><div><b>${s.ship ? s.ship.name : "Ein eigenes Schiff"}</b><small>${s.ship ? SHIPN[s.ship.stage] + " · ausbauen" : s.level >= 10 || s.aura ? "Flick ein Boot aus dem Wrack" : "Ab Stufe 10"}</small></div><div class="st">›</div></a>
+    <a class="q" href="../feste/" style="color:inherit;text-decoration:none"><div class="ic">🏯</div><div><b>${s.feste ? s.feste.name : "Eine eigene Feste"}</b><small>${s.feste ? "Ausbauen und verteidigen · beste Welle " + (s.feste.best || 0) : s.level >= 50 || s.aura ? "Gründe sie in der Welt" : "Ab Stufe 50"}</small></div><div class="st">›</div></a>`;
   // who is with you, and who is away
   const ex = s.excursions.filter((e) => !e.claimed), away = (c) => ex.find((e) => e.who.includes(c) && e.end > now);
   $("#comps").innerHTML = s.party.filter((c) => C[c]).map((c) => { const a = away(c);
