@@ -3477,6 +3477,29 @@ $("#voiceTest").addEventListener("click", () => {
   S.voice = was;
 });
 updateReadouts();
+/* Opened from the Crusaders menu (Spiritus): ?von=crusaders leads back there, ?wahl=… chooses the practice.
+   Sound needs a tap, so the app only gets everything ready; you start it yourself.
+   wahl: s:nachsport · s:morning · s:recap · post · reise:sleep|lucid|deep|tank|story · samsara ·
+         modus:jb|engine|tiefe|realtime|lead · box:4,4,4,4 · tagebuch */
+(function fromMenu() {
+  const q = new URLSearchParams(location.search), w = q.get("wahl");
+  if (q.get("von") === "crusaders") { const a = document.querySelector("header .back"); a.href = "/crusaders/?zu=spiritus"; a.setAttribute("aria-label", "Zurück zu Crusaders"); }
+  if (!w) return;
+  const pick = (name, value) => { const el = document.querySelector(`input[name=${name}][value="${value}"]`); if (el) el.checked = true; return el; };
+  const ready = (what, target) => {
+    updateFields();
+    $("#prompt").textContent = `${what}: alles bereit. Tippe auf Starten.`;
+    (target || $("#startBtn")).scrollIntoView({ block: "center" });
+  };
+  const [k, v] = w.includes(":") ? [w.slice(0, w.indexOf(":")), w.slice(w.indexOf(":") + 1)] : [w, ""];
+  if (k === "s") { pick("mode", "portal"); const j = pick("journey", w); if (j) { updateFields(); samLoad(samFind(w)); } ready(j ? j.nextElementSibling.textContent : "Changes"); }
+  else if (k === "post") { const b = document.querySelector('#changes [data-change="post"]'); if (b && $("#post").hidden) b.click(); $("#post").scrollIntoView({ block: "start" }); }
+  else if (k === "reise") { pick("mode", "portal"); const j = pick("journey", v); ready(j ? j.nextElementSibling.textContent : "Reise"); }
+  else if (k === "samsara") { pick("mode", "portal"); updateFields(); $("#samBuilder").open = true; $("#samBuilder").scrollIntoView({ block: "start" }); }
+  else if (k === "modus") { const m = pick("mode", v); ready(m ? m.nextElementSibling.textContent : "Übung"); }
+  else if (k === "box") { pick("mode", "box"); updateFields(); const b = document.querySelector(`.presets [data-box="${v}"]`); if (b) b.click(); ready("Viereck " + v.split(",").filter((x) => x !== "0").join("·")); }
+  else if (k === "tagebuch") { $("#diary").open = true; $("#diary").scrollIntoView({ block: "start" }); }
+})();
 </script>
 </body>
 </html>

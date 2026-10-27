@@ -143,6 +143,14 @@ const ICON = {
     "..............kq..", ".............kqQk.", "............kqQk..", "...........kqQk...", ".kkkkkk...kkQkkk..", "kppppppkkkpppppppk",
     "kplpllpkpkPppppppk", "kppppppkpkpllplppk", "kpllplpkpkPppppppk", "kppppppkpkpplpllpk", "kplplppkpkPppppppk", "kppppppkpkpllpllpk",
     "kpllpppkpkPppppppk", "kkkkkkkkkkkkkkkkkk", "krrrrrrrrrrrrrrrrk", ".kkkkkkkkkkkkkkkk."] },
+  tee: { pal: { k: "#14100c", s: "#d8dde2", w: "#f2ede2", W: "#c9c2b0", g: "#b8862a", l: "#5a9a3a", L: "#3a7a2a" }, rows: [
+    "....s...s.......", ".....s...s......", "....s...s....LL.", ".....s...s..LllL", "............Lll.", ".kkkkkkkkkkk.L..",
+    ".kwwwwwwwwwkkk..", ".kwgggggggwk.k..", ".kwgggggggwk.k..", ".kWwwwwwwwWkkk..", "..kWwwwwwWk.....", "...kkkkkkk......",
+    "kkkkkkkkkkkkk...", ".kwwwwwwwwwk....", "..kkkkkkkkk....."] },
+  wind: { pal: { b: "#7fd6e8", B: "#3a9ab8", w: "#e8f8fc" }, rows: [
+    "................", "..bbbbbbbb......", ".b........b.....", "...........b....", "....wwwwwwbb....", "..........b.....",
+    "BBBBBBBBBBB.....", "................", "..bbbbbbbbbbb...", ".............b..", "......bbbbb...b.", ".....b.....b.b..",
+    ".....b...bb.b...", "......bbb.......", "................"] },
   zelt: { pal: { k: "#14100c", w: "#e8dcc0", W: "#bdb39a", b: "#5a3a20", o: "#e2541a", y: "#ffb030", r: "#b8322a" }, rows: [
     "........r.......", "........rr......", "........b.......", ".......kwk......", "......kwWwk.....", ".....kwwWwwk....", "....kwwwWwwwk...",
     "...kwwwkbkwwwk..", "..kwwwwkbkwwwwk.", ".kwwwwwkbkwwwwwk", "kkkkkkkkkkkkkkkk", "......kyk.......", ".....koyok......", "....kbbbbbk....."] },
@@ -174,8 +182,10 @@ const RINGS = [
   { id: "charakter", label: "CHARAKTER", x: 0.27, y: 0.17, s: 0.31, icon: "ritter", rc: "#8d929c" },
   { id: "mensa", label: "MENSA", x: 0.75, y: 0.17, s: 0.29, icon: "mensa", rc: "#a07a52" },
   { id: "mundi", label: "MUNDI", x: 0.5, y: 0.48, s: 0.42, icon: "globe", rc: "#a07a52", fs: "28px" },
-  { id: "curriculum", label: "CURRICULUM", x: 0.42, y: 0.8, s: 0.29, icon: "buch", rc: "#8d929c" },
-  { id: "castra", label: "CASTRA", x: 0.84, y: 0.78, s: 0.2, icon: "zelt", rc: "#a07a52", fs: "15px" },
+  { id: "spiritus", label: "SPIRITUS", x: 0.14, y: 0.5, s: 0.22, icon: "wind", rc: "#5a9ab8", fs: "15px" },
+  { id: "herbarium", label: "HERBARIUM", x: 0.86, y: 0.5, s: 0.22, icon: "tee", rc: "#6a8a4a", fs: "15px" },
+  { id: "curriculum", label: "CURRICULUM", x: 0.42, y: 0.81, s: 0.29, icon: "buch", rc: "#8d929c" },
+  { id: "castra", label: "CASTRA", x: 0.84, y: 0.8, s: 0.19, icon: "zelt", rc: "#a07a52", fs: "15px" },
 ];
 function layout() {
   const box = $("#rings"), W = innerWidth, top = 80, bot = 90, H = innerHeight - top - bot, unit = Math.min(W, H * 0.62);
@@ -203,6 +213,9 @@ function subs() {
   set("curriculum", tr.start ? "Training läuft" : `${Object.keys(window.Postcards.found()).length} Funde`);
   set("castra", ["Wrack", "Feuer", "Zelt", "Palisade", "Steg", "Werft", "Hafen"][s.camp] || "");
   set("charakter", (S.me() || S.GENERICA).name);
+  const hb = S.read(HB_KEY, {}), diary = S.read("atemlotse-tagebuch", []), neu = diary.filter((e) => (e.start || 0) > (s.log.atemBis || 0)).length;
+  set("spiritus", neu ? `${neu} neu` : "Atmen");
+  set("herbarium", hb.brew ? "Zieht …" : `${Object.keys(hb.pressed || {}).length}/${HERBS.length} Kräuter`);
 }
 const hm = (ms) => { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`; };
 function bar() {
@@ -222,8 +235,8 @@ function open(id) {
 }
 $("#shX").onclick = () => { $("#sh").hidden = true; current = null; bar(); subs(); };
 function render() {
-  const f = { charakter: charakter, mensa: mensa, curriculum: codex, dev: dev }[current];
-  $("#shT").textContent = { charakter: "CHARAKTER", mensa: "MENSA · FASTEN", curriculum: "CURRICULUM · CODEX", dev: "✨ AURA DES DEV" }[current];
+  const f = { charakter: charakter, mensa: mensa, curriculum: codex, dev: dev, spiritus: spiritus, herbarium: herbarium }[current];
+  $("#shT").textContent = { charakter: "CHARAKTER", mensa: "MENSA · FASTEN", curriculum: "CURRICULUM · CODEX", dev: "✨ AURA DES DEV", spiritus: "SPIRITUS · ATMEN", herbarium: "HERBARIUM · TEE" }[current];
   f($("#shIn"));
 }
 
@@ -293,8 +306,10 @@ function codex(el) {
   const fac = window.Staedte ? window.Staedte.FACTIONS : null;
   el.innerHTML = `<p class="note">Alles, was du erlebt, gesammelt und geübt hast, wächst hier zu einem Baum.</p>
     <div class="br"><div class="head"><div class="orb">🏛</div><div><b>Kultur</b><small>${Object.keys(found).length} von ${spots.length} Funden</small></div><button type="button" class="btn ghost" id="cSam">Sammlung</button></div><ul class="tree">${kultur}</ul></div>
-    <div class="br"><div class="head"><div class="orb">🌬</div><div><b>Atem</b><small>${diary.length} Übungen im Tagebuch von Changes</small></div>${neu.length ? `<button type="button" class="btn" id="cAtem">${neu.length}× abholen</button>` : `<a class="btn ghost" href="/changes/" style="text-decoration:none">Atmen</a>`}</div>
+    <div class="br"><div class="head"><div class="orb">🌬</div><div><b>Atem</b><small>${diary.length} Übungen im Tagebuch von Changes</small></div>${neu.length ? `<button type="button" class="btn" id="cAtem">${neu.length}× abholen</button>` : `<button type="button" class="btn ghost" id="cSpir">Atmen</button>`}</div>
       <ul class="tree">${ms(diary.length, [1, 10, 30, 100], "Übungen")}<li><details><summary><span class="node ${kindsDone.length ? "part" : ""}"><i></i>Arten <em>${kindsDone.length}</em></span></summary><ul class="tree">${kindsDone.map((k) => node(true, k)).join("") || node(false, "noch keine")}</ul></details></li></ul></div>
+    <div class="br"><div class="head"><div class="orb">🍵</div><div><b>Herbarium</b><small>${Object.keys(S.read(HB_KEY, {}).pressed || {}).length} von ${HERBS.length} Kräutern gepresst</small></div><button type="button" class="btn ghost" id="cHerb">Tee</button></div>
+      <ul class="tree">${HERBS.map((h) => node(!!(S.read(HB_KEY, {}).pressed || {})[h.id], (S.read(HB_KEY, {}).pressed || {})[h.id] ? h.name : "???")).join("")}</ul></div>
     <div class="br"><div class="head"><div class="orb">⚔</div><div><b>Training</b><small>${tr.hist.length} Einheiten · ${hm(trMin * 60000)} h</small></div></div>
       <div style="margin:8px 0 4px 4px">${tr.start ? `<div class="clock" style="margin:0"><b id="tClock" style="font-size:34px">${hm(Date.now() - tr.start)}</b><small>${tr.type} läuft</small></div><div style="text-align:center"><button type="button" class="btn" id="tEnd">Training beenden · Belohnung</button></div>`
         : `<div class="chips">${TRAIN.map((t, i) => `<button type="button" data-tr="${t}" aria-pressed="${i === 0}">${t}</button>`).join("")}</div><button type="button" class="btn" id="tGo">Training starten</button>`}</div>
@@ -304,8 +319,10 @@ function codex(el) {
     <div class="br"><div class="head"><div class="orb">🛡</div><div><b>Taten</b><small>${S.me() ? S.me().name : "Generica"} · Stufe ${s.level}</small></div></div>
       <ul class="tree">${node(s.party.includes("porthos"), "Porthos befreit")}${node(s.party.includes("helgen"), "Die Raufboldbrüder gewonnen")}${node(!!s.chest, "Die Beutetruhe geborgen")}${ms((s.log || {}).exDone || 0, [1, 10], "Exkursionen")}${ms(s.level, [3, 5, 10], "Stufen").replace(/(\d+) Stufen/g, "Stufe $1")}${ms(s.log.jobsDone || 0, [1, 10, 25], "Aufträge")}
       ${node(s.camp >= 6, "Ein Kreuzfahrerhafen", s.camp < 6 ? `${s.camp}/6` : "")}${node(!!(s.quests.mitra && s.quests.mitra.done), "Die Hohepriesterin der Mitra bezwungen")}${fac ? Object.entries(fac).filter(([, f]) => !f.noJobs).map(([k, f]) => node((s.rep[k] || 0) >= 50, `Freund: ${f.name}`, (s.rep[k] || 0) < 50 ? `Ruf ${s.rep[k] || 0}/50` : "")).join("") : ""}</ul></div>`;
+  if ($("#cSpir")) $("#cSpir").onclick = () => { current = "spiritus"; render(); };
   $("#cSam").onclick = () => { $("#sh").hidden = true; current = null; window.Postcards.open(); };
   $("#cFast").onclick = () => { current = "mensa"; render(); };
+  $("#cHerb").onclick = () => { current = "herbarium"; render(); };
   if ($("#cAtem")) $("#cAtem").onclick = () => {
     const r = S.reward(25 * neu.length, 5 * neu.length); r.log.atemBis = Math.max(...diary.map((e) => e.start || 0)); delete r.up; S.save(r);
     toast(`Atem: +${25 * neu.length} EXP · +${5 * neu.length} Gold${r.level > s.level ? " · Stufe " + r.level + "!" : ""}`, 5000); render(); bar();
@@ -321,6 +338,97 @@ function codex(el) {
   };
 }
 
+/* Spiritus: everything from the breathing app (Changes), each practice opened ready to start.
+   The app itself stays where it is (/atem/, also /changes/); it gets ?wahl=… and comes back here. */
+const ATEM = [
+  { h: "Changes", items: [
+    ["s:nachsport", "After Work Breath-Out", "Nach dem Sport zurück in deinen Gleichatem"],
+    ["s:morning", "Morning Changes", "Wach werden und ein Change für heute"],
+    ["post", "Daily Changes", "Correspondence: fünf Postkarten an Menschen, denen du etwas sagen willst"],
+    ["s:recap", "Recap", "Abendbesinnung: was war, was bleibt, was geht"]] },
+  { h: "Reisen durchs Portal", items: [
+    ["reise:sleep", "Einschlafen", "Atem, Meer und Klänge, die dich in den Schlaf tragen, mit Schnarch-Erkennung"],
+    ["reise:lucid", "Luzid", "Klarträumen: leise Signale im Schlaf, auf Wunsch WBTB"],
+    ["reise:deep", "Tiefe", "Langsam tiefer, Shepard-Töne hinab und hinauf"],
+    ["reise:tank", "Tank", "Schwebe wie im Floating-Tank: Herzschlag, Stille"],
+    ["reise:story", "Der Garten", "Eine Gutenachtgeschichte, an Atem und Herzschlag gekoppelt, etwa 20 Minuten"],
+    ["samsara", "Samsara", "Eigene Reisen schreiben, speichern und als Link teilen"]] },
+  { h: "Übungen", items: [
+    ["modus:jb", "Just Breathe", "Handy auf die Brust: das Meer folgt deinem Atem in Echtzeit"],
+    ["modus:engine", "Kalibrierung", "Das Meer lernt deinen Atem; Doppeltipp schaltet die Klangschichten durch"],
+    ["box:4,4,4,4", "Viereck 4·4·4·4", "Box Breathing: ein, halten, aus, halten"],
+    ["box:4,7,8,0", "4·7·8", "Zum Runterkommen und Einschlafen"],
+    ["modus:tiefe", "Tiefe (Übung)", "Der Lotse führt dich Zug um Zug tiefer"],
+    ["modus:realtime", "Echtzeit", "Nur zuhören: die App zeigt, wie du atmest"],
+    ["modus:lead", "Führen", "Der Lotse gibt den Rhythmus vor"]] },
+];
+function spiritus(el) {
+  const s = S.get(), diary = S.read("atemlotse-tagebuch", []), neu = diary.filter((e) => (e.start || 0) > (s.log.atemBis || 0));
+  const href = (w) => `/atem/?von=crusaders&wahl=${encodeURIComponent(w)}`;
+  el.innerHTML = `<p class="note">Alles aus der Atem-App, an einem Ort. Tippe eine Übung an: Changes öffnet sich mit ihr vorgewählt, du tippst nur noch auf Starten. Jede Übung landet im Tagebuch und bringt deinem Charakter EXP.</p>
+    ${neu.length ? `<button type="button" class="btn" id="spClaim" style="width:100%;margin-bottom:12px">🌬 ${neu.length} neue Übung${neu.length > 1 ? "en" : ""} · +${25 * neu.length} EXP abholen</button>` : ""}
+    ${ATEM.map((g) => `<div class="br"><div class="head"><div class="orb">${g.h === "Changes" ? "✉" : g.h === "Übungen" ? "🫁" : "🌀"}</div><div><b>${g.h}</b></div></div>
+      ${g.items.map(([w, n, d]) => `<a class="hero" href="${href(w)}" style="text-decoration:none;color:inherit"><div class="t"><b>${n}</b><small>${d}</small></div><span style="font:700 20px 'Pixelify Sans'">›</span></a>`).join("")}</div>`).join("")}
+    <div class="br"><div class="head"><div class="orb">📖</div><div><b>Tagebuch</b><small>${diary.length} Einträge</small></div><a class="btn ghost" href="${href("tagebuch")}" style="text-decoration:none">Ganz</a></div>
+      ${diary.slice(-5).reverse().map((e) => `<div class="hero"><div class="t"><b>${e.what || "Übung"}</b><small>${new Date(e.start).toLocaleString("de-DE", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} · ${e.dur || ""}${e.note ? " · " + String(e.note).slice(0, 80) : ""}</small></div></div>`).join("") || `<p class="note">Noch leer.</p>`}</div>
+    <a class="hero" href="/atem/klassik/" style="text-decoration:none;color:inherit"><div class="t"><b>Changes Klassik</b><small>Die erste Fassung, unverändert</small></div><span>›</span></a>`;
+  if ($("#spClaim")) $("#spClaim").onclick = () => {
+    const r = S.reward(25 * neu.length, 5 * neu.length); r.log.atemBis = Math.max(...diary.map((e) => e.start || 0)); delete r.up; S.save(r);
+    toast(`Atem: +${25 * neu.length} EXP · +${5 * neu.length} Gold${r.level > s.level ? " · Stufe " + r.level + "!" : ""}`, 5000); render(); bar(); subs();
+  };
+}
+
+/* Herbarium: the teas of Rhodes and the Aegean. Brew one: it steeps for its real time, and when you
+   drink it, the herb is pressed into your herbarium, your character gets a little EXP (three times a
+   day) and the tea's effect for the next two hours in every fight. */
+const HB_KEY = "crusaders-herbarium";
+const HERBS = [
+  { id: "bergtee", name: "Bergtee", gr: "Τσάι του βουνού", lat: "Sideritis", icon: "🌿", min: 7, temp: "100 °C, kurz köcheln", eff: "Wärmt, öffnet die Bronchien, hilft bei Erkältung.", where: "Hoch an den Hängen von Attavyros und Profitis Ilias.", buff: ["hp", 15, "+15 % Lebenskraft"], atem: "Morning Changes" },
+  { id: "salbei", name: "Salbei", gr: "Φασκόμηλο", lat: "Salvia fruticosa", icon: "🍃", min: 5, temp: "90 °C", eff: "Für Hals und Stimme, klärt den Kopf.", where: "Überall in der Macchia, duftet in der Mittagshitze.", buff: ["def", 2, "+2 Abwehr"], atem: "Recap" },
+  { id: "thymian", name: "Thymian", gr: "Θυμάρι", lat: "Thymbra capitata", icon: "🌸", min: 6, temp: "95 °C", eff: "Gegen Husten. Seine Blüten machen den Honig der Insel.", where: "Auf den kargen Hügeln um Lindos und Kamiros.", buff: ["atk", 2, "+2 Angriff"], atem: "After Work Breath-Out" },
+  { id: "rigani", name: "Oregano", gr: "Ρίγανη", lat: "Origanum vulgare hirtum", icon: "🌱", min: 5, temp: "90 °C", eff: "Für den Magen nach einem schweren Essen.", where: "Steinige Hänge im Süden.", buff: ["hp", 10, "+10 % Lebenskraft"], atem: "Viereck" },
+  { id: "kamille", name: "Kamille", gr: "Χαμομήλι", lat: "Matricaria chamomilla", icon: "🌼", min: 6, temp: "90 °C", eff: "Beruhigt, macht schläfrig, sanft zum Bauch.", where: "Im Frühling an Feldrändern und Wegen.", buff: ["mp", 20, "+20 % Mana"], atem: "Einschlafen" },
+  { id: "minze", name: "Minze", gr: "Δυόσμος", lat: "Mentha spicata", icon: "🌿", min: 5, temp: "85 °C", eff: "Frisch im Kopf, gut gegen Hitze.", where: "An Quellen und in Gärten, etwa bei Salakos.", buff: ["spd", 0.1, "+10 % Tempo"], atem: "Just Breathe" },
+  { id: "louisa", name: "Zitronenverbene", gr: "Λουίζα", lat: "Aloysia citrodora", icon: "🍋", min: 5, temp: "90 °C", eff: "Der Abendtee der Inseln: entspannt, duftet nach Zitrone.", where: "In den Gärten der Dörfer.", buff: ["mp", 15, "+15 % Mana"], atem: "Der Garten" },
+  { id: "linde", name: "Lindenblüte", gr: "Τίλιο", lat: "Tilia", icon: "🌳", min: 7, temp: "90 °C", eff: "Für ruhigen Schlaf und gegen Fieber.", where: "Auf dem Markt in Rhodos, aus dem Norden gebracht.", buff: ["hp", 10, "+10 % Lebenskraft"], atem: "Luzid" },
+  { id: "diktamo", name: "Diptam", gr: "Δίκταμο", lat: "Origanum dictamnus", icon: "🪴", min: 5, temp: "95 °C", eff: "Das Heilkraut der Antike, das Kraut der Liebe, aus den Schluchten Kretas.", where: "Von kretischen Händlern im Hafen.", buff: ["atk", 3, "+3 Angriff"], atem: "Tiefe" },
+  { id: "rosmarin", name: "Rosmarin", gr: "Δενδρολίβανο", lat: "Salvia rosmarinus", icon: "🌲", min: 5, temp: "95 °C", eff: "Weckt die Erinnerung, gut zum Lernen.", where: "An Mauern und Gartenrändern.", buff: ["mp", 10, "+10 % Mana"], atem: "Morning Changes" },
+  { id: "lorbeer", name: "Lorbeer", gr: "Δάφνη", lat: "Laurus nobilis", icon: "🍂", min: 8, temp: "100 °C", eff: "Bitter und wärmend, für die Verdauung. Der Kranz der Sieger.", where: "In feuchten Tälern wie Petaloudes.", buff: ["def", 3, "+3 Abwehr"], atem: "Tank" },
+  { id: "melisse", name: "Melisse", gr: "Μελισσόχορτο", lat: "Melissa officinalis", icon: "🍀", min: 7, temp: "80 °C", eff: "Für Herz und Nerven, die Bienen lieben sie.", where: "Bei den Bienenstöcken in den Bergdörfern.", buff: ["spd", 0.1, "+10 % Tempo"], atem: "Kalibrierung" },
+];
+function herbarium(el) {
+  const hb = S.read(HB_KEY, { pressed: {}, brews: [] }), s = S.get(), now = Date.now(), fast = s.aura ? 10 : 1;     // the dev aura steeps ten times faster
+  hb.pressed = hb.pressed || {}; hb.brews = hb.brews || [];
+  const b = hb.brew, H = b && HERBS.find((x) => x.id === b.id), left = b ? b.start + (H.min * 60000) / fast - now : 0;
+  const today = new Date().toDateString(), paid = hb.brews.filter((x) => new Date(x.at).toDateString() === today && x.paid).length;
+  const buff = s.buff && s.buff.until > now ? s.buff : null;
+  el.innerHTML = `${b ? `<div class="clock"><b id="hbClock">${left > 0 ? Math.floor(left / 60000) + ":" + String(Math.floor((left % 60000) / 1000)).padStart(2, "0") : "fertig"}</b><small>${H.icon} ${H.name} · ${H.temp}${left > 0 ? " · zieht" : " · trinken!"}</small></div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px"><button type="button" class="btn" id="hbDrink" ${left > 0 ? "disabled" : ""}>Trinken</button><button type="button" class="btn ghost" id="hbPour">Weggießen</button></div>`
+    : `<p class="note">Wähle ein Kraut und gieß es auf. Wenn der Tee lange genug gezogen hat, trinkst du ihn: Das Kraut wird gepresst, und dein Charakter bekommt seine Wirkung für zwei Stunden in jedem Kampf.${s.aura ? " (Mit der Aura zieht er zehnmal schneller.)" : ""}</p>`}
+    ${buff ? `<p class="note" style="color:var(--gold)">Gerade wirkt: ${buff.name}, ${buff.text}, noch ${Math.ceil((buff.until - now) / 60000)} min.</p>` : ""}
+    <p class="note">${Object.keys(hb.pressed).length} von ${HERBS.length} Kräutern gepresst · heute ${paid}/3 Tees mit Belohnung</p>
+    ${HERBS.map((h) => { const pr = hb.pressed[h.id];
+      return `<div class="hero ${pr ? "on" : ""}"><div class="ic">${h.icon}</div><div class="t"><b>${h.name} <small style="font:italic 13px 'IM Fell English',serif">${h.gr} · ${h.lat}</small></b>
+        <small>${h.eff}<br>🌡 ${h.temp} · ⏳ ${h.min} min · 📍 ${h.where}<br>⚔ ${h.buff[2]} · 🌬 passt zu ${h.atem}${pr ? `<br>Gepresst am ${new Date(pr).toLocaleDateString("de-DE")}` : ""}</small></div>
+        <div class="row">${b ? "" : `<button type="button" class="btn" data-brew="${h.id}">Aufgießen</button>`}</div></div>`; }).join("")}`;
+  el.querySelectorAll("[data-brew]").forEach((x) => x.onclick = () => { hb.brew = { id: x.dataset.brew, start: Date.now() }; S.write(HB_KEY, hb); toast(`${HERBS.find((h) => h.id === x.dataset.brew).name} zieht. Atme solange durch.`); render(); subs(); });
+  if ($("#hbPour")) $("#hbPour").onclick = () => { hb.brew = null; S.write(HB_KEY, hb); render(); subs(); };
+  if ($("#hbDrink")) $("#hbDrink").onclick = () => {
+    const first = !hb.pressed[H.id], pay = paid < 3;
+    hb.pressed[H.id] = hb.pressed[H.id] || Date.now(); hb.brews.push({ id: H.id, at: Date.now(), paid: pay }); hb.brews = hb.brews.slice(-200); hb.brew = null; S.write(HB_KEY, hb);
+    const r = pay ? S.reward(first ? 40 : 15, first ? 10 : 3) : S.get();
+    r.buff = { id: H.id, name: H.name, kind: H.buff[0], v: H.buff[1], text: H.buff[2], until: Date.now() + 2 * 3600 * 1000 }; delete r.up; S.save(r);
+    toast(`${H.icon} ${H.name}${first ? " ist jetzt im Herbarium gepresst" : ""}. ${H.buff[2]} für zwei Stunden${pay ? ` · +${first ? 40 : 15} EXP` : ""}.`, 6000); render(); bar(); subs();
+  };
+}
+setInterval(() => {
+  if (current !== "herbarium" || !$("#hbClock")) return;
+  const hb = S.read(HB_KEY, {}), H = hb.brew && HERBS.find((x) => x.id === hb.brew.id); if (!H) return;
+  const left = hb.brew.start + (H.min * 60000) / (S.get().aura ? 10 : 1) - Date.now();
+  if (left <= 0) { if ($("#hbClock").textContent !== "fertig") render(); return; }
+  $("#hbClock").textContent = Math.floor(left / 60000) + ":" + String(Math.floor((left % 60000) / 1000)).padStart(2, "0");
+}, 1000);
+
 /* Aura des Dev: switch it, and wipe what you want to try again */
 function dev(el) {
   const s = S.get(), m = S.me();
@@ -328,7 +436,7 @@ function dev(el) {
     <div class="dev">
       <label><input type="checkbox" id="dPc"><span>Postkarten und Funde<small>Für alle Charaktere, auch auf der Karte</small></span></label>
       <label><input type="checkbox" id="dMe"><span>Spielstand von ${m ? m.name : "Generica"}<small>Stufe, Gold, Lager, Porthos, Aufträge, Ruf, abgeholte Atem-Belohnungen</small></span></label>
-      <label><input type="checkbox" id="dTime"><span>Fasten- und Trainingsverlauf<small>Laufende Timer und alle Einträge</small></span></label>
+      <label><input type="checkbox" id="dTime"><span>Fasten, Training und Herbarium<small>Laufende Timer, alle Einträge, gepresste Kräuter</small></span></label>
       <label><input type="checkbox" id="dAll"><span>Alle Charaktere<small>Löscht jeden Charakter samt Spielstand, auch vergebene Namen</small></span></label>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button type="button" class="btn" id="dGo">Zurücksetzen</button><button type="button" class="btn ghost" id="dAura">Aura ausschalten</button></div>`;
@@ -338,7 +446,7 @@ function dev(el) {
     if (!confirm("Wirklich zurücksetzen? Das lässt sich nicht rückgängig machen.")) return;
     if (pick.includes("dPc")) S.write("rhodos-postkarten", null);
     if (pick.includes("dMe")) S.wipe();
-    if (pick.includes("dTime")) { S.write("crusaders-fasten", null); S.write("crusaders-training", null); }
+    if (pick.includes("dTime")) { S.write("crusaders-fasten", null); S.write("crusaders-training", null); S.write(HB_KEY, null); }
     if (pick.includes("dAll")) { for (const h of S.heroes()) S.wipe(h); S.wipe(null); S.write("crusaders-helden", null); S.write("crusaders-ich", null); S.write("crusaders-vergeben", null); }
     location.reload();
   };
