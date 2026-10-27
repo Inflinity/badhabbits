@@ -12,27 +12,67 @@
   const today = () => new Date().toISOString().slice(0, 10);
   const seeded = (str) => { let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296; };
 
-  /* ---------------- Factions, Rhodes around 1310 ---------------- */
+  /* ---------------- The powers of Rhodes, from myth to 1945 ----------------
+     Every age left its masters in the towns; here they stand side by side. era: when they ruled or
+     roamed. noJobs: they hand out no work, they are only fought against. hidden: their sway is not shown. */
   const FACTIONS = {
-    johanniter: { name: "Johanniter", icon: "✠", color: "#b8322a", rival: "mentese",
-      desc: "Die Ritter des Hospitals. 1306 gelandet, seit 1309 Herren der Stadt Rhodos: Hospital, Galeeren, Mauern." },
-    griechen: { name: "Rhodische Griechen", icon: "☦", color: "#2a6fa8", rival: null,
-      desc: "Bauern, Fischer, Mönche und Priester. Das Volk der Insel, orthodox, unter wechselnden Herren." },
-    genuesen: { name: "Genuesen", icon: "⚓", color: "#c9973c", rival: "venezianer",
+    telchinen: { name: "Telchinen", icon: "🔱", color: "#1f6a7a", era: "Mythos", rival: "mitra",
+      desc: "Die ersten Bewohner der Insel, Kinder des Meeres. Sie schmiedeten Poseidons Dreizack und die Sichel des Kronos, riefen Regen und Hagel, bis Zeus sie in der Flut versenkte. Manche sagen, nicht alle." },
+    mitra: { name: "Schwestern der Mitra", icon: "🐍", color: "#2a5a3a", era: "im Verborgenen", rival: "telchinen", hidden: true,
+      desc: "Eine Schwesternschaft, älter als die Ritter, älter als die Hellenen. Sie flüstert Fürsten ins Ohr, lenkt Blutlinien über Jahrhunderte und trägt die Schlange unter dem Schleier. Wer ihr dient, wird reich, und gehört ihr." },
+    griechen: { name: "Rhodische Griechen", icon: "☦", color: "#2a6fa8", era: "immer", rival: null,
+      desc: "Bauern, Fischer, Mönche und Priester. Das Volk der Insel, orthodox, unter wechselnden Herren, und immer noch da." },
+    johanniter: { name: "Johanniter", icon: "✠", color: "#b8322a", era: "1309–1522", rival: "mentese",
+      desc: "Die Ritter des Hospitals. 1306 gelandet, ab 1309 Herren von Rhodos: Hospital, Galeeren, Mauern. 1522 ziehen sie nach der großen Belagerung ab." },
+    genuesen: { name: "Genuesen", icon: "⚓", color: "#c9973c", era: "13.–15. Jh.", rival: "venezianer",
       desc: "Kaufleute und Korsaren. Der Genuese Vignolo de' Vignoli verkaufte den Rittern die Insel, die er nie besaß." },
-    venezianer: { name: "Venezianer", icon: "🦁", color: "#8a2a5a", rival: "genuesen",
+    venezianer: { name: "Venezianer", icon: "🦁", color: "#8a2a5a", era: "13.–16. Jh.", rival: "genuesen",
       desc: "Händler der Serenissima: Pfeffer, Seide und Glas. Venedig handelt mit allen und traut keinem." },
-    mentese: { name: "Menteşe", icon: "☾", color: "#2a7a4a", rival: "johanniter",
+    mentese: { name: "Menteşe", icon: "☾", color: "#2a7a4a", era: "1260–1424", rival: "johanniter",
       desc: "Das Emirat an der anatolischen Küste gegenüber. Seefahrer und Krieger, Feinde der Ritter, Partner im Handel." },
+    osmanen: { name: "Osmanen", icon: "🌙", color: "#9a2a2a", era: "1522–1912", rival: "italiener",
+      desc: "Süleyman der Prächtige nimmt die Stadt 1522. Fast vier Jahrhunderte Paschas, Moscheen, Bäder und Basare; die Griechen leben vor den Mauern." },
+    italiener: { name: "Italiener", icon: "🏛", color: "#2a7a5a", era: "1912–1943", rival: "briten",
+      desc: "1912 im Krieg gegen die Osmanen besetzt. Rom baut Straßen, das Bad von Kallithea, den Palast der Großmeister neu, gräbt in Lindos und Kamiros, und will die Insel italienisch machen." },
+    wehrmacht: { name: "Wehrmacht", icon: "✚", color: "#4a4e48", era: "1943–1945", rival: "briten", noJobs: true,
+      desc: "Die deutsche Besatzung ab September 1943, nach dem Kampf gegen die italienische Garnison. Im Juli 1944 deportierte sie die jüdische Gemeinde von Rhodos nach Auschwitz. Hier nur Gegner: Wer gegen sie arbeitet, hilft Widerstand, Briten und Flüchtenden." },
+    briten: { name: "Briten", icon: "⚑", color: "#2a3a7a", era: "1943–1947", rival: "wehrmacht",
+      desc: "Kommandos des Special Boat Service in den Buchten, 1945 die Übergabe, bis die Insel 1947 an Griechenland kommt." },
   };
   const NAMES = ["Mavros", "Kara Ali", "Il Guercio", "Rizzo der Rote", "Sfakianos", "Lomellino", "Kakomoiris", "Umur der Schwarze", "Spinola der Jüngere", "Sarakinos", "Barbadoro", "Mezzalancia"];
 
   /* What each faction asks of you. t: kind; foes: who stands in the way (none = just get there). */
   const JOBS = {
+    telchinen: [
+      { name: "Erz für die Schmiede", text: "In der Höhle der Telchinen fehlt Erz für den Amboss, und eine Bestie hat sich davor gelegt.", foes: ["bulle"], exp: 60, gold: 30 },
+      { name: "Ein Splitter des Dreizacks", text: "Bring den Splitter zu einer Meereshöhle. Sprich nicht, bis du das Wasser hörst.", exp: 45, gold: 25 },
+      { name: "Die Wächterinnen vertreiben", text: "Die Schlange will die alte Schmiede für sich. Die Telchinen bitten dich, ihre Wächterinnen zu vertreiben.", foes: ["adeptin", "adeptin", "schlange"], exp: 90, gold: 35, hurt: "mitra" },
+    ],
+    mitra: [
+      { name: "Ein Flüstern am Hof", text: "Bring einen Brief ohne Siegel zu einem Mann, der ihn erwartet. Frag nicht, was darin steht.", exp: 40, gold: 80, hurt: "griechen" },
+      { name: "Ein Amulett für den Schmied", text: "Leg das Schlangenamulett dort ab, wo die Telchinen schmieden. Mehr nicht. Die Schwestern sind großzügig.", exp: 45, gold: 90, hurt: "telchinen" },
+      { name: "Die Neugierigen", text: "Zwei Söldner haben gesehen, was sie nicht sehen sollten. Die Schwestern wünschen, dass sie vergessen.", foes: ["soeldner", "soeldner"], exp: 50, gold: 110, hurt: "johanniter" },
+    ],
+    osmanen: [
+      { name: "Die Steuer des Paschas", text: "Der Steuereintreiber wurde auf dem Weg überfallen. Hol die Truhe zurück, bevor der Pascha Fragen stellt.", foes: ["bandit", "bandit"], exp: 50, gold: 40 },
+      { name: "Ein Brief an die Süleyman-Moschee", text: "Der Imam wartet auf Nachricht aus dem Dorf. Der Weg ist nicht weit, aber die Zeit drängt.", exp: 30, gold: 30 },
+      { name: "Kopfgeld: Pirat {N}", text: "{N} plündert die Handelsschiffe nach Smyrna. Der Kapudan Pascha zahlt in Gold.", foes: [{ k: "korsar", name: "{N}", hp: 1.5 }, "korsar"], exp: 65, gold: 45 },
+    ],
+    italiener: [
+      { name: "Nachtwache an der Grabung", text: "Die Archäologen aus Rom graben in der alten Stadt. Nachts kommen die Schatten aus den Gräbern.", foes: ["schatten", "schatten"], exp: 60, gold: 40, antik: true },
+      { name: "Vermessung für die neue Straße", text: "Der Ingenieur braucht einen Läufer mit Messkette und gutem Orientierungssinn.", exp: 30, gold: 35 },
+      { name: "Wasser aus den Quellen", text: "Für das neue Thermalbad soll das Quellwasser untersucht werden. Bring eine Probe, aber zerbrich das Glas nicht.", exp: 35, gold: 35 },
+    ],
+    briten: [
+      { name: "Ablenkung am Flugfeld", text: "Kommandos des SBS wollen an die Flugzeuge. Jemand muss die Wache weglocken.", foes: ["soldat", "soldat"], exp: 70, gold: 40, hurt: "wehrmacht" },
+      { name: "Das Fluchtboot nach Anatolien", text: "In einer Bucht wartet ein Kaiki. Bring die Versteckten ans Wasser, bevor die Streife kommt.", foes: ["soldat"], exp: 65, gold: 30, hurt: "wehrmacht" },
+      { name: "Das Funkgerät", text: "Ein Funkgerät muss aus dem Dorf in eine Höhle am Hang. Niemand darf dich damit sehen.", exp: 35, gold: 25 },
+    ],
     johanniter: [
       { name: "Kopfgeld: Korsar {N}", text: "Der Korsar {N} überfällt Pilgerschiffe vor der Küste. Der Orden zahlt für seinen Kopf.", foes: [{ k: "korsar", name: "{N}", hp: 1.5 }, "korsar"], exp: 70, gold: 45 },
       { name: "Versiegelte Order", text: "Bring einen Brief des Großmeisters an einen Ritter im Land. Niemand darf ihn lesen.", exp: 30, gold: 25 },
       { name: "Pilger geleiten", text: "Pilger auf dem Weg ins Heilige Land werden von Wegelagerern bedrängt. Bring sie sicher an ihr Ziel.", foes: ["bandit", "bandit"], exp: 50, gold: 30 },
+      { name: "Die Schwester im Hospital", text: "Eine Schwester im Hospital trägt eine Schlange unter dem Habit. Folge ihr, wenn sie nachts hinausgeht.", foes: ["adeptin", "adeptin"], exp: 70, gold: 40, hurt: "mitra" },
       { name: "Späher der Menteşe", text: "Fremde Reiter wurden gesehen. Finde sie, bevor sie die Mauern ausgespäht haben.", foes: ["reiter", "reiter"], exp: 60, gold: 35, hurt: "mentese" },
     ],
     griechen: [
@@ -40,6 +80,7 @@
       { name: "Die Ikone verstecken", text: "Die Ikone der Panagia soll vor Plünderern in eine Höhle gebracht werden.", exp: 30, gold: 15 },
       { name: "Kopfgeld: Räuber {N}", text: "{N} raubt die Bauern auf dem Weg zum Markt aus. Das ganze Dorf legt zusammen.", foes: [{ k: "bandit", name: "{N}", hp: 1.5 }, "bandit"], exp: 55, gold: 28 },
       { name: "Kräuter für den Priester", text: "Am Hang wachsen Salbei und Thymian. Der Priester braucht sie für die Kranken.", exp: 25, gold: 12 },
+      { name: "Die Schlange im Brunnen", text: "Fremde Frauen in grünen Schleiern wurden am Dorfbrunnen gesehen. Seitdem schläft das Vieh nicht mehr.", foes: ["adeptin", "schlange"], exp: 70, gold: 30, hurt: "mitra" },
       { name: "Schatten in den Ruinen", text: "In den alten Mauern der Hellenen spukt es. Seitdem meiden die Leute den Weg.", foes: ["schatten", "schatten"], exp: 60, gold: 25, antik: true },
     ],
     genuesen: [
@@ -67,34 +108,34 @@
   /* The towns: who holds sway (shares), what is made there (cheap) and what is wanted (dear).
      Villages without an entry take after the nearest of these, with the Greeks stronger. */
   const HUBS = {
-    Rhodos: { f: { johanniter: 50, griechen: 22, genuesen: 12, venezianer: 12, mentese: 4 }, make: ["seide", "pfeffer", "glas", "salz"], want: ["oel", "wein", "holz", "honig", "wachs"],
-      note: "Der große Hafen. Hinter neuen Mauern bauen die Ritter ihr Hospital und ihren Konvent." },
-    Lindos: { f: { griechen: 45, johanniter: 38, genuesen: 17 }, make: ["schwamm", "keramik", "salz"], want: ["holz", "pfeffer", "wein"],
-      note: "Die Burg auf der Akropolis, 1310 von den Rittern genommen. Unten die Kapitäne und ihre Häuser." },
-    Ialysos: { f: { griechen: 52, johanniter: 40, genuesen: 8 }, make: ["wein", "oel"], want: ["seide", "keramik"],
-      note: "Vom Berg Filerimos aus eroberten die Ritter die Insel. Das Kloster ist ihr erster Stützpunkt." },
-    Embonas: { f: { griechen: 92, johanniter: 8 }, make: ["wein", "honig"], want: ["salz", "keramik"],
+    Rhodos: { f: { johanniter: 28, osmanen: 20, italiener: 14, griechen: 14, genuesen: 6, venezianer: 6, wehrmacht: 5, briten: 3, mentese: 2, mitra: 2 }, make: ["seide", "pfeffer", "glas", "salz"], want: ["oel", "wein", "holz", "honig", "wachs"],
+      note: "Der große Hafen. Hinter neuen Mauern bauen die Ritter ihr Hospital und ihren Konvent. Später Paschas und Basare, dann die Italiener mit ihren Neubauten am Mandraki." },
+    Lindos: { f: { griechen: 40, johanniter: 24, italiener: 12, osmanen: 10, genuesen: 8, telchinen: 3, mitra: 3 }, make: ["schwamm", "keramik", "salz"], want: ["holz", "pfeffer", "wein"],
+      note: "Die Burg auf der Akropolis, 1310 von den Rittern genommen. Unten die Kapitäne und ihre Häuser. Später graben hier die Archäologen, und die Akropolis wird neu aufgerichtet." },
+    Ialysos: { f: { griechen: 38, johanniter: 25, italiener: 15, osmanen: 8, wehrmacht: 6, telchinen: 5, genuesen: 3 }, make: ["wein", "oel"], want: ["seide", "keramik"],
+      note: "Vom Berg Filerimos aus eroberten die Ritter die Insel. Das Kloster ist ihr erster Stützpunkt. Die Italiener bauen das Kloster neu, 1943 kämpfen hier die Garnisonen." },
+    Embonas: { f: { griechen: 78, telchinen: 10, osmanen: 6, mitra: 6 }, make: ["wein", "honig"], want: ["salz", "keramik"],
       note: "Am Fuß des Attavyros. Hier wird der Wein der Insel gekeltert." },
-    Kritinia: { f: { griechen: 75, johanniter: 20, mentese: 5 }, make: ["honig", "wachs"], want: ["salz", "leder"],
+    Kritinia: { f: { griechen: 58, johanniter: 18, telchinen: 10, mitra: 7, mentese: 7 }, make: ["honig", "wachs"], want: ["salz", "leder"],
       note: "Über Kamiros, der toten Stadt der Hellenen. Ein Ausguck nach Westen." },
-    Archangelos: { f: { griechen: 70, johanniter: 25, mentese: 5 }, make: ["keramik", "leder"], want: ["oel", "glas"],
+    Archangelos: { f: { griechen: 58, johanniter: 18, osmanen: 12, italiener: 8, mitra: 4 }, make: ["keramik", "leder"], want: ["oel", "glas"],
       note: "Töpfer und Gerber, und eine kleine Burg am Hang." },
-    Monolithos: { f: { griechen: 80, johanniter: 12, mentese: 8 }, make: ["holz", "harz"], want: ["salz", "wein", "pfeffer"],
+    Monolithos: { f: { griechen: 64, johanniter: 12, mentese: 8, wehrmacht: 8, mitra: 8 }, make: ["holz", "harz"], want: ["salz", "wein", "pfeffer"],
       note: "Ein Fels über dem Meer und Wälder ringsum. Wer hier wohnt, sieht die Segel zuerst." },
-    Charaki: { f: { johanniter: 55, griechen: 38, genuesen: 7 }, make: ["salz", "oel"], want: ["leder", "glas"],
+    Charaki: { f: { johanniter: 44, griechen: 34, osmanen: 10, genuesen: 6, mitra: 6 }, make: ["salz", "oel"], want: ["leder", "glas"],
       note: "Die Burg Feraklos, eine der ersten Festen der Ritter, wacht über die Bucht." },
-    Asklipio: { f: { griechen: 85, johanniter: 15 }, make: ["oel", "wachs"], want: ["seide", "pfeffer"],
+    Asklipio: { f: { griechen: 74, johanniter: 12, mitra: 8, telchinen: 6 }, make: ["oel", "wachs"], want: ["seide", "pfeffer"],
       note: "Die Kirche der Entschlafung, seit 1060 bemalt. Darüber die byzantinische Burg." },
-    Kattavia: { f: { griechen: 70, mentese: 20, genuesen: 10 }, make: ["salz", "leder"], want: ["holz", "wein"],
+    Kattavia: { f: { griechen: 52, mentese: 14, osmanen: 10, wehrmacht: 10, briten: 6, genuesen: 8 }, make: ["salz", "leder"], want: ["holz", "wein"],
       note: "Das Ende der Insel. Hierher kommen die Boote von der anatolischen Küste." },
-    Gennadi: { f: { griechen: 72, mentese: 18, venezianer: 10 }, make: ["feigen", "oel"], want: ["glas", "keramik"],
+    Gennadi: { f: { griechen: 58, mentese: 14, venezianer: 10, briten: 12, mitra: 6 }, make: ["feigen", "oel"], want: ["glas", "keramik"],
       note: "Feigengärten am langen Strand. Die Fischer zählen nachts die fremden Segel." },
-    Apolakkia: { f: { griechen: 88, mentese: 12 }, make: ["feigen", "honig"], want: ["seide", "salz"],
+    Apolakkia: { f: { griechen: 72, mentese: 10, osmanen: 10, mitra: 8 }, make: ["feigen", "honig"], want: ["seide", "salz"],
       note: "Unter der großen Platane wird verhandelt, gestritten und geheiratet." },
-    Salakos: { f: { griechen: 90, johanniter: 10 }, make: ["holz", "harz", "honig"], want: ["salz", "glas"],
-      note: "Quellen und Wälder am Profitis Ilias." },
-    Faliraki: { f: { griechen: 70, venezianer: 15, genuesen: 15 }, make: ["feigen", "salz"], want: ["leder", "wein"],
-      note: "Ein Fischerstrand nahe der heilenden Quellen von Kallithea." },
+    Salakos: { f: { griechen: 66, italiener: 16, wehrmacht: 10, johanniter: 4, telchinen: 4 }, make: ["holz", "harz", "honig"], want: ["salz", "glas"],
+      note: "Quellen und Wälder am Profitis Ilias. Oben am Profitis Ilias bauen die Italiener ihre Sommerhäuser." },
+    Faliraki: { f: { griechen: 46, italiener: 20, telchinen: 12, venezianer: 10, genuesen: 8, mitra: 4 }, make: ["feigen", "salz"], want: ["leder", "wein"],
+      note: "Ein Fischerstrand nahe der heilenden Quellen von Kallithea. 1929 bauen die Italiener dort ein Thermalbad, später ein Drehort für Navarone." },
   };
   // the old Greek towns of the Hellenes: their ruins are haunted
   const ANTIK = ["Lindos", "Kritinia", "Ialysos", "Faliraki", "Rhodos"];
@@ -117,7 +158,8 @@
   /* ---------------- Jobs ---------------- */
   const DIST = [{ km: 0.5, m: 1 }, { km: 1, m: 1.5 }, { km: 3, m: 2.5 }, { km: 8, m: 4 }];
   function offers(town) {
-    const pf = profile(town), rnd = seeded(town + today()), sh = shares(pf), out = [];
+    const pf = profile(town), rnd = seeded(town + today()), out = [];
+    let sh = shares(pf).filter(([k]) => JOBS[k] && !FACTIONS[k].noJobs); const tot = sh.reduce((a, [, v]) => a + v, 0); sh = sh.map(([k, v]) => [k, v / tot]);
     for (let i = 0; i < 4; i++) {
       let r = rnd(), fac = sh[0][0]; for (const [k, v] of sh) { if (r < v) { fac = k; break; } r -= v; }
       const pool = JOBS[fac].filter((j) => !j.antik || ANTIK.includes(town) || ANTIK.includes(pf.near));
@@ -132,7 +174,7 @@
   }
   function take(offer, choice) {
     const s = window.Spiel.get();
-    if (s.jobs.length >= 3) return "Du hast schon drei Aufträge. Erledige oder gib einen auf.";
+    if (s.jobs.filter((j) => !j.story).length >= 3) return "Du hast schon drei Aufträge. Erledige oder gib einen auf.";
     const at = ctx.where(), spot = ctx.landNear(at, choice.km);
     if (!spot) return "Hier findet sich kein Weg dorthin.";
     const town = places.find((p) => p.name === offer.town), onSite = town && km(at, town) < 2;
@@ -149,6 +191,7 @@
     s.rep[job.fac] = clamp((s.rep[job.fac] || 0) + 8, -100, 100);
     const rival = FACTIONS[job.fac].rival; if (rival) s.rep[rival] = clamp((s.rep[rival] || 0) - 3, -100, 100);
     if (job.hurt) s.rep[job.hurt] = clamp((s.rep[job.hurt] || 0) - 6, -100, 100);
+    if (job.story) s.quests[job.story] = { ...(s.quests[job.story] || {}), done: today() };
     s.log.jobsDone = (s.log.jobsDone || 0) + 1; s.log["fac:" + job.fac] = (s.log["fac:" + job.fac] || 0) + 1;
     delete s.up; window.Spiel.save(s); ctx.changed();
     return { exp, gold, up: s.level };
@@ -158,7 +201,7 @@
     if (!job.foes) { const r = finish(job); done(true, r); return; }
     const L = window.Spiel.get().level, tier = 1 + Math.floor((L - 1) / 3);
     window.Kampf.start({
-      title: `${FACTIONS[job.fac].icon} ${job.name}`, foes: job.foes, tier, at: { lat: job.lat, lon: job.lon },
+      title: `${FACTIONS[job.fac].icon} ${job.name}`, foes: job.foes, tier, boss: !!job.boss, at: { lat: job.lat, lon: job.lon },
       loot: { text: `Auftrag für ${FACTIONS[job.fac].name} erfüllt. ×${job.mult.toString().replace(".", ",")} für ${fmtKm(job.km)} Weg.` },
       onWin: () => { const r = finish(job); done(true, r); },
       onLose: (why) => done(false, why),
@@ -277,10 +320,12 @@
         <table class="goods">${Object.entries(GOODS).map(([k, g]) => `<tr><td>${g.icon}</td><td class="n">${g.name}${pr[k].make ? ' <small>erzeugt</small>' : pr[k].want ? ' <small class="w">gesucht</small>' : ""}<br><span style="font-weight:400">Kauf ${pr[k].buy} · Verkauf ${pr[k].sell} · du hast ${have(s, k)}</span></td>
           <td><button type="button" data-sell="${k}">−</button></td><td><button type="button" data-buy="${k}">+</button></td></tr>`).join("")}</table>`;
     }
-    return `<p class="note">Wer in ${town} das Sagen hat, und wie man dort über dich spricht.</p>` + shares(pf).map(([k, v]) => `<div class="card">${facTag(k)}
-      <div style="margin-top:6px">${FACTIONS[k].desc}</div>
-      <div class="rw">Einfluss in ${town}: ${Math.round(v * 100)} %</div><div class="bar"><i style="width:${Math.round(v * 100)}%;background:${FACTIONS[k].color}"></i></div>
-      <div class="rw">Dein Ruf: ${s.rep[k] || 0}</div><div class="bar"><i style="width:${clamp(50 + (s.rep[k] || 0) / 2, 0, 100)}%;background:${(s.rep[k] || 0) < 0 ? "#8e2a1c" : "#4a7a3a"}"></i></div></div>`).join("");
+    return `<p class="note">Wer in ${town} das Sagen hatte und hat, durch alle Zeiten, und wie man dort über dich spricht.</p>` + shares(pf).map(([k, v]) => { const F = FACTIONS[k], hid = F.hidden && !(s.rep[k] || s.log["fac:" + k]);
+      return `<div class="card">${facTag(k)} <small style="color:#6a5030;font:italic 13px 'IM Fell English',serif">${F.era}</small>
+      <div style="margin-top:6px">${hid ? "Man spricht nicht darüber. Man senkt die Stimme, wenn grüne Schleier vorübergehen." : F.desc}</div>
+      ${F.noJobs ? `<div class="rw" style="color:#8e2a1c">Gegner · vergibt keine Aufträge</div>` : ""}
+      <div class="rw">Einfluss in ${town}: ${hid ? "verborgen" : Math.round(v * 100) + " %"}</div><div class="bar"><i style="width:${hid ? 0 : Math.round(v * 100)}%;background:${F.color}"></i></div>
+      <div class="rw">Dein Ruf: ${s.rep[k] || 0}</div><div class="bar"><i style="width:${clamp(50 + (s.rep[k] || 0) / 2, 0, 100)}%;background:${(s.rep[k] || 0) < 0 ? "#8e2a1c" : "#4a7a3a"}"></i></div></div>`; }).join("");
   }
 
   window.Staedte = { init, open, close, isOpen, nearest, profile, offers, arrive, drop, FACTIONS, GOODS, HUBS, fmtKm, km };

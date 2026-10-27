@@ -65,7 +65,17 @@
       "kuuk.kLLLLk.kuuk", "kkk..kLLLLk..kkk", ".....kLLLLk.....", ".....kuukuuk.....", "....kuuk.kuuk....", "....kuuk.kuuk....",
       "....kuuk.kuuk....", "....kuuk.kuuk....", "...kuuuk.kuuuk...", "...kkkkk.kkkkk...", "................", "................"],
   };
-  const PAL = { k: "#1a120c", b: "#8a5a32", c: "#b8322a", W: "#f2ede2", r: "#b8322a", m: "#8e939a", P: "#c9b48a", B: "#5a3a22",
+  // a soldier of 1943 in a steel helmet; a temple serpent of the Mitra
+  SPR.soldat = [
+    "................", ".....kkkkkk.....", "....kGGGGGGk....", "...kGGGGGGGGk...", "...kkkkkkkkkk...", "....kssssssk....",
+    "....kskssksk....", "....ksssssk.....", ".....kssssk.....", "....kkGGGGkk....", "...kGGGGGGGGk...", "..kGGkGGGGkGGk..",
+    "..kGGkGGGGkGGk..", "..ksk.kBBBk.ksk.", "..kk..kGGGk..kk.", ".....kGGGGGk....", ".....kGGkGGk....", ".....kGGkGGk....",
+    ".....kGGkGGk....", ".....kGk.kGk....", ".....kBk.kBk....", ".....kBk.kBk....", "....kBBk.kBBk...", "....kkkk.kkkk..."];
+  SPR.schlange = [
+    "..........kkkk......", ".........kgggyk.....", "........kgggggkr....", "........kggkkk.r....", "...kkk...kggk.......", "..kgggk...kggk......",
+    ".kggkggk...kggk.....", ".kgk.kggkkkggk......", "kggk..kggggggk......", "kggk...kkkkkk.......", ".kggkkkkkkkkkkkkk...", "..kgggggggggggggggk.",
+    "...kkkkkkkkkkkkkkk.."];
+  const PAL = { G: "#6a7060", k: "#1a120c", b: "#8a5a32", c: "#b8322a", W: "#f2ede2", r: "#b8322a", m: "#8e939a", P: "#c9b48a", B: "#5a3a22",
     v: "#4b2a6b", y: "#e8d84a", g: "#c9b84a", H: "#d8c9a8", u: "#6a4a6e", L: "#7a5a3a", t: "#b9a582", T: "#a08a62", p: "#7d6a50" };
   function sprite(ctx, name, x, y, pal, flip = false, alpha = 1) {
     const rows = SPR[name], P = { ...PAL, ...pal };
@@ -176,6 +186,11 @@
     bulle: (t) => ({ name: "Bestie", spr: "bulle", hp: 50 + 24 * t, atk: 9 + 4 * t, def: 3 + t, spd: 0.75 }),
     korsar: (t) => ({ name: "Korsar", spr: "bandit", pal: { W: "#b8322a", r: "#e2b04a", m: "#3a3a4a", P: "#5a4a6a" }, hp: 32 + 17 * t, atk: 7 + 3 * t, def: 2 + t, spd: 1.05 }),
     reiter: (t) => ({ name: "Menteşe-Krieger", spr: "bandit", pal: { W: "#e8e2d0", r: "#2a6a3a", m: "#6a4a2a", P: "#8a6a3a" }, hp: 36 + 18 * t, atk: 8 + 3 * t, def: 3 + t, spd: 1.0 }),
+    janitschar: (t) => ({ name: "Janitschar", spr: "bandit", pal: { W: "#f2ede2", r: "#b8322a", m: "#2a4a8a", P: "#e8d8a8" }, hp: 36 + 18 * t, atk: 8 + 3 * t, def: 3 + t, spd: 1.0 }),
+    soldat: (t) => ({ name: "Soldat der Wehrmacht", spr: "soldat", pal: { B: "#2a2420" }, hp: 40 + 18 * t, atk: 9 + 3 * t, def: 4 + t, spd: 0.95 }),
+    adeptin: (t) => ({ name: "Schwester der Mitra", spr: "schatten", pal: { v: "#2a5a3a", y: "#e2b04a", g: "#c9b84a" }, hp: 30 + 15 * t, atk: 9 + 3 * t, def: 2 + t, spd: 1.2 }),
+    schlange: (t) => ({ name: "Tempelschlange", spr: "schlange", pal: { g: "#4a7a3a", y: "#e8d84a", r: "#c8321e" }, hp: 55 + 22 * t, atk: 10 + 4 * t, def: 3 + t, spd: 0.85 }),
+    hohepriesterin: (t) => ({ name: "Hohepriesterin der Mitra", spr: "schatten", pal: { v: "#183a28", y: "#ff5a3a", g: "#e2b04a" }, hp: 110 + 35 * t, atk: 10 + 4 * t, def: 5 + t, spd: 1.05, boss: true }),
     wolf: (t) => ({ name: "Wildhund", spr: "hund", pal: { b: "#6a6a6a", c: "#3a3a3a" }, hp: 22 + 12 * t, atk: 6 + 3 * t, def: 1 + t, spd: 1.3 }),
     haendler: (t) => ({ name: "Sklavenhändler Kerim", spr: "bandit", pal: { W: "#7a1a14", r: "#e2b04a", m: "#5a3a2a" }, hp: 70 + 30 * t, atk: 7 + 4 * t, def: 4 + t, spd: 1.0, boss: true }),
   };
@@ -317,7 +332,7 @@
         if (f.hp <= 0 && f.side) continue;
         if (f.lunge > 0) f.lunge -= dt;
         const dx = f.lunge > 0 ? (f.side ? -6 : 6) : 0, bob = Math.round(Math.sin(now / 300 + f.x) * 0.6);
-        ctx.fillStyle = "rgba(60,30,10,0.35)"; ctx.fillRect(f.x + dx + 1, f.y + (f.spr === "hund" ? 12 : 23), f.spr === "hund" ? 20 : 14, 2);
+        ctx.fillStyle = "rgba(60,30,10,0.35)"; ctx.fillRect(f.x + dx + 1, f.y + (f.spr === "hund" ? 12 : f.spr === "schlange" ? 13 : 23), f.spr === "hund" || f.spr === "schlange" ? 20 : 14, 2);
         sprite(ctx, f.spr, f.x + dx, f.y + bob, f.pal || {}, f.side === 1, f.hp <= 0 ? 0.35 : 1);
         if (f.side === 1 && f.hp > 0) { ctx.fillStyle = "#1a120c"; ctx.fillRect(f.x, f.y - 4, 16, 3); ctx.fillStyle = f.boss ? "#ffb030" : "#d83a2a"; ctx.fillRect(f.x + 1, f.y - 3, Math.ceil((14 * f.hp) / f.max), 1); }
         if (f.side === 0 && f.spr === "held") { ctx.fillStyle = "#7a5230"; ctx.fillRect(f.x + 15, f.y + 6, 2, 12); ctx.fillStyle = "#5a3a20"; ctx.fillRect(f.x + 14, f.y + 4, 4, 4); }

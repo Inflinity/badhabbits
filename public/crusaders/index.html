@@ -303,7 +303,7 @@ function codex(el) {
       <ul class="tree">${FAST.map((x) => node(fastMax >= x.h, `${x.name} (${x.h} h)`)).join("")}${ms(fast.hist.filter((x) => x.h >= 12).length, [5, 20], "Fasten")}</ul></div>
     <div class="br"><div class="head"><div class="orb">🛡</div><div><b>Taten</b><small>${S.me() ? S.me().name : "Generica"} · Stufe ${s.level}</small></div></div>
       <ul class="tree">${node(s.party.includes("porthos"), "Porthos befreit")}${ms(s.level, [3, 5, 10], "Stufen").replace(/(\d+) Stufen/g, "Stufe $1")}${ms(s.log.jobsDone || 0, [1, 10, 25], "Aufträge")}
-      ${node(s.camp >= 6, "Ein Kreuzfahrerhafen", s.camp < 6 ? `${s.camp}/6` : "")}${fac ? Object.entries(fac).map(([k, f]) => node((s.rep[k] || 0) >= 50, `Freund der ${f.name}`, (s.rep[k] || 0) < 50 ? `Ruf ${s.rep[k] || 0}/50` : "")).join("") : ""}</ul></div>`;
+      ${node(s.camp >= 6, "Ein Kreuzfahrerhafen", s.camp < 6 ? `${s.camp}/6` : "")}${node(!!(s.quests.mitra && s.quests.mitra.done), "Die Hohepriesterin der Mitra bezwungen")}${fac ? Object.entries(fac).filter(([, f]) => !f.noJobs).map(([k, f]) => node((s.rep[k] || 0) >= 50, `Freund: ${f.name}`, (s.rep[k] || 0) < 50 ? `Ruf ${s.rep[k] || 0}/50` : "")).join("") : ""}</ul></div>`;
   $("#cSam").onclick = () => { $("#sh").hidden = true; current = null; window.Postcards.open(); };
   $("#cFast").onclick = () => { current = "mensa"; render(); };
   if ($("#cAtem")) $("#cAtem").onclick = () => {
