@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1a2a">
+<title>Crusaders · Mundi II</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; font: 14px/1.4 "Figtree", sans-serif; color: #fff; }
+#world { position: fixed; inset: 0; touch-action: none; }
+#world canvas { width: 100%; height: 100%; display: block; }
+.top { position: fixed; left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.top a { pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(10,20,30,0.45); border: 1px solid rgba(255,255,255,0.35); color: #fff; text-decoration: none; font-size: 22px; backdrop-filter: blur(6px); }
+.top h1 { margin: 0; font: 800 18px "Cinzel", serif; letter-spacing: 0.12em; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+.top small { display: block; font: 12px "Figtree", sans-serif; letter-spacing: 0; opacity: 0.8; }
+.bar { position: fixed; right: 10px; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.bar button { width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,20,30,0.45); color: #fff; font: 600 10px "Figtree", sans-serif; backdrop-filter: blur(6px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.bar button span { font-size: 19px; line-height: 1; }
+.bar button.on { background: rgba(240,210,140,0.85); color: #1a1208; }
+#src { position: fixed; left: 10px; bottom: max(8px, env(safe-area-inset-bottom)); right: 74px; font-size: 9.5px; opacity: 0.7; text-shadow: 0 0 3px #000; }
+#info { position: fixed; left: 10px; top: calc(max(10px, env(safe-area-inset-top)) + 50px); font-size: 12px; opacity: 0.85; text-shadow: 0 0 4px #000; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1a2a; font: italic 18px "Cinzel", serif; letter-spacing: 0.1em; z-index: 9; }
+</style>
+</head>
+<body>
+<div id="world"></div>
+<div class="top"><a href="../" aria-label="Zurück">‹</a><h1>MUNDI II<small>Rhodos, wie aus dem Flugzeug</small></h1></div>
+<div id="info"></div>
+<div class="bar">
+  <button type="button" id="bFlug"><span>✈</span>Flug</button>
+  <button type="button" id="bZeit"><span>☀</span>Echtzeit</button>
+  <button type="button" id="bWolken" class="on"><span>☁</span>Wolken</button>
+  <button type="button" id="bMeer" class="on"><span>🌊</span>Meer</button>
+</div>
+<div id="src">Küste © OpenStreetMap-Mitwirkende (ODbL) · Höhen: Terrain Tiles (AWS/Mapzen: SRTM, ETOPO1, GEBCO) · Satellit: Sentinel-2 cloudless 2020 von EOX (s2maps.eu, CC BY-NC-SA 4.0, enthält veränderte Copernicus-Sentinel-Daten)</div>
+<div id="loading">Rhodos erhebt sich …</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../geo/geo.js"></script>
+<script>
+"use strict";
+/* Mundi II: the island as if seen from a plane. Not drawn, measured:
+   - heights from a real elevation model, land and sea floor (down to −4200 m in the Rhodes basin),
+     exaggerated like a film relief (land ×3, sea floor ×2.5)
+   - the land coloured by a cloud-free satellite mosaic
+   - the water coloured by its real depth: light is swallowed red first, then green, so sand banks
+     shine turquoise and the deep goes ultramarine; on top the sky's reflection and the sun's glint
+   - a layer of cumulus with its shadows on land and sea, haze toward the horizon, filmic tone
+   The coastline is the contract: whether a point is land or sea is decided only by the OSM coast
+   (30 m), never by the coarse height model or the picture. Everything else is cheap on purpose. */
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const q = new URLSearchParams(location.search);
+const LON0 = 27.55, LAT0 = 36.52, KM = 111.32, KX = Math.cos(36.17 * Math.PI / 180);
+const P = (lon, lat) => [(lon - LON0) * KM * KX, (LAT0 - lat) * KM];
+const W0 = -6, W1 = 76, D0 = -6, D1 = 84, WX = W1 - W0, DZ = D1 - D0;
+const EX_LAND = 3, EX_SEA = 2.5;
+
+/* ---------------- The coast: the contract ---------------- */
+const MRES = 0.03, MW = Math.round(WX / MRES), MH = Math.round(DZ / MRES);
+let MASK = null, maskTex = null;
+function drawMask(features) {
+  const cv = document.createElement("canvas"); cv.width = MW; cv.height = MH; const c = cv.getContext("2d");
+  c.fillStyle = "#000"; c.fillRect(0, 0, MW, MH);
+  const paths = features.map((f) => new Path2D(f.d));
+  // B: how near the coast (a soft glow, for the shallow shelf and the surf)
+  const sm = document.createElement("canvas"); sm.width = Math.ceil(MW / 4); sm.height = Math.ceil(MH / 4);
+  const s4 = sm.getContext("2d"); s4.globalCompositeOperation = "lighter";
+  for (const [blur, a] of [[1.2, 0.6], [5, 0.5]]) {
+    s4.save(); s4.filter = `blur(${blur}px)`; s4.setTransform(KM * KX / MRES / 4e5, 0, 0, KM / MRES / 4e5, (-LON0 * KM * KX - W0) / MRES / 4, (LAT0 * KM - D0) / MRES / 4);
+    s4.fillStyle = `rgba(0,0,255,${a})`; for (const p of paths) s4.fill(p); s4.restore();
+  }
+  c.globalCompositeOperation = "lighter"; c.imageSmoothingEnabled = true; c.drawImage(sm, 0, 0, MW, MH);
+  // R: land, exactly
+  c.save(); c.setTransform(KM * KX / MRES / 1e5, 0, 0, KM / MRES / 1e5, (-LON0 * KM * KX - W0) / MRES, (LAT0 * KM - D0) / MRES);
+  c.fillStyle = "#f00"; for (const p of paths) c.fill(p); c.restore();
+  const img = c.getImageData(0, 0, MW, MH).data; MASK = new Uint8Array(MW * MH);
+  for (let i = 0, j = 0; i < img.length; i += 4, j++) MASK[j] = img[i];
+  maskTex = new THREE.CanvasTexture(cv); maskTex.generateMipmaps = false; maskTex.minFilter = maskTex.magFilter = THREE.LinearFilter;
+}
+const isLand = (x, z) => { const i = Math.floor((x - W0) / MRES), j = Math.floor((z - D0) / MRES); return i >= 0 && j >= 0 && i < MW && j < MH && MASK[j * MW + i] > 127; };
+
+/* ---------------- Heights: land and sea floor, in metres ---------------- */
+let HW = 0, HH = 0, HM = null;
+function loadImage(src) { return new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+async function loadHeights() {
+  const img = await loadImage("data/hoehe.png"), cv = document.createElement("canvas"); HW = cv.width = img.width; HH = cv.height = img.height;
+  const c = cv.getContext("2d"); c.drawImage(img, 0, 0); const d = c.getImageData(0, 0, HW, HH).data;
+  HM = new Float32Array(HW * HH); for (let i = 0; i < HW * HH; i++) HM[i] = d[i * 4] * 256 + d[i * 4 + 1] - 10000;
+  // the sea floor comes from coarse soundings and shows their seams as ripples: smooth it (two box passes, 5 px), keep the land sharp
+  let A = HM.slice();
+  for (let n = 0; n < 2; n++) {
+    const B = new Float32Array(A.length);
+    for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) { let t = 0, c = 0; for (let k = -2; k <= 2; k++) { const ii = i + k; if (ii >= 0 && ii < HW) { t += A[j * HW + ii]; c++; } } B[j * HW + i] = t / c; }
+    for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) { let t = 0, c = 0; for (let k = -2; k <= 2; k++) { const jj = j + k; if (jj >= 0 && jj < HH) { t += B[jj * HW + i]; c++; } } A[j * HW + i] = t / c; }
+  }
+  for (let i = 0; i < HM.length; i++) if (HM[i] < 0) HM[i] = Math.min(HM[i] * 0.25 + A[i] * 0.75, -1);
+}
+function hAt(x, z) {
+  const gx = clamp(((x - W0) / WX) * HW - 0.5, 0, HW - 1.001), gz = clamp(((z - D0) / DZ) * HH - 0.5, 0, HH - 1.001), i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
+  const h = (a, b) => HM[b * HW + a];
+  return h(i, j) * (1 - fx) * (1 - fz) + h(i + 1, j) * fx * (1 - fz) + h(i, j + 1) * (1 - fx) * fz + h(i + 1, j + 1) * fx * fz;
+}
+// distance to the coast, in km, on a 60 m grid (two-pass chamfer): the coarse heights must bow to the coast,
+// and the water gets shallow toward the beach
+const CR = 2, CW = Math.ceil(MW / CR), CH = Math.ceil(MH / CR); let CD = null;
+function coastDist() {
+  const land = new Uint8Array(CW * CH);
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CW; i++) land[j * CW + i] = MASK[Math.min(MH - 1, j * CR + 1) * MW + Math.min(MW - 1, i * CR + 1)] > 127 ? 1 : 0;
+  CD = new Float32Array(CW * CH).fill(1e9);
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CW; i++) {
+    const k = j * CW + i;
+    if ((i > 0 && land[k - 1] !== land[k]) || (j > 0 && land[k - CW] !== land[k]) || (i < CW - 1 && land[k + 1] !== land[k]) || (j < CH - 1 && land[k + CW] !== land[k])) CD[k] = 0.5;
+  }
+  const pass = (i0, i1, di, j0, j1, dj) => {
+    for (let j = j0; j !== j1; j += dj) for (let i = i0; i !== i1; i += di) {
+      const k = j * CW + i; let v = CD[k];
+      if (i - di >= 0 && i - di < CW) v = Math.min(v, CD[k - di] + 1);
+      if (j - dj >= 0 && j - dj < CH) { v = Math.min(v, CD[k - dj * CW] + 1);
+        if (i - di >= 0 && i - di < CW) v = Math.min(v, CD[k - dj * CW - di] + 1.4142);
+        if (i + di >= 0 && i + di < CW) v = Math.min(v, CD[k - dj * CW + di] + 1.4142); }
+      CD[k] = v;
+    }
+  };
+  pass(0, CW, 1, 0, CH, 1); pass(CW - 1, -1, -1, CH - 1, -1, -1);
+  for (let k = 0; k < CD.length; k++) CD[k] = Math.max(0, CD[k] - 0.5) * MRES * CR;
+  // for the shader: metres from the beach out to sea, square-root scale (fine near the shore), up to 2 km
+  const cv = document.createElement("canvas"); cv.width = CW; cv.height = CH; const c = cv.getContext("2d"), im = c.createImageData(CW, CH);
+  for (let k = 0; k < CD.length; k++) { im.data[k * 4] = land[k] ? 0 : Math.sqrt(Math.min(1, CD[k] / 2)) * 255; im.data[k * 4 + 3] = 255; }
+  c.putImageData(im, 0, 0); distTex = new THREE.CanvasTexture(cv); distTex.generateMipmaps = false; distTex.minFilter = distTex.magFilter = THREE.LinearFilter;
+}
+let distTex = null;
+const cdAt = (x, z) => CD[clamp(Math.floor((z - D0) / (MRES * CR)), 0, CH - 1) * CW + clamp(Math.floor((x - W0) / (MRES * CR)), 0, CW - 1)];
+// the surface as drawn: exaggerated, on the right side of the water line wherever the coast says so,
+// and sloping to it: no higher than a steep cliff allows at that distance from the shore
+function yAt(x, z) {
+  const h = hAt(x, z), d = cdAt(x, z);
+  return isLand(x, z) ? Math.min(Math.max(h, 4) * 0.001 * EX_LAND, 0.004 + d * 0.7) : Math.max(Math.min(h, -6) * 0.001 * EX_SEA, -(0.006 + d * 0.6));
+}
+// relief texture for the shaders: R land height, G depth (square-root scale), and the surface normals
+let reliefTex = null, normalTex = null;
+function buildRelief() {
+  const a = document.createElement("canvas"), b = document.createElement("canvas"); a.width = b.width = HW; a.height = b.height = HH;
+  const ia = a.getContext("2d").createImageData(HW, HH), ib = b.getContext("2d").createImageData(HW, HH);
+  const dx = (WX / HW) * 1000, dz = (DZ / HH) * 1000;
+  for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) {
+    const k = j * HW + i, h = HM[k], ex = h > 0 ? EX_LAND : EX_SEA;
+    const hx = (HM[j * HW + Math.min(HW - 1, i + 1)] - HM[j * HW + Math.max(0, i - 1)]) / (2 * dx) * ex, hz = (HM[Math.min(HH - 1, j + 1) * HW + i] - HM[Math.max(0, j - 1) * HW + i]) / (2 * dz) * ex;
+    const L = Math.hypot(hx, 1, hz), nx = -hx / L, nz = -hz / L;
+    ia.data[k * 4] = clamp(h / 1300, 0, 1) * 255; ia.data[k * 4 + 1] = Math.sqrt(clamp(-h / 4500, 0, 1)) * 255; ia.data[k * 4 + 2] = 0; ia.data[k * 4 + 3] = 255;
+    ib.data[k * 4] = (nx * 0.5 + 0.5) * 255; ib.data[k * 4 + 1] = (nz * 0.5 + 0.5) * 255; ib.data[k * 4 + 2] = 0; ib.data[k * 4 + 3] = 255;
+  }
+  a.getContext("2d").putImageData(ia, 0, 0); b.getContext("2d").putImageData(ib, 0, 0);
+  reliefTex = new THREE.CanvasTexture(a); normalTex = new THREE.CanvasTexture(b);
+  for (const t of [reliefTex, normalTex]) { t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; }
+}
+
+/* ---------------- Clouds: a tileable noise, two octaves of it make cumulus ---------------- */
+function cloudNoise() {
+  const N = 256, cv = document.createElement("canvas"); cv.width = cv.height = N; const c = cv.getContext("2d"), im = c.createImageData(N, N);
+  const g = (s) => { const a = new Float32Array(s * s); for (let i = 0; i < a.length; i++) a[i] = Math.random(); return a; };
+  const oct = [[4, 0.5, g(4)], [8, 0.25, g(8)], [16, 0.14, g(16)], [32, 0.07, g(32)], [64, 0.04, g(64)]];
+  const sm = (t) => t * t * (3 - 2 * t);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let v = 0;
+    for (const [s, w, a] of oct) { const fx = (x / N) * s, fy = (y / N) * s, i = Math.floor(fx), j = Math.floor(fy), u = sm(fx - i), t = sm(fy - j), I = (i + 1) % s, J = (j + 1) % s;
+      v += w * (a[j * s + i] * (1 - u) * (1 - t) + a[j * s + I] * u * (1 - t) + a[J * s + i] * (1 - u) * t + a[J * s + I] * u * t); }
+    const k = (y * N + x) * 4; im.data[k] = im.data[k + 1] = im.data[k + 2] = clamp(v, 0, 1) * 255; im.data[k + 3] = 255;
+  }
+  c.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+
+/* ---------------- The sun, where it really stands over Rhodes ---------------- */
+function sunNow(date) {
+  const d = date.getTime() / 864e5 + 2440587.5 - 2451545, r = Math.PI / 180;
+  const g = (357.529 + 0.98560028 * d) * r, qq = 280.459 + 0.98564736 * d;
+  const L = (qq + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * r, e = (23.439 - 0.00000036 * d) * r;
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)), dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const gmst = (18.697374558 + 24.06570982441908 * d) * 15 * r, H = gmst + 28.0 * r - ra, lat = 36.2 * r;
+  const east = -Math.cos(dec) * Math.sin(H), north = Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.cos(H) * Math.sin(lat);
+  const up = Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(H) * Math.cos(lat);
+  return new THREE.Vector3(east, up, -north).normalize();
+}
+const TIMES = [["Echtzeit", null], ["Morgen", 8.5], ["Mittag", 12.5], ["Abend", 17.2]];
+let timeIdx = q.get("zeit") ? -1 : 0;
+function sunDir() {
+  const d = new Date(), h = timeIdx < 0 ? parseFloat(q.get("zeit")) : TIMES[timeIdx][1];
+  if (h != null) d.setUTCHours(Math.floor(h) - 2, (h % 1) * 60, 0, 0);
+  let s = sunNow(d);
+  if (timeIdx === 0 && s.y < 0.05) { const n = new Date(); n.setUTCHours(10, 30, 0, 0); s = sunNow(n); $("#info").textContent = "Nacht auf Rhodos: gezeigt wird der Mittag."; }
+  return s;
+}
+
+/* ---------------- Shaders ---------------- */
+const COMMON = `
+  uniform vec3 uSun, uSunCol, uZen, uHor, uCam; uniform float uTime, uHaze, uCloudCov, uCloudH, uClouds;
+  uniform sampler2D uMask, uRelief, uNormal, uCloud, uDist; uniform vec4 uBox; uniform vec2 uCloudOff;
+  vec2 boxUv(vec2 p) { return vec2((p.x - uBox.x) / uBox.z, 1.0 - (p.y - uBox.y) / uBox.w); }
+  float inBox(vec2 uv) { return step(0.0, uv.x) * step(0.0, uv.y) * step(uv.x, 1.0) * step(uv.y, 1.0); }
+  float cloudD(vec2 p) {
+    if (uClouds < 0.5) return 0.0;
+    vec2 uv = p / 22.0 + uCloudOff;
+    float n = texture2D(uCloud, uv).r * 0.62 + texture2D(uCloud, uv * 2.9 + 0.37).r * 0.38;
+    return smoothstep(1.0 - uCloudCov, 1.0 - uCloudCov + 0.22, n);
+  }
+  float cloudShadow(vec3 p) { vec2 q = p.xz + uSun.xz / max(uSun.y, 0.15) * (uCloudH - p.y); return 1.0 - 0.62 * cloudD(q); }
+  vec3 skyCol(vec3 d) { float h = clamp(d.y, 0.0, 1.0); return mix(uHor, uZen, pow(h, 0.5)); }
+  // aerial haze lives low in the air (scale height 1.6 km): from high up you look through little of it
+  vec3 haze(vec3 col, vec3 p) {
+    float dist = length(uCam - p), H = 1.6, a = max(p.y, 0.0), b = max(uCam.y, 0.0);
+    float dens = abs(b - a) > 0.01 ? H * (exp(-a / H) - exp(-b / H)) / (b - a) : exp(-a / H);
+    float f = 1.0 - exp(-dist * uHaze * dens);
+    return mix(col, uHor * 0.92, f);
+  }
+  // light under water: red is swallowed first, then green; sand banks shine turquoise, the deep goes ultramarine
+  vec3 waterCol(vec3 p, float depth, float shore, vec3 N, vec3 V, float sh) {
+    vec3 sigma = vec3(0.42, 0.085, 0.045);
+    vec3 T = exp(-sigma * depth * 2.0);
+    float grass = smoothstep(0.55, 0.72, texture2D(uCloud, p.xz * 0.9).r) * smoothstep(3.0, 9.0, depth) * (1.0 - smoothstep(25.0, 45.0, depth));
+    vec3 floorA = mix(vec3(0.82, 0.74, 0.55), vec3(0.16, 0.2, 0.12), grass);
+    vec3 light = uSunCol * max(uSun.y, 0.0) * sh * 1.25 + uZen * 0.35;
+    vec3 scatter = vec3(0.004, 0.045, 0.13);
+    vec3 col = floorA * T * light + scatter * (1.0 - T.b * 0.6) * light * 1.6;
+    float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    vec3 R = reflect(-V, N); R.y = abs(R.y);
+    col = mix(col, skyCol(R), fres);
+    float rs = max(dot(R, uSun), 0.0);
+    float rough = clamp(length(uCam - p) * 0.012, 0.0, 1.0);
+    col += uSunCol * (pow(rs, mix(900.0, 120.0, rough)) * mix(9.0, 2.2, rough) + pow(rs, mix(60.0, 14.0, rough)) * 0.25) * sh;
+    // surf where the sea meets the land
+    float surf = smoothstep(28.0, 3.0, shore) * smoothstep(0.3, 0.9, 0.5 + 0.5 * sin(shore * 0.32 + uTime * 1.3 + sin(p.x * 40.0 + p.z * 31.0) * 1.5));
+    col = mix(col, vec3(0.9, 0.93, 0.94) * (0.45 + 0.55 * sh), surf * 0.55 + smoothstep(6.0, 0.0, shore) * 0.35);
+    return col;
+  }
+  vec3 waves(vec2 p, float dist) {
+    vec2 s = vec2(0.0); float tm = uTime;
+    vec2 D0 = vec2(0.94, 0.34), D1 = vec2(0.6, 0.8), D2 = vec2(-0.3, 0.95), D3 = vec2(0.98, -0.2);
+    // a wave smaller than a few pixels only flickers: fade it out, its slope goes into roughness instead
+    float fp = dist * 0.0012;
+    #define WV(D, k, sp, a) s += D * cos(dot(D, p) * k + tm * sp) * a * clamp((6.283 / k / fp - 3.0) / 4.0, 0.0, 1.0);
+    WV(D0, 55.0, 1.9, 0.05) WV(D1, 97.0, 2.5, 0.04) WV(D2, 171.0, 3.3, 0.03) WV(D3, 310.0, 4.4, 0.02)
+    return normalize(vec3(-s.x, 1.0, -s.y));
+  }
+  float shoreAt(vec2 uv) { float s = texture2D(uDist, uv).r; return s * s * 2000.0; }
+  float depthAt(vec2 uv, float shore, vec2 p) {
+    // where the height model has no depth (its coarse land spills into the sea) the coast alone decides
+    float g = texture2D(uRelief, uv).g; float d = g < 0.025 ? 4500.0 : g * g * 4500.0;
+    // the height model is coarse at the shore: from the beach the floor drops 5–14 m per 100 m
+    float slope = mix(0.05, 0.14, texture2D(uCloud, p * 0.35).r);
+    return clamp(min(d, 0.6 + shore * slope), 0.4, 4500.0);
+  }
+`;
+const TAIL = `#include <tonemapping_fragment>\n#include <encodings_fragment>`;
+function shader(frag, extra = {}) {
+  return new THREE.ShaderMaterial({ uniforms: U, vertexShader: `varying vec3 vP; varying vec2 vUv; void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `varying vec3 vP; varying vec2 vUv;\n${COMMON}\n${frag}`, ...extra });
+}
+const U = {
+  uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
+  uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
+  uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null },
+  uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
+};
+
+/* ---------------- Scene ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.outputEncoding = THREE.sRGBEncoding;
+$("#world").append(renderer.domElement);
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, 1, 0.05, 2500);
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+function terrain() {
+  const NX = 330, NZ = 362, pos = new Float32Array(NX * NZ * 3), uvs = new Float32Array(NX * NZ * 2), idx = [];
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const x = W0 + (i / (NX - 1)) * WX, z = D0 + (j / (NZ - 1)) * DZ, k = j * NX + i;
+    pos[k * 3] = x; pos[k * 3 + 1] = yAt(x, z); pos[k * 3 + 2] = z; uvs[k * 2] = (x - W0) / WX; uvs[k * 2 + 1] = 1 - (z - D0) / DZ;
+    if (i < NX - 1 && j < NZ - 1) idx.push(k, k + NX, k + 1, k + 1, k + NX, k + NX + 1);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+  const m = new THREE.Mesh(g, shader(`
+    uniform sampler2D uSat; uniform float uSea;
+    void main() {
+      vec4 mk = texture2D(uMask, vUv); float land = step(0.5, mk.r);
+      vec2 nn = texture2D(uNormal, vUv).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
+      float sh = cloudShadow(vP), diff = max(dot(N, uSun), 0.0);
+      vec3 V = normalize(uCam - vP), col;
+      if (land > 0.5) {
+        vec3 sat = pow(texture2D(uSat, vUv).rgb, vec3(2.2)) * 1.25;
+        col = sat * (uSunCol * (0.25 + 1.1 * diff) * sh + uZen * 0.28);
+      } else if (uSea > 0.5) {
+        discard;      // the sea plane draws the water, flat, at sea level
+      } else {
+        // the sea floor, when the water is switched off: tinted by depth like a relief globe, light shelf, ink-blue deep
+        float dn = texture2D(uRelief, vUv).g;
+        vec3 fl = mix(vec3(0.46, 0.62, 0.68), vec3(0.13, 0.28, 0.48), smoothstep(0.02, 0.35, dn));
+        fl = mix(fl, vec3(0.03, 0.08, 0.2), smoothstep(0.35, 0.9, dn));
+        float steep = 1.0 - N.y;
+        col = fl * (uSunCol * (0.12 + 1.15 * diff) * sh + uZen * 0.22) * (1.0 - steep * 0.5);
+      }
+      gl_FragColor = vec4(haze(col, vP), 1.0);
+      ${TAIL}
+    }`));
+  m.material.uniforms.uSat = U.uSat;
+  scene.add(m); return m;
+}
+// without the water the map is a cut block, like a relief model: its sides show the section through the earth
+let skirt = null;
+function cutSides() {
+  const pos = [], col = [], N = 160, BOT = -12, edge = (t, k) => [[W0 + t * WX, D0], [W1, D0 + t * DZ], [W1 - t * WX, D1], [W0, D1 - t * DZ]][k];
+  for (let k = 0; k < 4; k++) for (let i = 0; i < N; i++) {
+    const [ax, az] = edge(i / N, k), [bx, bz] = edge((i + 1) / N, k), ay = yAt(ax, az), by = yAt(bx, bz);
+    pos.push(ax, ay, az, ax, BOT, az, bx, by, bz, bx, by, bz, ax, BOT, az, bx, BOT, bz);
+    const top = (y) => (y > 0 ? [0.42, 0.34, 0.26] : [0.3, 0.28, 0.27]), lo = [0.1, 0.09, 0.09];
+    col.push(...top(ay), ...lo, ...top(by), ...top(by), ...lo, ...lo);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  skirt = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })); skirt.visible = false; scene.add(skirt);
+}
+// the sea surface over everything that is not land; beyond the map it goes on to the horizon
+let sea = null;
+function seaSurface() {
+  sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shader(`
+    void main() {
+      vec2 uv = boxUv(vP.xz); float inside = inBox(uv);
+      vec4 mk = inside > 0.5 ? texture2D(uMask, uv) : vec4(0.0);
+      if (mk.r > 0.5) discard;
+      float sd = inside > 0.5 ? shoreAt(uv) : 5000.0, d = inside > 0.5 ? depthAt(uv, sd, vP.xz) : 1500.0;
+      vec3 V = normalize(uCam - vP);
+      vec3 col = waterCol(vP, d, sd, waves(vP.xz, length(uCam - vP) / max(V.y, 0.1)), V, cloudShadow(vP));
+      gl_FragColor = vec4(haze(col, vP), 1.0);
+      ${TAIL}
+    }`));
+  sea.rotation.x = -Math.PI / 2; sea.scale.set(3000, 3000, 1); scene.add(sea);
+}
+let clouds = null;
+function cloudLayer() {
+  clouds = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shader(`
+    void main() {
+      float d = cloudD(vP.xz); if (d < 0.02) discard;
+      // light from the side the sun is on: thin and bright there, grey and thick underneath
+      float toward = cloudD(vP.xz + uSun.xz * 1.2);
+      float lit = clamp(1.0 - toward * 0.55 + (d - toward) * 0.4, 0.35, 1.0);
+      vec3 col = uSunCol * lit * 1.15 + uZen * 0.35;
+      float under = step(vP.y, uCam.y) ;
+      col *= mix(0.72, 1.0, under);
+      gl_FragColor = vec4(haze(col, vP), d * 0.96);
+      ${TAIL}
+    }`, { transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  clouds.rotation.x = -Math.PI / 2; clouds.scale.set(600, 600, 1); scene.add(clouds);
+}
+const sky = new THREE.Mesh(new THREE.SphereGeometry(2000, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, uniforms: U,
+  vertexShader: `varying vec3 vD; void main() { vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `varying vec3 vD; uniform vec3 uSun, uSunCol, uZen, uHor;
+    void main() { vec3 d = normalize(vD); float h = clamp(d.y, 0.0, 1.0); vec3 col = mix(uHor, uZen, pow(h, 0.45)); if (d.y < 0.0) col = uHor;
+      float s = max(dot(d, uSun), 0.0); col += uSunCol * (pow(s, 8.0) * 0.2 + pow(s, 200.0) * 0.6 + smoothstep(0.9996, 0.9999, s) * 6.0);
+      gl_FragColor = vec4(col, 1.0);
+      #include <tonemapping_fragment>
+      #include <encodings_fragment>
+    }`,
+}));
+sky.renderOrder = -1; scene.add(sky);
+
+/* ---------------- Light and colour of the hour ---------------- */
+function light() {
+  const s = sunDir(), e = Math.asin(s.y) * 180 / Math.PI, low = clamp((e - 2) / 25, 0, 1);
+  U.uSun.value.copy(s);
+  U.uSunCol.value.setRGB(1.0, 0.72 + 0.26 * low, 0.48 + 0.46 * low).multiplyScalar(0.9 + 0.5 * low);
+  U.uZen.value.setRGB(0.10, 0.25, 0.55).lerp(new THREE.Color(0.18, 0.2, 0.36), 1 - low);
+  U.uHor.value.setRGB(0.62, 0.74, 0.86).lerp(new THREE.Color(0.95, 0.66, 0.46), 1 - low);
+}
+
+/* ---------------- Flying: drag to move, pinch to zoom, two fingers to turn and tilt ---------------- */
+const cam = { x: 40, z: 36, dist: 95, yaw: 2.6, pitch: 0.62 };
+function place() {
+  const ty = Math.max(0, cam.dist < 25 ? yAt(cam.x, cam.z) : 0);
+  const cx = cam.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist, cz = cam.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist;
+  let cy = ty + Math.sin(cam.pitch) * cam.dist;
+  if (cx > W0 && cx < W1 && cz > D0 && cz < D1) cy = Math.max(cy, yAt(cx, cz) + 0.3);
+  camera.position.set(cx, cy, cz); camera.lookAt(cam.x, ty, cam.z);
+  camera.near = clamp(cam.dist * 0.004, 0.02, 2); camera.updateProjectionMatrix();
+}
+const el = renderer.domElement, ptrs = new Map(); let pinch = null, two = null, flying = false;
+el.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); pinch = null; two = null; flying = false; $("#bFlug").classList.remove("on"); });
+el.addEventListener("pointermove", (e) => {
+  if (!ptrs.has(e.pointerId)) return; const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 1) {
+    const k = (2 * cam.dist * Math.tan(Math.PI / 8)) / innerHeight, dx = -(e.clientX - prev[0]) * k, dy = -(e.clientY - prev[1]) * k / Math.max(0.4, Math.sin(cam.pitch));
+    cam.x += Math.cos(cam.yaw) * dx + Math.sin(cam.yaw) * dy; cam.z += -Math.sin(cam.yaw) * dx + Math.cos(cam.yaw) * dy;
+  } else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    if (pinch) cam.dist = clamp(cam.dist * (pinch / d), 1.5, 400);
+    if (two) { cam.yaw += ang - two.ang; cam.pitch = clamp(cam.pitch + (m[1] - two.m[1]) * 0.004, 0.12, 1.5); }
+    pinch = d; two = { ang, m };
+  }
+});
+const up = (e) => { ptrs.delete(e.pointerId); pinch = null; two = null; };
+el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+el.addEventListener("wheel", (e) => { e.preventDefault(); cam.dist = clamp(cam.dist * (e.deltaY > 0 ? 1.12 : 1 / 1.12), 1.5, 400); }, { passive: false });
+el.addEventListener("contextmenu", (e) => e.preventDefault());
+
+/* ---------------- Buttons ---------------- */
+$("#bFlug").onclick = () => { flying = !flying; $("#bFlug").classList.toggle("on", flying); };
+$("#bZeit").onclick = () => { timeIdx = (Math.max(0, timeIdx) + 1) % TIMES.length; $("#bZeit").lastChild.textContent = TIMES[timeIdx][0]; $("#info").textContent = ""; light(); };
+$("#bWolken").onclick = () => { U.uClouds.value = 1 - U.uClouds.value; $("#bWolken").classList.toggle("on", U.uClouds.value > 0.5); clouds.visible = U.uClouds.value > 0.5; };
+$("#bMeer").onclick = () => { U.uSea.value = 1 - U.uSea.value; sea.visible = skirt.visible = U.uSea.value > 0.5; skirt.visible = !sea.visible; $("#bMeer").classList.toggle("on", sea.visible); $("#info").textContent = sea.visible ? "" : `Ohne Wasser: der Meeresboden, ${String(EX_SEA).replace(".", ",")}-fach überhöht, bis 4200 m tief`; };
+
+/* ---------------- Weather: the real cloud cover over Rhodes ---------------- */
+async function weather() {
+  if (q.get("wolken")) { U.uCloudCov.value = clamp(parseFloat(q.get("wolken")), 0, 1); return; }
+  try { const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=36.2&longitude=28.0&current=cloud_cover,wind_speed_10m,wind_direction_10m");
+    const c = (await r.json()).current; U.uCloudCov.value = clamp(0.12 + (c.cloud_cover / 100) * 0.6, 0.12, 0.75); wind = [c.wind_speed_10m, c.wind_direction_10m]; } catch (e) {}
+}
+let wind = [15, 300];
+
+/* ---------------- Start ---------------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (flying) { cam.yaw += dt * 0.035; }
+  U.uTime.value = now / 1000;
+  const wr = (wind[1] * Math.PI) / 180, ws = (wind[0] / 3600) * 6 / 22;      // clouds drift with the real wind, a little faster
+  U.uCloudOff.value.x += -Math.sin(wr) * ws * dt; U.uCloudOff.value.y -= Math.cos(wr) * ws * dt;
+  place(); U.uCam.value.copy(camera.position);
+  sea.position.set(camera.position.x, 0, camera.position.z); clouds.position.set(camera.position.x, U.uCloudH.value, camera.position.z); sky.position.copy(camera.position);
+  U.uHaze.value = 0.02;
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+(async () => {
+  const [geo, sat] = await Promise.all([window.CrusadersGeo.load(), new THREE.TextureLoader().loadAsync("data/satellit.jpg"), loadHeights()]);
+  const exact = geo.regions.filter((r) => r.quality === "genau").map((r) => r.bbox);
+  const feats = geo.features.filter((f) => f.quality === "genau" || !f.rings.every((ring) => ring.every(([lon, lat]) => exact.some(([a, b, c, d]) => lon >= a && lon <= c && lat >= b && lat <= d))));
+  drawMask(feats); coastDist(); buildRelief();
+  sat.encoding = THREE.sRGBEncoding; sat.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  U.uMask.value = maskTex; U.uRelief.value = reliefTex; U.uNormal.value = normalTex; U.uDist.value = distTex; U.uCloud.value = cloudNoise(); U.uSat.value = sat;
+  terrain(); cutSides(); seaSurface(); cloudLayer(); light(); weather();
+  setInterval(light, 60000);
+  if (q.get("ziel")) { const [lon, lat, dist, yaw, pitch] = q.get("ziel").split(",").map(Number); [cam.x, cam.z] = P(lon, lat); if (dist) cam.dist = dist; if (yaw != null && !isNaN(yaw)) cam.yaw = yaw; if (pitch) cam.pitch = pitch; }
+  $("#loading").hidden = true;
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
