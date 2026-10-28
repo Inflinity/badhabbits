@@ -18,12 +18,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; fon
 .top a { pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(10,20,30,0.45); border: 1px solid rgba(255,255,255,0.35); color: #fff; text-decoration: none; font-size: 22px; backdrop-filter: blur(6px); }
 .top h1 { margin: 0; font: 800 18px "Cinzel", serif; letter-spacing: 0.12em; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
 .top small { display: block; font: 12px "Figtree", sans-serif; letter-spacing: 0; opacity: 0.8; }
-.bar { position: fixed; right: 10px; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
-.bar button { width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,20,30,0.45); color: #fff; font: 600 10px "Figtree", sans-serif; backdrop-filter: blur(6px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.bar { position: fixed; right: 10px; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 7px; }
+.bar button { width: 52px; height: 50px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,20,30,0.45); color: #fff; font: 600 10px "Figtree", sans-serif; backdrop-filter: blur(6px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
 .bar button span { font-size: 19px; line-height: 1; }
 .bar button.on { background: rgba(240,210,140,0.85); color: #1a1208; }
 #src { position: fixed; left: 10px; bottom: max(8px, env(safe-area-inset-bottom)); right: 74px; font-size: 9.5px; opacity: 0.7; text-shadow: 0 0 3px #000; }
 #info { position: fixed; left: 10px; top: calc(max(10px, env(safe-area-inset-top)) + 50px); font-size: 12px; opacity: 0.85; text-shadow: 0 0 4px #000; }
+#cap { position: fixed; left: 16px; right: 74px; bottom: 26%; text-align: center; font: 600 17px/1.35 "Cinzel", serif; letter-spacing: 0.06em; text-shadow: 0 1px 10px #000, 0 0 3px #000; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
+#cap.on { opacity: 1; }
+#cap small { display: block; font: italic 13px "Figtree", sans-serif; letter-spacing: 0; opacity: 0.85; margin-top: 4px; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1a2a; font: italic 18px "Cinzel", serif; letter-spacing: 0.1em; z-index: 9; }
 </style>
 </head>
@@ -32,12 +35,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; fon
 <div class="top"><a href="../" aria-label="Zurück">‹</a><h1>MUNDI II<small>Rhodos, wie aus dem Flugzeug</small></h1></div>
 <div id="info"></div>
 <div class="bar">
+  <button type="button" id="bGenesis"><span>🌋</span>Genesis</button>
+  <button type="button" id="bSchicht"><span>🌿</span>Natur</button>
   <button type="button" id="bFlug"><span>✈</span>Flug</button>
   <button type="button" id="bZeit"><span>☀</span>Echtzeit</button>
   <button type="button" id="bWolken" class="on"><span>☁</span>Wolken</button>
   <button type="button" id="bMeer" class="on"><span>🌊</span>Meer</button>
 </div>
 <div id="src">Küste © OpenStreetMap-Mitwirkende (ODbL) · Höhen: Terrain Tiles (AWS/Mapzen: SRTM, ETOPO1, GEBCO) · Satellit: Sentinel-2 cloudless 2020 von EOX (s2maps.eu, CC BY-NC-SA 4.0, enthält veränderte Copernicus-Sentinel-Daten)</div>
+<div id="cap"></div>
 <div id="loading">Rhodos erhebt sich …</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -51,6 +57,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; fon
    - the water coloured by its real depth: light is swallowed red first, then green, so sand banks
      shine turquoise and the deep goes ultramarine; on top the sky's reflection and the sun's glint
    - a layer of cumulus with its shadows on land and sea, haze toward the horizon, filmic tone
+   - two layers: Natur (the satellite picture with roads, towns and quarries painted over) and Fels
+     (bare geology: limestone, flysch, marl, gravel beds, deltas, beaches), with cast shadows and occlusion
+   - Genesis at the start: the earth glows, a crust sets, the mountains rise, the sea fills the basins, life colours the land
    The coastline is the contract: whether a point is land or sea is decided only by the OSM coast
    (30 m), never by the coarse height model or the picture. Everything else is cheap on purpose. */
 const $ = (s) => document.querySelector(s);
@@ -129,9 +138,9 @@ function coastDist() {
   };
   pass(0, CW, 1, 0, CH, 1); pass(CW - 1, -1, -1, CH - 1, -1, -1);
   for (let k = 0; k < CD.length; k++) CD[k] = Math.max(0, CD[k] - 0.5) * MRES * CR;
-  // for the shader: metres from the beach out to sea, square-root scale (fine near the shore), up to 2 km
+  // for the shader: metres from the beach out to sea (R) and inland (G), square-root scale (fine near the shore), up to 2 km
   const cv = document.createElement("canvas"); cv.width = CW; cv.height = CH; const c = cv.getContext("2d"), im = c.createImageData(CW, CH);
-  for (let k = 0; k < CD.length; k++) { im.data[k * 4] = land[k] ? 0 : Math.sqrt(Math.min(1, CD[k] / 2)) * 255; im.data[k * 4 + 3] = 255; }
+  for (let k = 0; k < CD.length; k++) { const v = Math.sqrt(Math.min(1, CD[k] / 2)) * 255; im.data[k * 4] = land[k] ? 0 : v; im.data[k * 4 + 1] = land[k] ? v : 0; im.data[k * 4 + 3] = 255; }
   c.putImageData(im, 0, 0); distTex = new THREE.CanvasTexture(cv); distTex.generateMipmaps = false; distTex.minFilter = distTex.magFilter = THREE.LinearFilter;
 }
 let distTex = null;
@@ -142,22 +151,64 @@ function yAt(x, z) {
   const h = hAt(x, z), d = cdAt(x, z);
   return isLand(x, z) ? Math.min(Math.max(h, 4) * 0.001 * EX_LAND, 0.004 + d * 0.7) : Math.max(Math.min(h, -6) * 0.001 * EX_SEA, -(0.006 + d * 0.6));
 }
-// relief texture for the shaders: R land height, G depth (square-root scale), and the surface normals
-let reliefTex = null, normalTex = null;
+// relief texture for the shaders: R land height, G depth (square-root scale); normals (RG) with ambient occlusion (B)
+let reliefTex = null, normalTex = null, geoTex = null, shadowTex = null, EH = null;
+const cv2d = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); return [c, x, x.createImageData(w, h)]; };
+const ctex = (c) => { const t = new THREE.CanvasTexture(c); t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; return t; };
 function buildRelief() {
-  const a = document.createElement("canvas"), b = document.createElement("canvas"); a.width = b.width = HW; a.height = b.height = HH;
-  const ia = a.getContext("2d").createImageData(HW, HH), ib = b.getContext("2d").createImageData(HW, HH);
-  const dx = (WX / HW) * 1000, dz = (DZ / HH) * 1000;
+  const [a, ca, ia] = cv2d(HW, HH), [b, cb, ib] = cv2d(HW, HH), [g, cg, ig] = cv2d(HW, HH);
+  const dx = (WX / HW) * 1000, dz = (DZ / HH) * 1000, cell = WX / HW;
+  EH = new Float32Array(HW * HH); for (let k = 0; k < EH.length; k++) EH[k] = HM[k] * 0.001 * (HM[k] > 0 ? EX_LAND : EX_SEA);      // as drawn, km
+  // a smooth regional noise, for where one rock gives way to another
+  const rn = (x, z, f, sd) => { const v = (i, j) => { const t = Math.sin(i * 127.1 + j * 311.7 + sd * 74.7) * 43758.5453; return t - Math.floor(t); };
+    const X = x * f, Z = z * f, i = Math.floor(X), j = Math.floor(Z), u = X - i, w = Z - j, sm = (t) => t * t * (3 - 2 * t);
+    return v(i, j) * (1 - sm(u)) * (1 - sm(w)) + v(i + 1, j) * sm(u) * (1 - sm(w)) + v(i, j + 1) * (1 - sm(u)) * sm(w) + v(i + 1, j + 1) * sm(u) * sm(w); };
+  // rivers: every land cell drains to its lowest neighbour; what gathers much water cuts a gravel bed
+  const acc = new Float32Array(HW * HH).fill(1), order = [...Array(HW * HH).keys()].filter((k) => HM[k] > 0).sort((p, q) => HM[q] - HM[p]);
+  for (const k of order) { const i = k % HW, j = (k / HW) | 0; let best = -1, bh = HM[k];
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ii = i + di, jj = j + dj; if ((di || dj) && ii >= 0 && jj >= 0 && ii < HW && jj < HH && HM[jj * HW + ii] < bh) { bh = HM[jj * HW + ii]; best = jj * HW + ii; } }
+    if (best >= 0) acc[best] += acc[k]; }
   for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) {
     const k = j * HW + i, h = HM[k], ex = h > 0 ? EX_LAND : EX_SEA;
     const hx = (HM[j * HW + Math.min(HW - 1, i + 1)] - HM[j * HW + Math.max(0, i - 1)]) / (2 * dx) * ex, hz = (HM[Math.min(HH - 1, j + 1) * HW + i] - HM[Math.max(0, j - 1) * HW + i]) / (2 * dz) * ex;
-    const L = Math.hypot(hx, 1, hz), nx = -hx / L, nz = -hz / L;
-    ia.data[k * 4] = clamp(h / 1300, 0, 1) * 255; ia.data[k * 4 + 1] = Math.sqrt(clamp(-h / 4500, 0, 1)) * 255; ia.data[k * 4 + 2] = 0; ia.data[k * 4 + 3] = 255;
-    ib.data[k * 4] = (nx * 0.5 + 0.5) * 255; ib.data[k * 4 + 1] = (nz * 0.5 + 0.5) * 255; ib.data[k * 4 + 2] = 0; ib.data[k * 4 + 3] = 255;
+    const tanS = Math.hypot(hx, hz) / ex, sx_ = hx * 0.6, sz_ = hz * 0.6, L = Math.hypot(sx_, 1, sz_), nx = -sx_ / L, nz = -sz_ / L;      // light the relief a little gentler than it is drawn
+    // ambient occlusion: how much of the sky the valley walls hide (8 directions, 4 distances)
+    let occ = 0;
+    for (let d = 0; d < 8; d++) { const ax = Math.cos(d * Math.PI / 4), az = Math.sin(d * Math.PI / 4); let m = 0;
+      for (const r of [1, 3, 8, 20]) { const ii = clamp(Math.round(i + ax * r), 0, HW - 1), jj = clamp(Math.round(j + az * r), 0, HH - 1); m = Math.max(m, (EH[jj * HW + ii] - EH[k]) / (r * cell)); }
+      occ += Math.atan(m) / (Math.PI / 2); }
+    const ao = clamp(1 - occ / 8 * 1.6, 0, 1);
+    ia.data[k * 4] = clamp(h / 1300, 0, 1) * 255; ia.data[k * 4 + 1] = Math.sqrt(clamp(-h / 4500, 0, 1)) * 255; ia.data[k * 4 + 3] = 255;
+    ib.data[k * 4] = (nx * 0.5 + 0.5) * 255; ib.data[k * 4 + 1] = (nz * 0.5 + 0.5) * 255; ib.data[k * 4 + 2] = ao * 255; ib.data[k * 4 + 3] = 255;
+    // the rocks of Rhodes, beer-mat geology: grey Mesozoic limestone and marble on the high massifs and sea cliffs,
+    // brown flysch (sandstone and shale) in the hills, pale Neogene marls on the low plains, mostly in the north
+    const x = W0 + (i + 0.5) * cell, z = D0 + (j + 0.5) * (DZ / HH), lat = LAT0 - z / KM, lon = LON0 + x / (KM * KX);
+    const reg = rn(x, z, 0.28, 1) - 0.5, reg2 = rn(x, z, 0.9, 2) - 0.5;
+    let lime = clamp((h - 380) / 400, 0, 1) + clamp((tanS - 0.3) / 0.35, 0, 1) * 0.7 + reg * 0.7 + reg2 * 0.3;
+    if (lat > 36.47 || (lon < 27.74 && lat > 36.18) || lon > 28.3) lime += 0.45;      // Turkey, Symi, Chalki: limestone lands
+    let marl = clamp((230 - h) / 180, 0, 1) * clamp(1 - tanS * 4, 0, 1) * (lat > 36.24 ? 1 : 0.65) + reg * 0.5 - reg2 * 0.3;
+    lime = clamp(lime, 0, 1); marl = clamp(marl, 0, 1 - lime);
+    const fl = h > 0 ? clamp((Math.log(acc[k]) - Math.log(40)) / (Math.log(4000) - Math.log(40)), 0, 1) : 0;
+    ig.data[k * 4] = lime * 255; ig.data[k * 4 + 1] = marl * 255; ig.data[k * 4 + 2] = fl * 255; ig.data[k * 4 + 3] = 255;
   }
-  a.getContext("2d").putImageData(ia, 0, 0); b.getContext("2d").putImageData(ib, 0, 0);
-  reliefTex = new THREE.CanvasTexture(a); normalTex = new THREE.CanvasTexture(b);
-  for (const t of [reliefTex, normalTex]) { t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; }
+  ca.putImageData(ia, 0, 0); cb.putImageData(ib, 0, 0); cg.putImageData(ig, 0, 0);
+  reliefTex = ctex(a); normalTex = ctex(b); geoTex = ctex(g);
+  const [sc] = cv2d(HW, HH); shadowTex = ctex(sc);
+}
+// cast shadows of the mountains for where the sun stands: march toward the sun over the drawn heights
+let shadowFor = null;
+function castShadows(sun) {
+  if (sun.y < 0.01) return;
+  if (shadowFor && shadowFor.angleTo(sun) < 0.004) return; shadowFor = sun.clone();
+  const cv = shadowTex.image, c = cv.getContext("2d"), im = c.createImageData(HW, HH), cell = WX / HW, hl = Math.hypot(sun.x, sun.z) || 1e-6;
+  const sx = sun.x / hl, sz = sun.z / hl, tn = sun.y / hl, STEPS = [1, 2, 3, 4, 6, 8, 11, 15, 20, 27, 36, 48, 64, 85, 113, 150];
+  for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) {
+    const k = j * HW + i, h0 = EH[k]; let v = 9;
+    for (const r of STEPS) { const ii = Math.round(i + sx * r), jj = Math.round(j + sz * r); if (ii < 0 || jj < 0 || ii >= HW || jj >= HH) break;
+      const t = r * cell, ray = h0 + t * tn; if (ray > 3.8) break; v = Math.min(v, (ray - EH[jj * HW + ii]) / (t * 0.035 + 0.02)); }
+    im.data[k * 4] = clamp(0.5 + v * 0.5, 0, 1) * 255; im.data[k * 4 + 3] = 255;
+  }
+  c.putImageData(im, 0, 0); shadowTex.needsUpdate = true;
 }
 
 /* ---------------- Clouds: a tileable noise, two octaves of it make cumulus ---------------- */
@@ -199,7 +250,8 @@ function sunDir() {
 /* ---------------- Shaders ---------------- */
 const COMMON = `
   uniform vec3 uSun, uSunCol, uZen, uHor, uCam; uniform float uTime, uHaze, uCloudCov, uCloudH, uClouds;
-  uniform sampler2D uMask, uRelief, uNormal, uCloud, uDist; uniform vec4 uBox; uniform vec2 uCloudOff;
+  uniform sampler2D uMask, uRelief, uNormal, uCloud, uDist, uGeo, uShadow; uniform vec4 uBox; uniform vec2 uCloudOff;
+  uniform float uLife, uHeat, uGrow, uLevel, uShadowK;
   vec2 boxUv(vec2 p) { return vec2((p.x - uBox.x) / uBox.z, 1.0 - (p.y - uBox.y) / uBox.w); }
   float inBox(vec2 uv) { return step(0.0, uv.x) * step(0.0, uv.y) * step(uv.x, 1.0) * step(uv.y, 1.0); }
   float cloudD(vec2 p) {
@@ -256,14 +308,15 @@ const COMMON = `
   }
 `;
 const TAIL = `#include <tonemapping_fragment>\n#include <encodings_fragment>`;
-function shader(frag, extra = {}) {
-  return new THREE.ShaderMaterial({ uniforms: U, vertexShader: `varying vec3 vP; varying vec2 vUv; void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+function shader(frag, extra = {}, grow = "") {
+  return new THREE.ShaderMaterial({ uniforms: U, vertexShader: `varying vec3 vP; varying vec2 vUv; uniform float uGrow; void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); ${grow} vP = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: `varying vec3 vP; varying vec2 vUv;\n${COMMON}\n${frag}`, ...extra });
 }
 const U = {
   uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
   uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
-  uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null },
+  uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null }, uGeo: { value: null }, uShadow: { value: null },
+  uLife: { value: 1 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 },
   uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
 };
 
@@ -287,27 +340,80 @@ function terrain() {
   g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
   const m = new THREE.Mesh(g, shader(`
     uniform sampler2D uSat; uniform float uSea;
+    vec3 lin(vec3 c) { return c * c; }
+    float nz(vec2 p) { return texture2D(uCloud, p).r; }
+    // bare earth, as a geologist would colour it: no plants, no people
+    vec3 rock(vec2 uv, vec3 p, float h, float steep, float far) {
+      vec4 gg = texture2D(uGeo, uv); float lime = gg.r, marl = gg.g, flow = gg.b, flysch = max(0.0, 1.0 - lime - marl);
+      float n1 = nz(p.xz * 0.9), n2 = nz(p.xz * 3.7 + 0.3), n3 = nz(p.xz * 13.0 + 0.7) * (1.0 - far);
+      float strata = 0.5 + 0.5 * sin(h * 0.075 + n1 * 5.0);            // bedding, seen where the slope cuts it
+      vec3 lc = mix(vec3(0.55, 0.52, 0.47), vec3(0.8, 0.77, 0.7), n2);           // limestone, marble grey-white
+      lc = mix(lc, vec3(0.6, 0.38, 0.26), smoothstep(0.55, 0.75, n1) * (1.0 - steep) * 0.7);   // terra rossa in the hollows
+      lc = mix(lc, vec3(0.86, 0.84, 0.8), smoothstep(0.35, 0.7, steep) * 0.5);   // fresh cliff faces
+      vec3 fc = mix(vec3(0.45, 0.36, 0.27), vec3(0.66, 0.5, 0.34), strata * smoothstep(0.1, 0.45, steep) * 0.8 + n2 * 0.4);   // flysch: shale and sandstone
+      vec3 mc = mix(vec3(0.78, 0.68, 0.5), vec3(0.9, 0.84, 0.7), n2);           // marl, chalky
+      vec3 c = lc * lime + fc * flysch + mc * marl;
+      c *= 0.86 + 0.28 * n3;
+      // dry river beds of grey gravel, and where they reach the sea, a fan of mud and sand
+      float river = smoothstep(0.25, 0.75, flow);
+      c = mix(c, vec3(0.7, 0.67, 0.6), river * 0.75);
+      float inland = texture2D(uDist, uv).g; inland = inland * inland * 2000.0;
+      c = mix(c, vec3(0.38, 0.34, 0.29), smoothstep(0.15, 0.5, flow) * smoothstep(500.0, 100.0, inland) * smoothstep(60.0, 5.0, h) * 0.8);
+      // beaches: low and flat right at the water
+      c = mix(c, vec3(0.86, 0.79, 0.64), smoothstep(70.0, 15.0, inland) * smoothstep(0.4, 0.1, steep) * smoothstep(40.0, 4.0, h));
+      return lin(c);
+    }
+    // the sea floor laid bare: sand on the shelf, grey-brown mud below, dark rock on the steep walls
+    vec3 seabed(float dn, float steep, vec3 p) {
+      float d = dn * dn * 4500.0, n = nz(p.xz * 1.3);
+      vec3 c = mix(vec3(0.7, 0.64, 0.5), vec3(0.42, 0.38, 0.33), smoothstep(30.0, 250.0, d));
+      c = mix(c, vec3(0.32, 0.29, 0.26), smoothstep(800.0, 3000.0, d));
+      c = mix(c, vec3(0.27, 0.26, 0.25), smoothstep(0.08, 0.35, steep));
+      return lin(c * (0.9 + 0.2 * n));
+    }
     void main() {
       vec4 mk = texture2D(uMask, vUv); float land = step(0.5, mk.r);
-      vec2 nn = texture2D(uNormal, vUv).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
-      float sh = cloudShadow(vP), diff = max(dot(N, uSun), 0.0);
-      vec3 V = normalize(uCam - vP), col;
-      if (land > 0.5) {
-        vec3 sat = pow(texture2D(uSat, vUv).rgb, vec3(2.2)) * 1.25;
-        col = sat * (uSunCol * (0.25 + 1.1 * diff) * sh + uZen * 0.28);
-      } else if (uSea > 0.5) {
-        discard;      // the sea plane draws the water, flat, at sea level
-      } else {
-        // the sea floor, when the water is switched off: tinted by depth like a relief globe, light shelf, ink-blue deep
-        float dn = texture2D(uRelief, vUv).g;
-        vec3 fl = mix(vec3(0.46, 0.62, 0.68), vec3(0.13, 0.28, 0.48), smoothstep(0.02, 0.35, dn));
-        fl = mix(fl, vec3(0.03, 0.08, 0.2), smoothstep(0.35, 0.9, dn));
-        float steep = 1.0 - N.y;
-        col = fl * (uSunCol * (0.12 + 1.15 * diff) * sh + uZen * 0.22) * (1.0 - steep * 0.5);
+      vec4 nt = texture2D(uNormal, vUv); vec2 nn = nt.rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
+      float dist = length(uCam - vP), far = clamp(dist / 40.0, 0.0, 1.0);
+      // fine erosion, too small for the height model: a bumpy normal from noise, strongest on steep ground, gone far away
+      float e = 0.015, b0 = nz(vP.xz * 2.2), bx = nz(vP.xz * 2.2 + vec2(e, 0.0)), bz = nz(vP.xz * 2.2 + vec2(0.0, e));
+      float steep0 = 1.0 - N.y;
+      N = normalize(N + vec3(b0 - bx, 0.0, b0 - bz) * (6.0 + 30.0 * steep0) * (1.0 - far) * uGrow);
+      float steep = 1.0 - N.y, ao = mix(1.0, nt.b, uShadowK);
+      float shd = mix(1.0, texture2D(uShadow, vUv).r, uShadowK);
+      float sh = cloudShadow(vP) * shd, diff = max(dot(N, uSun), 0.0);
+      vec3 sky = (uZen * 0.5 * (0.6 + 0.4 * N.y) + uHor * 0.22 + uSunCol * max(uSun.y, 0.0) * 0.16) * ao;
+      vec3 col, alb;
+      float h = texture2D(uRelief, vUv).r * 1300.0, dn = texture2D(uRelief, vUv).g;
+      if (land > 0.5 || uSea < 0.5) {
+        if (land > 0.5) {
+          vec3 bare = rock(vUv, vP, h, steep, far);
+          vec3 sat = pow(texture2D(uSat, vUv).rgb, vec3(2.2)) * 1.25;
+          // the satellite picture carries the sun of its own day; our light only adds the relief on top
+          vec3 life = sat * (uSunCol * (0.3 + 0.9 * diff * shd) * cloudShadow(vP) + uZen * 0.25 * ao);
+          col = mix(bare * (uSunCol * diff * sh * 1.05 + sky), life, uLife);
+        } else {
+          vec3 fl = mix(vec3(0.46, 0.62, 0.68), vec3(0.13, 0.28, 0.48), smoothstep(0.02, 0.35, dn));
+          fl = mix(fl, vec3(0.03, 0.08, 0.2), smoothstep(0.35, 0.9, dn));
+          vec3 globe = fl * (uSunCol * (0.12 + 1.15 * diff) * sh + uZen * 0.22) * (1.0 - steep * 0.5);
+          col = mix(seabed(dn, steep, vP) * (uSunCol * diff * sh * 1.05 + sky), globe, uLife);
+        }
+      } else discard;      // the sea plane draws the water, flat, at sea level
+      // Genesis: molten rock, a crust that cools and cracks
+      if (uHeat > 0.001) {
+        // big plates of crust drifting on the melt; between them, cracks that glow
+        vec2 q = vP.xz + vec2(uTime * 0.05, 0.0);
+        float nA = nz(q * 0.045) * 0.6 + nz(q * 0.16 + 0.3) * 0.3 + nz(q * 0.6 + 0.7) * 0.1;
+        float crack = pow(1.0 - abs(2.0 * nA - 1.0), 9.0);
+        float crust = smoothstep(0.92, 0.45, uHeat);
+        vec3 basalt = lin(vec3(0.1, 0.09, 0.085)) * (uSunCol * diff * sh + sky) * (0.7 + 0.6 * nz(vP.xz * 2.0));
+        col = mix(col, basalt, smoothstep(0.0, 0.4, uHeat));
+        float T = mix(0.15 + 0.85 * smoothstep(0.35, 0.75, nA), crack, crust) * smoothstep(0.02, 0.45, uHeat) * min(uHeat, 0.8);
+        col += (mix(vec3(0.45, 0.03, 0.0), vec3(1.0, 0.3, 0.03), clamp(T * 1.6, 0.0, 1.0)) * 1.4 + vec3(1.0, 0.75, 0.4) * pow(T, 4.0) * 1.2) * T;
       }
       gl_FragColor = vec4(haze(col, vP), 1.0);
       ${TAIL}
-    }`));
+    }`, {}, "w.y *= uGrow;"));
   m.material.uniforms.uSat = U.uSat;
   scene.add(m); return m;
 }
@@ -318,7 +424,7 @@ function cutSides() {
   for (let k = 0; k < 4; k++) for (let i = 0; i < N; i++) {
     const [ax, az] = edge(i / N, k), [bx, bz] = edge((i + 1) / N, k), ay = yAt(ax, az), by = yAt(bx, bz);
     pos.push(ax, ay, az, ax, BOT, az, bx, by, bz, bx, by, bz, ax, BOT, az, bx, BOT, bz);
-    const top = (y) => (y > 0 ? [0.42, 0.34, 0.26] : [0.3, 0.28, 0.27]), lo = [0.1, 0.09, 0.09];
+    const top = (y) => (y > 0 ? [0.2, 0.15, 0.1] : [0.12, 0.11, 0.1]), lo = [0.015, 0.012, 0.012];
     col.push(...top(ay), ...lo, ...top(by), ...top(by), ...lo, ...lo);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
@@ -331,8 +437,16 @@ function seaSurface() {
     void main() {
       vec2 uv = boxUv(vP.xz); float inside = inBox(uv);
       vec4 mk = inside > 0.5 ? texture2D(uMask, uv) : vec4(0.0);
-      if (mk.r > 0.5) discard;
-      float sd = inside > 0.5 ? shoreAt(uv) : 5000.0, d = inside > 0.5 ? depthAt(uv, sd, vP.xz) : 1500.0;
+      float sd, d;
+      if (uLevel < -0.002) {
+        // Genesis: the sea still rising; how deep it is here, from the drawn floor
+        float g = inside > 0.5 ? texture2D(uRelief, uv).g : 0.6;
+        d = g * g * 4500.0 + uLevel / (0.001 * ${EX_SEA.toFixed(2)} * uGrow); sd = 5000.0;
+        if (d < 0.3) discard;
+      } else {
+        if (mk.r > 0.5) discard;
+        sd = inside > 0.5 ? shoreAt(uv) : 5000.0; d = inside > 0.5 ? depthAt(uv, sd, vP.xz) : 1500.0;
+      }
       vec3 V = normalize(uCam - vP);
       vec3 col = waterCol(vP, d, sd, waves(vP.xz, length(uCam - vP) / max(V.y, 0.1)), V, cloudShadow(vP));
       gl_FragColor = vec4(haze(col, vP), 1.0);
@@ -376,6 +490,10 @@ function light() {
   U.uSunCol.value.setRGB(1.0, 0.72 + 0.26 * low, 0.48 + 0.46 * low).multiplyScalar(0.9 + 0.5 * low);
   U.uZen.value.setRGB(0.10, 0.25, 0.55).lerp(new THREE.Color(0.18, 0.2, 0.36), 1 - low);
   U.uHor.value.setRGB(0.62, 0.74, 0.86).lerp(new THREE.Color(0.95, 0.66, 0.46), 1 - low);
+  // Genesis: a young earth under smoke, lit from below by its own glow
+  const H = U.uHeat.value;
+  if (H > 0) { U.uZen.value.lerp(new THREE.Color(0.012, 0.008, 0.01), H); U.uHor.value.lerp(new THREE.Color(0.16, 0.05, 0.025), H); U.uSunCol.value.multiplyScalar(1 - 0.6 * H); }
+  castShadows(s);
 }
 
 /* ---------------- Flying: drag to move, pinch to zoom, two fingers to turn and tilt ---------------- */
@@ -413,6 +531,50 @@ $("#bZeit").onclick = () => { timeIdx = (Math.max(0, timeIdx) + 1) % TIMES.lengt
 $("#bWolken").onclick = () => { U.uClouds.value = 1 - U.uClouds.value; $("#bWolken").classList.toggle("on", U.uClouds.value > 0.5); clouds.visible = U.uClouds.value > 0.5; };
 $("#bMeer").onclick = () => { U.uSea.value = 1 - U.uSea.value; sea.visible = skirt.visible = U.uSea.value > 0.5; skirt.visible = !sea.visible; $("#bMeer").classList.toggle("on", sea.visible); $("#info").textContent = sea.visible ? "" : `Ohne Wasser: der Meeresboden, ${String(EX_SEA).replace(".", ",")}-fach überhöht, bis 4200 m tief`; };
 
+// the layer: the land as it lives (satellite, without people), or bare rock as the geologist sees it
+let life = 1; try { life = localStorage.getItem("mundi2-schicht") === "fels" ? 0 : 1; } catch (e) {}
+function showLayer() { const b = $("#bSchicht"); b.firstChild.textContent = life ? "🌿" : "🪨"; b.lastChild.textContent = life ? "Natur" : "Fels"; if (!gen) U.uLife.value = life; }
+$("#bSchicht").onclick = () => { life = 1 - life; try { localStorage.setItem("mundi2-schicht", life ? "natur" : "fels"); } catch (e) {} showLayer(); };
+$("#bGenesis").onclick = () => genesis();
+
+/* ---------------- Genesis: the world begins hot, cools to rock, the sea rises, life colours the land ---------------- */
+const BOTTOM = -4.3 * EX_SEA;
+const ACTS = [
+  [0, "Vor 4,5 Milliarden Jahren", "Die junge Erde glüht."],
+  [3.2, "Fels und Silikat erstarren", "Eine Kruste bildet sich, Gebirge falten sich auf."],
+  [9.5, "Kalk, Sandstein, Mergel", "Nackter Fels, kein Halm, kein Tropfen."],
+  [13, "Wasserdampf regnet ab", "Das Meer steigt."],
+  [20.5, "Das Leben färbt das Land", ""],
+];
+let gen = null;
+const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+function genesis() {
+  gen = { t: 0, act: -1, cov: U.uCloudCov.value || 0.35, cam: { ...cam } };
+  cam.dist = 135; cam.pitch = 0.5; cam.x = 40; cam.z = 36; flying = false; $("#bFlug").classList.remove("on");
+  U.uSea.value = 0; sea.visible = true; skirt.visible = true; $("#info").textContent = "";
+}
+function genEnd() {
+  if (!gen) return;
+  U.uHeat.value = 0; U.uGrow.value = 1; U.uLevel.value = 0; U.uShadowK.value = 1; U.uLife.value = life; U.uCloudCov.value = gen.cov;
+  U.uSea.value = 1; sea.visible = true; skirt.visible = false; $("#bMeer").classList.add("on");
+  $("#cap").classList.remove("on"); gen = null; light();
+}
+function genStep(dt) {
+  const g = gen; g.t += dt; const t = g.t;
+  const act = ACTS.reduce((a, x, i) => (t >= x[0] ? i : a), 0);
+  if (act !== g.act) { g.act = act; const c = $("#cap"); c.classList.remove("on"); setTimeout(() => { if (!gen) return; c.innerHTML = `${ACTS[act][1]}<small>${ACTS[act][2]}</small>`; c.classList.add("on"); }, act ? 500 : 0); }
+  U.uHeat.value = 1 - 0.72 * ease((t - 2) / 7) - 0.28 * ease((t - 8.5) / 3.5);
+  U.uGrow.value = 0.08 + 0.92 * ease((t - 2.5) / 7.5);
+  U.uShadowK.value = ease((t - 9) / 2);
+  U.uLevel.value = BOTTOM * (1 - ease((t - 13) / 7.5));
+  U.uCloudCov.value = g.cov * ease((t - 14) / 6);
+  U.uLife.value = life * ease((t - 21) / 4);
+  cam.yaw += dt * 0.045; cam.dist = 135 - 40 * ease(t / 24);
+  light();
+  if (t > 26) genEnd();
+}
+el.addEventListener("pointerdown", () => { if (gen && gen.t > 0.5) genEnd(); });
+
 /* ---------------- Weather: the real cloud cover over Rhodes ---------------- */
 async function weather() {
   if (q.get("wolken")) { U.uCloudCov.value = clamp(parseFloat(q.get("wolken")), 0, 1); return; }
@@ -426,26 +588,30 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (flying) { cam.yaw += dt * 0.035; }
+  if (gen) genStep(dt);
   U.uTime.value = now / 1000;
   const wr = (wind[1] * Math.PI) / 180, ws = (wind[0] / 3600) * 6 / 22;      // clouds drift with the real wind, a little faster
   U.uCloudOff.value.x += -Math.sin(wr) * ws * dt; U.uCloudOff.value.y -= Math.cos(wr) * ws * dt;
   place(); U.uCam.value.copy(camera.position);
-  sea.position.set(camera.position.x, 0, camera.position.z); clouds.position.set(camera.position.x, U.uCloudH.value, camera.position.z); sky.position.copy(camera.position);
-  U.uHaze.value = 0.02;
+  sea.position.set(camera.position.x, U.uLevel.value, camera.position.z); clouds.position.set(camera.position.x, U.uCloudH.value, camera.position.z); sky.position.copy(camera.position);
+  U.uHaze.value = 0.02 * (1 + U.uHeat.value);
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
 (async () => {
-  const [geo, sat] = await Promise.all([window.CrusadersGeo.load(), new THREE.TextureLoader().loadAsync("data/satellit.jpg"), loadHeights()]);
+  const [geo, sat] = await Promise.all([window.CrusadersGeo.load(), new THREE.TextureLoader().loadAsync("data/natur.jpg"), loadHeights()]);
   const exact = geo.regions.filter((r) => r.quality === "genau").map((r) => r.bbox);
   const feats = geo.features.filter((f) => f.quality === "genau" || !f.rings.every((ring) => ring.every(([lon, lat]) => exact.some(([a, b, c, d]) => lon >= a && lon <= c && lat >= b && lat <= d))));
   drawMask(feats); coastDist(); buildRelief();
   sat.encoding = THREE.sRGBEncoding; sat.anisotropy = renderer.capabilities.getMaxAnisotropy();
   U.uMask.value = maskTex; U.uRelief.value = reliefTex; U.uNormal.value = normalTex; U.uDist.value = distTex; U.uCloud.value = cloudNoise(); U.uSat.value = sat;
+  U.uGeo.value = geoTex; U.uShadow.value = shadowTex;
   terrain(); cutSides(); seaSurface(); cloudLayer(); light(); weather();
   setInterval(light, 60000);
   if (q.get("ziel")) { const [lon, lat, dist, yaw, pitch] = q.get("ziel").split(",").map(Number); [cam.x, cam.z] = P(lon, lat); if (dist) cam.dist = dist; if (yaw != null && !isNaN(yaw)) cam.yaw = yaw; if (pitch) cam.pitch = pitch; }
+  showLayer();
   $("#loading").hidden = true;
+  if (q.get("genesis") !== "0" && !q.get("ziel")) genesis();
   requestAnimationFrame(loop);
 })();
 </script>
