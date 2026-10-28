@@ -182,6 +182,7 @@ const RINGS = [
   { id: "charakter", label: "CHARAKTER", x: 0.27, y: 0.17, s: 0.31, icon: "ritter", rc: "#8d929c" },
   { id: "mensa", label: "MENSA", x: 0.75, y: 0.17, s: 0.29, icon: "mensa", rc: "#a07a52" },
   { id: "mundi", label: "MUNDI", x: 0.5, y: 0.48, s: 0.42, icon: "globe", rc: "#a07a52", fs: "28px" },
+  { id: "mundi2", label: "MUNDI II", x: 0.69, y: 0.67, s: 0.16, icon: "globe", rc: "#5a7a9a", fs: "13px" },
   { id: "spiritus", label: "SPIRITUS", x: 0.14, y: 0.5, s: 0.22, icon: "wind", rc: "#5a9ab8", fs: "15px" },
   { id: "herbarium", label: "HERBARIUM", x: 0.86, y: 0.5, s: 0.22, icon: "tee", rc: "#6a8a4a", fs: "15px" },
   { id: "curriculum", label: "CURRICULUM", x: 0.42, y: 0.81, s: 0.29, icon: "buch", rc: "#8d929c" },
@@ -209,6 +210,7 @@ function subs() {
   const s = S.get(), fast = S.read("crusaders-fasten", {}), tr = S.read("crusaders-training", {});
   const set = (id, t) => { const e = $("#sub-" + id); if (e) e.textContent = t; };
   set("mundi", s.jobs.length ? `${s.jobs.length} Aufträge` : "In die Welt");
+  set("mundi2", "Flugansicht");
   set("mensa", fast.start ? "Fastest " + hm(Date.now() - fast.start) : "");
   set("curriculum", tr.start ? "Training läuft" : `${Object.keys(window.Postcards.found()).length} Funde`);
   set("castra", ["Wrack", "Feuer", "Zelt", "Palisade", "Steg", "Werft", "Hafen"][s.camp] || "");
@@ -230,6 +232,7 @@ function bar() {
 let current = null;
 function open(id) {
   if (id === "mundi") { location.href = "welt/"; return; }
+  if (id === "mundi2") { location.href = "welt2/"; return; }
   if (id === "castra") { location.href = "lager/"; return; }
   current = id; $("#sh").hidden = false; render();
 }
