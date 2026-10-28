@@ -56,8 +56,11 @@ label.tog { display: flex; gap: 8px; align-items: center; color: var(--muted); m
           <li><b>Gemischt</b> (10×): die Stimme sagt vor dem Ding „einmal“ oder „zweimal“</li>
         </ol></li>
       <li>Die Dings kommen unregelmäßig, damit du nicht vorab im Takt klopfst. Etwa drei Minuten.</li>
-      <li>Am Ende sagt die Stimme, wie viel erkannt wurde. Dann das Log teilen.</li>
+      <li>Danach die <b>Atem-Kalibrierung</b>, ganz in deinem Tempo: <b>ganz ausatmen und unten halten</b>, während du hältst <b>einmal klopfen</b>; dann <b>einatmen und oben halten</b>, wieder <b>einmal klopfen</b>, und wieder hinab. <b>Zehnmal ganz flach, dann zehnmal ganz tief.</b> Ein tiefer Ton heißt „unten markiert“, ein hoher „oben markiert“; die Stimme zählt mit.</li>
+      <li>Am Ende sagt die Stimme, wie viel erkannt wurde und wie weit sich deine Brust bewegt. Dann das Log teilen.</li>
     </ol>
+    <label class="tog"><input type="checkbox" id="doGesten" checked> Gesten-Test (Ruhe, Klopfen, Doppeltipp, gemischt)</label>
+    <label class="tog"><input type="checkbox" id="doKalib" checked> Atem-Kalibrierung (10× flach, 10× tief)</label>
     <label class="tog"><input type="checkbox" id="feedback" checked> Sofort ein Echo: ein Klick für Klopfen, zwei für Doppeltipp; dumpf, wenn nichts oder das Falsche ankam</label>
     <div class="row" style="margin-top:10px"><button type="button" id="go">Starten</button></div>
   </section>
@@ -140,6 +143,7 @@ function onMotion(e) {
   if (hasLin && l && l.x != null) lin = [l.x, l.y, l.z];
   else { const raw = [g.x, g.y, g.z]; if (!prevRaw) prevRaw = raw; for (let k = 0; k < 3; k++) hpL[k] = 0.9 * (hpL[k] + raw[k] - prevRaw[k]); prevRaw = raw; lin = hpL.slice(); }
   RING.push([t, g.x, g.y, g.z, lin[0], lin[1], lin[2], r.alpha || 0, r.beta || 0, r.gamma || 0]);
+  if (CAL.on) CAL.stream.push([+(t - CAL.t0).toFixed(3), +g.x.toFixed(3), +g.y.toFixed(3), +g.z.toFixed(3), +lin[0].toFixed(2), +lin[1].toFixed(2), +lin[2].toFixed(2), +(r.alpha || 0).toFixed(1), +(r.beta || 0).toFixed(1), +(r.gamma || 0).toFixed(1)]);
   if (rate.length < 200) rate.push(t);
   while (RING.length && t - RING[0][0] > 12) RING.shift();
 }
@@ -150,12 +154,74 @@ const windowOf = (t0, a, b) => RING.filter((s) => s[0] >= t0 - a && s[0] <= t0 +
    gesture between 0.15 and 3 s after it. */
 const GOT = [];
 function onGesture(g) {
+  if (CAL.on) return calTap(g);
   GOT.push(g);
   if (run && run.feedback) { tone(1400, 0.06, 0.25, "square"); if (g.kind !== "tipp") setTimeout(() => tone(1400, 0.06, 0.25, "square"), 140); }
 }
 function answer(t0) {
   const g = GOT.find((x) => x.t - t0 > 0.15 && x.t - t0 <= 3.0);
   return g ? { label: g.kind, g: { ...g, t: +(g.t - t0).toFixed(3) }, thr: +Klopf.threshold.toFixed(2) } : { label: "nichts", thr: +Klopf.threshold.toFixed(2) };
+}
+
+/* ---------------- Breath calibration, marked by knocks ----------------
+   Breathe all the way out and hold; while holding, knock once (low tone: "bottom marked").
+   Breathe in and hold; knock once (high tone: "top marked"). Down again. Ten times very
+   shallow, ten times very deep, in your own tempo. The whole sensor stream is kept, and each
+   knock marks exactly where the chest is at its lowest and highest: the ground truth to tune
+   the breath detection on. */
+const CAL = { on: false, t0: 0, block: "", want: "unten", cycle: 0, taps: [], stream: [], done: null, lastTap: 0 };
+const NUM = ["null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn"];
+const CAL_N = 10;
+function calTap(g) {
+  if (g.t - CAL.lastTap < 1.0) return;                  // a knock that rings on, or a slip: once per hold
+  CAL.lastTap = g.t;
+  CAL.taps.push({ t: +(g.t - CAL.t0).toFixed(3), block: CAL.block, at: CAL.want, cycle: CAL.cycle + 1, kind: g.kind, v: g.v });
+  if (CAL.want === "unten") { tone(330, 0.35, 0.3); CAL.want = "oben"; status(`Kalibrierung · ${CAL.block}`, `${CAL.cycle + 1} von ${CAL_N}: oben`); }
+  else {
+    tone(880, 0.35, 0.3); CAL.want = "unten"; CAL.cycle++;
+    status(`Kalibrierung · ${CAL.block}`, `${Math.min(CAL.cycle + 1, CAL_N)} von ${CAL_N}: unten`);
+    setTimeout(() => { if (CAL.on) say(NUM[CAL.cycle] || String(CAL.cycle)); }, 450);
+    if (CAL.cycle >= CAL_N && CAL.done) { const d = CAL.done; CAL.done = null; setTimeout(d, 1600); }
+  }
+}
+async function calibrate() {
+  CAL.t0 = now(); CAL.taps = []; CAL.stream = []; CAL.on = true;
+  for (const [block, text] of [
+    ["flach", "Jetzt die Atem-Kalibrierung. Zuerst zehnmal ganz flach. Atme flach aus, so weit es geht, und halte unten. Während du hältst, klopfe einmal. Dann atme flach ein, halte oben, und klopfe wieder einmal. Ganz in deinem Tempo. Ein tiefer Ton heißt unten, ein hoher heißt oben."],
+    ["tief", "Gut. Jetzt zehnmal ganz tief. Atme ganz aus, halte unten und klopfe einmal. Dann atme ganz tief ein, halte oben und klopfe wieder. Nimm dir Zeit."],
+  ]) {
+    if (run.stop) break;
+    CAL.block = block; CAL.want = "unten"; CAL.cycle = 0; CAL.lastTap = now();
+    status(`Kalibrierung · ${block}`, `1 von ${CAL_N}: unten`);
+    await say(text);
+    // wait for ten breaths; remind gently if nothing comes for a while
+    await new Promise((res) => {
+      CAL.done = res; let lastN = CAL.taps.length, quietSince = now();
+      const iv = setInterval(() => {
+        if (run.stop || !CAL.done) { clearInterval(iv); if (CAL.done) { CAL.done = null; res(); } return; }
+        if (CAL.taps.length !== lastN) { lastN = CAL.taps.length; quietSince = now(); }
+        if (now() - quietSince > 45) { quietSince = now(); say(CAL.want === "unten" ? "Wenn du unten hältst, klopfe einmal." : "Wenn du oben hältst, klopfe einmal."); }
+      }, 500);
+    });
+  }
+  CAL.on = false;
+}
+// how far the chest tilts between bottom and top: the gravity vector, averaged just before each knock
+function calResult() {
+  const vecAt = (t) => { const w = CAL.stream.filter((s) => s[0] >= t - 0.7 && s[0] <= t - 0.15); if (w.length < 5) return null;
+    const m = [0, 0, 0]; for (const s of w) for (let k = 0; k < 3; k++) m[k] += s[1 + k] / w.length; return m; };
+  const ang = (a, b) => { const d = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b)); return (Math.acos(Math.min(1, Math.max(-1, d))) * 180) / Math.PI; };
+  const out = {};
+  for (const block of ["flach", "tief"]) {
+    const deg = [];
+    for (let c = 1; c <= CAL_N; c++) {
+      const lo = CAL.taps.find((x) => x.block === block && x.cycle === c && x.at === "unten"), hi = CAL.taps.find((x) => x.block === block && x.cycle === c && x.at === "oben");
+      const a = lo && vecAt(lo.t), b = hi && vecAt(hi.t); if (a && b) deg.push(ang(a, b));
+    }
+    deg.sort((x, y) => x - y);
+    out[block] = { n: deg.length, median: deg.length ? +deg[Math.floor(deg.length / 2)].toFixed(2) : null, min: deg.length ? +deg[0].toFixed(2) : null, max: deg.length ? +deg[deg.length - 1].toFixed(2) : null };
+  }
+  return out;
 }
 
 /* ---------------- The session ---------------- */
@@ -172,7 +238,7 @@ async function start() {
   await say("Leg das Handy jetzt mit dem Bildschirm nach unten auf deine Brust, oben Richtung Kinn. Atme ruhig. Wir fangen gleich an.");
   await wait(5);
   if (!RING.length) { await say("Ich spüre keine Sensoren. Auf diesem Gerät geht es leider nicht."); status("Keine Bewegungssensoren gefunden.", ""); return; }
-  for (const B of BLOCKS) {
+  for (const B of $("#doGesten").checked ? BLOCKS : []) {
     if (run.stop) return;
     status(B.name, "Die Stimme erklärt …");
     await say(B.say); await wait(2.5);
@@ -190,15 +256,17 @@ async function start() {
       if (run.feedback && !ok) no();
     }
   }
-  finish();
+  if ($("#doKalib").checked && !run.stop) await calibrate();
+  if (!run.stop) finish();
 }
 function status(a, b) { $("#now").textContent = a; $("#trial").textContent = b; }
 async function finish() {
   window.removeEventListener("devicemotion", onMotion); Klopf.stop();
   try { if (wake) wake.release(); } catch (e) {}
-  const byB = BLOCKS.map((B) => { const l = run.trials.filter((t) => t.block === B.id); return { B, n: l.length, ok: l.filter((t) => t.ok).length, l }; });
+  run.calib = CAL.taps.length ? { taps: CAL.taps, result: calResult(), stream: CAL.stream } : null;
+  const byB = BLOCKS.filter((B) => run.trials.some((t) => t.block === B.id)).map((B) => { const l = run.trials.filter((t) => t.block === B.id); return { B, n: l.length, ok: l.filter((t) => t.ok).length, l }; });
   $("#live").hidden = true; $("#result").hidden = false;
-  $("#tab").innerHTML = `<tr><th>Geste</th><th>erkannt</th><th>verwechselt mit</th></tr>` + byB.map(({ B, n, ok, l }) => {
+  $("#tab").innerHTML = (byB.length ? `<tr><th>Geste</th><th>erkannt</th><th>verwechselt mit</th></tr>` : "") + byB.map(({ B, n, ok, l }) => {
     const wrong = {}; for (const t of l) if (!t.ok) wrong[t.got] = (wrong[t.got] || 0) + 1;
     return `<tr><td>${B.name}</td><td class="${ok >= n * 0.8 ? "ok" : "bad"}">${ok} / ${n}</td><td>${Object.entries(wrong).map(([k, v]) => `${v}× ${k}`).join(", ") || "–"}</td></tr>`; }).join("");
   $("#per").innerHTML = byB.map(({ B, l }) => `<div style="margin-top:8px;color:var(--muted);font-size:14px">${B.name}</div><div class="trials">${l.map((t) => `<span class="${t.ok ? "ok" : "bad"}">${t.got}</span>`).join("")}</div>`).join("");
@@ -206,18 +274,23 @@ async function finish() {
   $("#note").textContent = `Sensor: ${r} Messungen pro Sekunde · ${hasLin ? "lineare Beschleunigung vom Gerät" : "Beschleunigung selbst gefiltert"}. Schick mir das Log, dann schärfe ich die Erkennung an deinen echten Gesten.`;
   run.device = { ua: navigator.userAgent, hz: r, hasLin };
   const said = byB.filter((x) => x.B.id !== "ruhe").map(({ B, n, ok }) => `${B.name} ${ok} von ${n}`).join(", ");
-  const still = byB[0];
-  await say(`Fertig. ${said}. In der Ruhe ${still.n - still.ok === 0 ? "keine falschen Meldungen" : still.n - still.ok + " falsche Meldungen"}. Du kannst das Handy jetzt umdrehen.`);
+  const still = byB.find((x) => x.B.id === "ruhe");
+  const cr = run.calib && run.calib.result, deg = (v) => (v == null ? "–" : String(v).replace(".", ",") + "°");
+  if (cr) $("#tab").insertAdjacentHTML("beforeend", `<tr><th colspan="3" style="padding-top:14px">Atem-Kalibrierung: Neigung der Brust, unten bis oben</th></tr>
+    <tr><td>Flach</td><td class="ok">${deg(cr.flach.median)}</td><td>${cr.flach.n} Atemzüge · ${deg(cr.flach.min)} bis ${deg(cr.flach.max)}</td></tr>
+    <tr><td>Tief</td><td class="ok">${deg(cr.tief.median)}</td><td>${cr.tief.n} Atemzüge · ${deg(cr.tief.min)} bis ${deg(cr.tief.max)}</td></tr>`);
+  await say(`Fertig. ${said ? said + ". " : ""}${still ? `In der Ruhe ${still.n - still.ok === 0 ? "keine falschen Meldungen" : still.n - still.ok + " falsche Meldungen"}. ` : ""}${cr && cr.tief.median != null ? `Flach bewegt sich deine Brust um ${deg(cr.flach.median).replace("°", " Grad")}, tief um ${deg(cr.tief.median).replace("°", " Grad")}. ` : ""}Du kannst das Handy jetzt umdrehen.`);
 }
 function logFile() {
   const name = `gesten-${new Date(run.id).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
-  const head = { format: "changes-gesten/2", detector: "klopf.js: z-Achse, Schwelle 0,35–1,2 m/s² (3,5 × Ruhe-Median), Nachschwingen 0,16 s, Doppeltipp bis 0,45 s, Klopfer ≥ 30 % des stärksten", about: "samples: [t s relative to the Ding, g.x, g.y, g.z (incl. gravity), lin.x, lin.y, lin.z (m/s²), rot.alpha, rot.beta, rot.gamma (°/s)]", started: run.started, device: run.device };
-  return new File([JSON.stringify({ ...head, trials: run.trials })], name, { type: "application/json" });
+  const head = { format: "changes-gesten/3", detector: "klopf.js: Betrag der linearen Beschleunigung, Schwelle 0,3–1,2 m/s² (5 × Ruhe-Median), Nachschwingen 0,16 s, Doppeltipp bis 0,45 s, Klopfer ≥ 30 % des stärksten",
+    about: "samples: [t s relative to the Ding, g.x, g.y, g.z (incl. gravity), lin.x, lin.y, lin.z (m/s²), rot.alpha, rot.beta, rot.gamma (°/s)]; calib.stream: the same columns, t in s since the calibration began; calib.taps: knocks marking the bottom (unten) and top (oben) of each held breath", started: run.started, device: run.device };
+  return new File([JSON.stringify({ ...head, trials: run.trials, calib: run.calib })], name, { type: "application/json" });
 }
 $("#share").onclick = async () => { const f = logFile(); try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: f.name }); return; } } catch (e) { if (e.name === "AbortError") return; } $("#save").click(); };
 $("#save").onclick = () => { const f = logFile(), a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(f), download: f.name }); document.body.append(a); a.click(); a.remove(); };
 $("#again").onclick = () => { $("#result").hidden = true; $("#intro").hidden = false; };
-$("#stop").onclick = () => { if (run) run.stop = true; speechSynthesis.cancel(); window.removeEventListener("devicemotion", onMotion); Klopf.stop(); $("#live").hidden = true; $("#intro").hidden = false; };
+$("#stop").onclick = () => { CAL.on = false; if (run) run.stop = true; speechSynthesis.cancel(); window.removeEventListener("devicemotion", onMotion); Klopf.stop(); $("#live").hidden = true; $("#intro").hidden = false; };
 $("#go").onclick = start;
 
 /* a small live view: jolts (sea glass) and rocking (gold), for when you look */
