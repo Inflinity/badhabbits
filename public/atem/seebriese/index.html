@@ -47,7 +47,7 @@ label.l { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-i
 
   <section class="card" id="ein">
     <b>Einschwingen</b>
-    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. <b>Schritt 1:</b> nur das Meer, sauber und ohne Knistern; das Handy hört dabei deinem Atem zu und schreibt ihn ins Log. Im nächsten Schritt wird das Rauschen dann langsam zu deinem Atem. Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
+    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. Das Meer brandet leise, mit tiefem Grund, der nie ganz verstummt, und Wellen, die brechen und auslaufen. Nach einer Dreiviertelminute beginnt es, über etwa vier Minuten, zu deinem Atem zu werden. Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
     <canvas id="eCv" aria-label="Dein Atem und das Meer" hidden></canvas>
     <div id="eState" style="font:600 18px var(--display);color:var(--guide);min-height:26px;margin-top:6px"></div>
     <div class="row" style="margin-top:8px"><button type="button" id="eGo">Einschwingen starten</button>
@@ -308,81 +308,116 @@ const ema = (old, x, dt, tau) => old + (x - old) * (1 - Math.exp(-dt / tau));
 function eStart() {
   const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "playback" });
   const src = ctx.createBufferSource(); src.buffer = makeNoise(ctx); src.loop = true;
-  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.Q.value = 0.7; lp.frequency.value = map(0, 0).freq;
-  const body = ctx.createGain(); body.gain.value = 0; const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2800;
-  const air = ctx.createGain(); air.gain.value = 0; const master = ctx.createGain(); master.gain.value = 0;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.Q.value = 0.7;
+  const body = ctx.createGain(); const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2800;
+  const air = ctx.createGain(); const master = ctx.createGain(); master.gain.value = 0;
   src.connect(lp).connect(body).connect(master); src.connect(hp).connect(air).connect(master); master.connect(ctx.destination);
   const t = ctx.currentTime + 0.05; src.start(t);
-  master.gain.setValueAtTime(0, t); master.gain.linearRampToValueAtTime(+$("#vol").value * 0.4, t + 12);      // quiet, and it comes up slowly
+  master.gain.setValueAtTime(0, t); master.gain.linearRampToValueAtTime(+$("#vol").value * 0.24, t + 12);      // quiet, and it comes up slowly
   Object.assign(E, { on: true, ctx, src, lp, body, air, master, t0: performance.now() / 1000, last: null,
-    g: null, m: null, C: [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]], a: [1, 0, 0], x: 0, xs: 0, hi: 0.001, lo: -0.001, dx: 0, rise: 6, fall: 6, pol: 1,
-    b: 0, bs: 0, db: 0, f: 0, w: 0, amb: { t0: 0, c: null }, acc: [0, 0, 0, 0], rows: [], events: [], lastRow: 0, lastPlan: 0, phases: [], dirSince: 0, dir: 0 });
-  const p1 = Math.random() * 6, p2 = Math.random() * 6; E.gV0 = (T) => 1 + 0.08 * Math.sin(T * 0.21 + p1) + 0.05 * Math.sin(T * 0.53 + p2);
-  for (const pr of [E.body.gain, E.air.gain]) pr.setValueAtTime(0, t); E.lp.frequency.setValueAtTime(map(0, 0).freq, t);
-  E.amb.c = ambWave(); E.amb.t0 = t; E.tS = t; E.gS = t; E.gV = 1; ePlan();
+    g: null, m: null, C: [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]], a: [1, 0, 0], x: 0, xs: 0, lo: 0, hi: 0, pol: 1, sk: 0, sq: 1e-9,
+    b: 0, db: 0, f: 0, bS: 0, fS: 0, w: 0, period: 6, buf: [], quietUntil: 0, away: 0, ready: false, nextEnv: 0,
+    waves: [], acc: [0, 0, 0, 0], rows: [], events: [], tAud: t });
+  const p1 = Math.random() * 6, p2 = Math.random() * 6; E.gust = (T) => 1 + 0.08 * Math.sin(T * 0.21 + p1) + 0.05 * Math.sin(T * 0.53 + p2);
+  const s0 = sound(t); body.gain.setValueAtTime(s0.body, t); lp.frequency.setValueAtTime(s0.freq, t); air.gain.setValueAtTime(s0.air, t);
   window.addEventListener("devicemotion", eMotion);
-  if (window.Klopf) Klopf.start((g) => { E.events.push({ t: +(eNow()).toFixed(2), knock: g.kind }); if (g.kind === "doppel") eStop(); });
+  if (window.Klopf) Klopf.start((g) => { E.events.push({ t: +(eNow()).toFixed(2), knock: g.kind }); E.quietUntil = eNow() + 1.5; if (g.kind === "doppel") eStop(); });
   E.timer = setInterval(eTick, 50);
 }
 const eNow = () => performance.now() / 1000 - E.t0;
-// the sea's own waves before it knows you: no holds, 4-6 s up, 5-7 s down, gently eased
-function ambWave() { return { ein: [4 + Math.random() * 2, "sanft"], oben: 0, aus: [5 + Math.random() * 2, "weich"], unten: 0.3 + Math.random() * 0.8 }; }
+
+/* ---- the sea: a low surf that never quite stops, and waves that break and run out ----
+   Each wave swells over 1.2-2.2 s, breaks (loudest, brightest), then runs out over several seconds: the body of the
+   sound dies away slowly, its brightness sooner, and the hiss of the foam and the backwash lingers longest. The next
+   wave comes 6-11 s after the last, often before it has quite run out. */
+const sanft = (x) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(x, 0, 1));
+function seaAt(T) {
+  const W = E.waves;
+  if (!W.length || T > W[W.length - 1].t0 + W[W.length - 1].gap) {
+    const t0 = W.length ? W[W.length - 1].t0 + W[W.length - 1].gap : T;
+    W.push({ t0, gap: 6 + Math.random() * 5, R: 1.2 + Math.random(), D: 2.5 + Math.random() * 1.8, A: 0.55 + Math.random() * 0.45 });
+    while (W.length > 4) W.shift();
+  }
+  let level = 0.22, bright = 0, foam = 0;
+  for (const w of W) {
+    const u = T - w.t0; if (u < 0) continue;
+    if (u < w.R) { const k = sanft(u / w.R); level += w.A * k; bright += w.A * Math.pow(u / w.R, 1.5); }
+    else { const v = u - w.R; level += w.A * Math.exp(-v / w.D); bright += w.A * Math.exp(-v / (w.D * 0.55)); foam += w.A * (1 - Math.exp(-v / 0.35)) * Math.exp(-v / (w.D * 1.3)); }
+  }
+  bright = clamp(bright, 0, 1); level = Math.min(level, 1.3);
+  return { body: 0.8 * level * (1 + 0.35 * (1 - bright)), freq: 95 * Math.pow(2, bright * 3.5), air: 0.13 * Math.min(foam, 1.2), level, bright };
+}
+// what sounds at audio time T: the sea, and your breath (smoothed, as last read) blended in by w
+function sound(T) {
+  const sea = seaAt(T), g = E.gust(T);
+  if (E.w <= 0.001) return { body: sea.body * g, freq: sea.freq, air: sea.air, sea };
+  const br = map(E.bS, E.fS), w = E.w;
+  return { body: (sea.body + (br.body - sea.body) * w) * g, freq: Math.exp(Math.log(sea.freq) + (Math.log(br.freq) - Math.log(sea.freq)) * w), air: sea.air + (br.air - sea.air) * w, sea };
+}
+
+/* ---- your breath, read from the tilt of the chest ----
+   The axis the chest rocks the phone along is found as it goes; the breath's span is the 8th to 92nd percentile of the
+   last 30 s, so one jolt (laying the phone down, a knock, turning over) cannot stretch it; after a jolt the samples are
+   left out for 1.5 s, and if the phone lies differently afterwards everything is learned anew. */
 function eMotion(e) {
   const g = e.accelerationIncludingGravity; if (!g || g.x == null) return;
   const t = eNow(), dt = E.last == null ? 0.016 : clamp(t - E.last, 0.001, 0.2); E.last = t;
   E.acc[0] += g.x; E.acc[1] += g.y; E.acc[2] += g.z; E.acc[3]++;
   const raw = [g.x, g.y, g.z];
+  if (E.g && Math.hypot(raw[0] - E.g[0], raw[1] - E.g[1], raw[2] - E.g[2]) > 1.5) E.quietUntil = t + 1.5;      // a jolt
   E.g = E.g ? E.g.map((v, k) => ema(v, raw[k], dt, 0.35)) : raw;
   const n = Math.hypot(...E.g) || 1, u = E.g.map((v) => v / n);
-  E.m = E.m ? E.m.map((v, k) => ema(v, u[k], dt, 20)) : u.slice();
+  if (!E.m) E.m = u.slice();
+  // lying differently now? (more than 6° off the mean for over two seconds): start over
+  const off = Math.hypot(u[0] - E.m[0], u[1] - E.m[1], u[2] - E.m[2]);
+  E.away = off > 0.1 ? E.away + dt : 0;
+  if (E.away > 2) { E.m = u.slice(); E.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; E.buf = []; E.ready = false; E.away = 0; E.events.push({ t: +t.toFixed(2), relearn: true }); }
+  E.m = E.m.map((v, k) => ema(v, u[k], dt, 20));
   const d = u.map((v, k) => v - E.m[k]);
-  // the main axis of the chest's rocking: a slowly kept covariance, one step of power iteration per sample
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) E.C[i][j] = ema(E.C[i][j], d[i] * d[j], dt, 30);
+  if (t > E.quietUntil) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) E.C[i][j] = ema(E.C[i][j], d[i] * d[j], dt, 30);
   let a = [0, 1, 2].map((i) => E.C[i][0] * E.a[0] + E.C[i][1] * E.a[1] + E.C[i][2] * E.a[2]); const an = Math.hypot(...a) || 1; a = a.map((v) => v / an);
   if (a[0] * E.a[0] + a[1] * E.a[1] + a[2] * E.a[2] < 0) a = a.map((v) => -v); E.a = a;
-  const x = d[0] * a[0] + d[1] * a[1] + d[2] * a[2];
-  // the envelope of the last breaths: the extremes, each drawing slowly back toward the middle
-  const mid = (E.hi + E.lo) / 2; E.hi = Math.max(x, E.hi - (E.hi - mid) * dt / 25); E.lo = Math.min(x, E.lo + (mid - E.lo) * dt / 25);
-  const prev = E.xs; E.xs = ema(E.xs, x, dt, 0.25); E.dx = ema(E.dx, (E.xs - prev) / dt, dt, 0.4); E.x = x;
-  // how long the chest moves each way: the shorter way is breathing in
-  const span = Math.max(E.hi - E.lo, 1e-4), sp = E.dx / span, dir = sp > 0.04 ? 1 : sp < -0.04 ? -1 : 0;
-  if (dir !== E.dir) { if (E.dir !== 0 && t - E.dirSince > 0.6) { (E.dir > 0 ? (E.rise = ema(E.rise, t - E.dirSince, 1, 3)) : (E.fall = ema(E.fall, t - E.dirSince, 1, 3))); E.phases.push([+t.toFixed(2), E.dir, +(t - E.dirSince).toFixed(2)]); } E.dir = dir; E.dirSince = t; }
+  E.x = d[0] * a[0] + d[1] * a[1] + d[2] * a[2];
+  const prev = E.xs; E.xs = ema(E.xs, E.x, dt, 0.25);
+  if (!E.ready) return;
+  const span = Math.max(E.hi - E.lo, 1e-4), sp = (E.xs - prev) / dt / span;
   // the fast way is in: the cube of the speed, kept over a minute, leans toward the quicker direction
-  E.sk = ema(E.sk || 0, Math.pow(sp, 3), dt, 60); E.sq = ema(E.sq || 1e-6, Math.pow(Math.abs(sp), 3), dt, 60);
+  if (t > E.quietUntil) { E.sk = ema(E.sk, sp * sp * sp, dt, 60); E.sq = ema(E.sq, Math.abs(sp * sp * sp), dt, 60); }
   const lean = E.sk / E.sq, want = lean > 0.12 ? 1 : lean < -0.12 ? -1 : E.pol;
-  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, lean: +lean.toFixed(3), rise: +E.rise.toFixed(2), fall: +E.fall.toFixed(2) }); }
+  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, lean: +lean.toFixed(3) }); }
   let b = clamp((E.xs - E.lo) / span, 0, 1); if (E.pol < 0) b = 1 - b;
   const pb = E.b; E.b = b; E.db = ema(E.db, (b - pb) / dt, dt, 0.3);
   // the rush as the breath moves: 1 at the pace of an average half breath, nothing while you hold
-  const half = (E.rise + E.fall) / 2, speed = Math.abs(E.db) * half, target = (0.65 + 0.35 * clamp(speed / 1.6, 0, 1)) * (speed < 0.12 ? 0 : clamp((speed - 0.12) / 0.35, 0, 1));
-  E.f = ema(E.f, target, dt, target > E.f ? 0.18 : (E.db * E.pol > 0 || b > 0.7 ? 0.45 : 0.3));
+  const speed = Math.abs(E.db) * E.period / 2, target = t < E.quietUntil ? E.f : (0.65 + 0.35 * clamp(speed / 1.6, 0, 1)) * clamp((speed - 0.12) / 0.35, 0, 1);
+  E.f = ema(E.f, target, dt, target > E.f ? 0.18 : 0.35);
+  // for the sound, smoothed once more: no jitter reaches the ear
+  E.bS = ema(E.bS, E.b, dt, 0.2); E.fS = ema(E.fS, E.f, dt, 0.15);
 }
-// the sea, planned two seconds ahead on the audio clock in steps of 1/25 s, like the Seebriese: never driven by the
-// sensor's jitter, so nothing crackles. Its waves come one after the other, each a little different; slow gusts over them
-const ESTEP = 1 / 25;
-function ambAt(T) {
-  while (T >= E.amb.t0 + cycleLen(E.amb.c)) { E.amb.t0 += cycleLen(E.amb.c); E.amb.c = ambWave(); }
-  const s = T - E.amb.t0; return [breathIn(E.amb.c, s)[0], flow(E.amb.c, s)];
-}
-function ePlan() {
-  const ahead = E.ctx.currentTime + 2;
-  while (E.tS < ahead) {
-    const T = E.tS + ESTEP, [ba, fa] = ambAt(T), mm = map(ba, fa);
-    E.body.gain.linearRampToValueAtTime(mm.body * E.gV0(T), T); E.lp.frequency.linearRampToValueAtTime(mm.freq, T); E.air.gain.linearRampToValueAtTime(mm.air, T);
-    E.tS = T; E.now = [ba, fa, mm];
-  }
+// once a second: the span from the last 30 s, and the pace (how often the breath crosses its middle)
+function envelope(t) {
+  const B = E.buf; if (B.length < 200) { E.ready = false; return; }
+  const s = [...B].sort((p, q) => p - q), lo = s[Math.floor(s.length * 0.08)], hi = s[Math.floor(s.length * 0.92)], mid = (lo + hi) / 2;
+  const first = !E.ready; E.lo = first ? lo : ema(E.lo, lo, 1, 4); E.hi = first ? hi : ema(E.hi, hi, 1, 4); E.ready = true;
+  let cross = 0, side = B[0] > mid; for (const v of B) { const sd = v > mid + (hi - lo) * 0.1 ? true : v < mid - (hi - lo) * 0.1 ? false : side; if (sd !== side) { cross++; side = sd; } }
+  if (cross >= 2) E.period = clamp(ema(E.period, (B.length * 0.05) / (cross / 2), 1, 6), 2.5, 25);
 }
 function eTick() {
   if (!E.on) return;
-  const t = eNow(); ePlan();
-  // step a: only the sea; the sensor reads and logs your breath, but does not steer yet
-  E.w = 0;
-  const [ba, fa] = (() => { const s = E.ctx.currentTime - E.amb.t0; return s >= 0 && s <= cycleLen(E.amb.c) ? [breathIn(E.amb.c, s)[0], flow(E.amb.c, s)] : [0, 0]; })(), mm = map(ba, fa);
+  const t = eNow(), ctx = E.ctx;
+  if (t > E.quietUntil && t > 6) { E.buf.push(E.xs); if (E.buf.length > 600) E.buf.shift(); }
+  if (t > E.nextEnv) { E.nextEnv = t + 1; envelope(t); }
+  // you, slowly: from 45 s on, over about four minutes, while the chest moves clearly enough; back to the sea if lost
+  const clear = E.ready ? clamp(((E.hi - E.lo) - 0.0015) / 0.002, 0, 1) : 0;
+  const goal = clear * EASE.weich.f(clamp((t - 45) / 240, 0, 1));
+  E.w = goal > E.w ? Math.min(goal, E.w + 0.05 / 20) : ema(E.w, goal, 0.05, 10);
+  // the sound, 0.3 s ahead on the audio clock: one ramp every 50 ms, from smooth values only
+  const T = Math.max(ctx.currentTime + 0.3, E.tAud + 0.01), sd = sound(T); E.tAud = T;
+  E.body.gain.linearRampToValueAtTime(sd.body, T); E.lp.frequency.linearRampToValueAtTime(sd.freq, T); E.air.gain.linearRampToValueAtTime(sd.air, T);
   // the log, 20 rows a second
   const n = E.acc[3] || 1, r5 = (v) => +v.toFixed(5), r3 = (v) => +v.toFixed(3);
-  E.rows.push([r3(t), r3(E.acc[0] / n), r3(E.acc[1] / n), r3(E.acc[2] / n), r5(E.x), r5(E.lo), r5(E.hi), E.pol, r3(E.b), r3(E.f), r3(ba), r3(fa), r3(E.w), r3(mm.body), Math.round(mm.freq)]);
+  E.rows.push([r3(t), r3(E.acc[0] / n), r3(E.acc[1] / n), r3(E.acc[2] / n), r5(E.x), r5(E.lo), r5(E.hi), E.pol, r3(E.b), r3(E.f), r3(sd.sea.bright), r3(sd.sea.level), r3(E.w), r3(sd.body), Math.round(sd.freq)]);
   E.acc = [0, 0, 0, 0];
-  $("#eState").textContent = "Das Meer rauscht. Atme einfach.";
+  $("#eState").textContent = !E.ready ? "Das Meer rauscht. Atme einfach." : E.w < 0.03 ? "Das Meer rauscht. Es hört dir zu." : E.w < 0.97 ? `Das Meer findet deinen Atem … ${Math.round(E.w * 100)} %` : "Das Meer ist dein Atem.";
   eDraw();
 }
 function eStop() {
@@ -396,10 +431,10 @@ function eStop() {
 }
 function eLog() {
   const name = `einschwingen-${new Date(E.started).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
-  const head = { format: "changes-einschwingen/1", started: E.started, ua: navigator.userAgent,
-    about: "rows (20/s): [t s, g.x, g.y, g.z (mean of the 50 ms, incl. gravity, m/s²), x (tilt along the main axis, rad), lo, hi (envelope), polarity, b (your breath 0 out..1 in), f (your air flow 0..1), b sea, f sea (its own wave), w (0 sea .. 1 you), body gain, low-pass Hz]; phases: [t, direction of x, seconds]",
+  const head = { format: "changes-einschwingen/2", started: E.started, ua: navigator.userAgent,
+    about: "rows (20/s): [t s, g.x, g.y, g.z (mean of the 50 ms, incl. gravity, m/s²), x (tilt along the main axis, rad), lo, hi (envelope), polarity, b (your breath 0 out..1 in), f (your air flow 0..1), sea brightness, sea level (its own waves), w (0 sea .. 1 you), body gain, low-pass Hz]",
     settings: { vol: +$("#vol").value, floor: +$("#floor").value } };
-  return new File([JSON.stringify({ ...head, events: E.events, phases: E.phases, rows: E.rows })], name, { type: "application/json" });
+  return new File([JSON.stringify({ ...head, events: E.events, period: E.period, rows: E.rows })], name, { type: "application/json" });
 }
 $("#eGo").onclick = async () => {
   if (E.on) { eStop(); return; }
