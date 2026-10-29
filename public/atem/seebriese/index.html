@@ -188,7 +188,8 @@ function flow(c, s) {
   const [b, ph, t, d] = breathIn(c, s);
   if (ph === "oben" || ph === "unten" || d <= 0) return 0;
   // breathing out begins softer: its rush fades in over up to 0.9 s
-  const a = ph === "aus" ? Math.min(0.9, 0.25 * d) : Math.min(0.3, 0.15 * d), r = Math.min(0.55, 0.33 * d), sanft = EASE.sanft.f;
+  // and the breath in dies away into the held top more gently, over up to 1.1 s
+  const a = ph === "aus" ? Math.min(0.9, 0.25 * d) : Math.min(0.3, 0.15 * d), r = ph === "ein" ? Math.min(1.1, 0.4 * d) : Math.min(0.55, 0.33 * d), sanft = EASE.sanft.f;
   const env = sanft(clamp(t / a, 0, 1)) * sanft(clamp((d - t) / r, 0, 1));
   const f = EASE[(ph === "ein" ? c.ein : c.aus)[1]].f, e = 0.02, speed = Math.abs(f(clamp(t / d + e, 0, 1)) - f(clamp(t / d - e, 0, 1))) / (2 * e);      // 1 = the average pace
   return env * (0.65 + 0.35 * clamp(speed / 1.6, 0, 1));
