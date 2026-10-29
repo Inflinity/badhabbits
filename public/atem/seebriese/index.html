@@ -47,7 +47,7 @@ label.l { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-i
 
   <section class="card" id="ein">
     <b>Einschwingen</b>
-    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. Das Meer brandet leise, mit tiefem Grund, der nie ganz verstummt, und Wellen, die brechen und auslaufen. Nach einer Dreiviertelminute beginnt es, über etwa vier Minuten, zu deinem Atem zu werden. Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
+    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. Das Meer brandet leise, mit tiefem Grund, der nie ganz verstummt, und Wellen, die brechen und auslaufen. Nach einer Dreiviertelminute beginnt es, über etwa vier Minuten, zu deinem Atem zu werden. Wenn du magst, hilf ihm einmal: tief einatmen, oben kurz halten und <b>einmal</b> auf die Rückseite klopfen; dann weiß es sicher, wo bei dir „ein“ ist. Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
     <canvas id="eCv" aria-label="Dein Atem und das Meer" hidden></canvas>
     <div id="eState" style="font:600 18px var(--display);color:var(--guide);min-height:26px;margin-top:6px"></div>
     <div class="row" style="margin-top:8px"><button type="button" id="eGo">Einschwingen starten</button>
@@ -316,12 +316,21 @@ function eStart() {
   master.gain.setValueAtTime(0, t); master.gain.linearRampToValueAtTime(+$("#vol").value * 0.24, t + 12);      // quiet, and it comes up slowly
   Object.assign(E, { on: true, ctx, src, lp, body, air, master, t0: performance.now() / 1000, last: null,
     g: null, m: null, C: [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]], a: [1, 0, 0], x: 0, xs: 0, lo: 0, hi: 0, pol: 1, sk: 0, sq: 1e-9,
-    b: 0, db: 0, f: 0, bS: 0, fS: 0, w: 0, period: 6, buf: [], quietUntil: 0, away: 0, ready: false, nextEnv: 0,
+    b: 0, db: 0, f: 0, bS: 0, fS: 0, w: 0, period: 5, buf: [], quietUntil: 0, away: 0, ready: false, nextEnv: 0, locked: null, score: 0, hist: [],
     waves: [], acc: [0, 0, 0, 0], rows: [], events: [], tAud: t });
   const p1 = Math.random() * 6, p2 = Math.random() * 6; E.gust = (T) => 1 + 0.08 * Math.sin(T * 0.21 + p1) + 0.05 * Math.sin(T * 0.53 + p2);
   const s0 = sound(t); body.gain.setValueAtTime(s0.body, t); lp.frequency.setValueAtTime(s0.freq, t); air.gain.setValueAtTime(s0.air, t);
   window.addEventListener("devicemotion", eMotion);
-  if (window.Klopf) Klopf.start((g) => { E.events.push({ t: +(eNow()).toFixed(2), knock: g.kind }); E.quietUntil = eNow() + 1.5; if (g.kind === "doppel") eStop(); });
+  if (window.Klopf) Klopf.start((g) => {
+    const tk = g.t - E.t0; E.events.push({ t: +tk.toFixed(2), knock: g.kind }); E.quietUntil = eNow() + 1.5;
+    if (g.kind === "doppel") { eStop(); return; }
+    // one knock while holding at the top of a breath in: where the chest was just before says which way is in
+    if (g.kind === "tipp" && E.ready && tk > 8) {
+      const before = E.hist.filter((h) => h[0] > tk - 0.9 && h[0] < tk - 0.2); if (before.length < 5) return;
+      const xk = before.reduce((a, h) => a + h[1], 0) / before.length, pos = (xk - E.lo) / Math.max(E.hi - E.lo, 1e-5);
+      if (pos > 0.62 || pos < 0.38) { E.pol = pos > 0.5 ? 1 : -1; E.locked = "klopf"; E.events.push({ t: +tk.toFixed(2), polarity: E.pol, by: "klopf", pos: +pos.toFixed(2) }); }
+    }
+  });
   E.timer = setInterval(eTick, 50);
 }
 const eNow = () => performance.now() / 1000 - E.t0;
@@ -365,53 +374,66 @@ function eMotion(e) {
   E.acc[0] += g.x; E.acc[1] += g.y; E.acc[2] += g.z; E.acc[3]++;
   const raw = [g.x, g.y, g.z];
   if (E.g && Math.hypot(raw[0] - E.g[0], raw[1] - E.g[1], raw[2] - E.g[2]) > 1.5) E.quietUntil = t + 1.5;      // a jolt
-  E.g = E.g ? E.g.map((v, k) => ema(v, raw[k], dt, 0.35)) : raw;
+  E.g = E.g ? E.g.map((v, k) => ema(v, raw[k], dt, 0.22)) : raw;
   const n = Math.hypot(...E.g) || 1, u = E.g.map((v) => v / n);
   if (!E.m) E.m = u.slice();
   // lying differently now? (more than 6° off the mean for over two seconds): start over
   const off = Math.hypot(u[0] - E.m[0], u[1] - E.m[1], u[2] - E.m[2]);
   E.away = off > 0.1 ? E.away + dt : 0;
-  if (E.away > 2) { E.m = u.slice(); E.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; E.buf = []; E.ready = false; E.away = 0; E.events.push({ t: +t.toFixed(2), relearn: true }); }
+  if (E.away > 2) { E.m = u.slice(); E.C = [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]]; E.buf = []; E.ready = false; E.away = 0; E.locked = null; E.score = 0; E.events.push({ t: +t.toFixed(2), relearn: true }); }
   E.m = E.m.map((v, k) => ema(v, u[k], dt, 20));
   const d = u.map((v, k) => v - E.m[k]);
   if (t > E.quietUntil) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) E.C[i][j] = ema(E.C[i][j], d[i] * d[j], dt, 30);
   let a = [0, 1, 2].map((i) => E.C[i][0] * E.a[0] + E.C[i][1] * E.a[1] + E.C[i][2] * E.a[2]); const an = Math.hypot(...a) || 1; a = a.map((v) => v / an);
   if (a[0] * E.a[0] + a[1] * E.a[1] + a[2] * E.a[2] < 0) a = a.map((v) => -v); E.a = a;
   E.x = d[0] * a[0] + d[1] * a[1] + d[2] * a[2];
-  const prev = E.xs; E.xs = ema(E.xs, E.x, dt, 0.25);
+  const prev = E.xs; E.xs = ema(E.xs, E.x, dt, 0.18); E.hist.push([t, E.xs]); while (E.hist.length && E.hist[0][0] < t - 3) E.hist.shift();
   if (!E.ready) return;
   const span = Math.max(E.hi - E.lo, 1e-4), sp = (E.xs - prev) / dt / span;
   // the fast way is in: the cube of the speed, kept over a minute, leans toward the quicker direction
   if (t > E.quietUntil) { E.sk = ema(E.sk, sp * sp * sp, dt, 60); E.sq = ema(E.sq, Math.abs(sp * sp * sp), dt, 60); }
-  const lean = E.sk / E.sq, want = lean > 0.12 ? 1 : lean < -0.12 ? -1 : E.pol;
-  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, lean: +lean.toFixed(3) }); }
-  let b = clamp((E.xs - E.lo) / span, 0, 1); if (E.pol < 0) b = 1 - b;
+  let b = clamp((E.xs - E.lo) / span, 0, 1); E.raw = b; if (E.pol < 0) b = 1 - b;
   const pb = E.b; E.b = b; E.db = ema(E.db, (b - pb) / dt, dt, 0.3);
   // the rush as the breath moves: 1 at the pace of an average half breath, nothing while you hold
-  const speed = Math.abs(E.db) * E.period / 2, target = t < E.quietUntil ? E.f : (0.65 + 0.35 * clamp(speed / 1.6, 0, 1)) * clamp((speed - 0.12) / 0.35, 0, 1);
+  const speed = Math.abs(E.db) * E.period / 2.4, target = t < E.quietUntil ? E.f : (0.65 + 0.35 * clamp(speed / 1.6, 0, 1)) * clamp((speed - 0.12) / 0.35, 0, 1);
   E.f = ema(E.f, target, dt, target > E.f ? 0.18 : 0.35);
   // for the sound, smoothed once more: no jitter reaches the ear
-  E.bS = ema(E.bS, E.b, dt, 0.2); E.fS = ema(E.fS, E.f, dt, 0.15);
+  E.bS = ema(E.bS, E.b, dt, 0.15); E.fS = ema(E.fS, E.f, dt, 0.12);
 }
 // once a second: the span from the last 30 s, and the pace (how often the breath crosses its middle)
+// four times a second: the span from the last two breaths or so (at least 8 s), so a slowly wandering baseline
+// is followed; the pace from how often the breath crosses its middle over the last 30 s; and which way is in
 function envelope(t) {
-  const B = E.buf; if (B.length < 200) { E.ready = false; return; }
-  const s = [...B].sort((p, q) => p - q), lo = s[Math.floor(s.length * 0.08)], hi = s[Math.floor(s.length * 0.92)], mid = (lo + hi) / 2;
-  const first = !E.ready; E.lo = first ? lo : ema(E.lo, lo, 1, 4); E.hi = first ? hi : ema(E.hi, hi, 1, 4); E.ready = true;
-  let cross = 0, side = B[0] > mid; for (const v of B) { const sd = v > mid + (hi - lo) * 0.1 ? true : v < mid - (hi - lo) * 0.1 ? false : side; if (sd !== side) { cross++; side = sd; } }
-  if (cross >= 2) E.period = clamp(ema(E.period, (B.length * 0.05) / (cross / 2), 1, 6), 2.5, 25);
+  const B = E.buf; if (B.length < 160) { E.ready = false; return; }
+  const n = Math.min(B.length, Math.round(Math.max(8, 2.2 * E.period) * 20)), R = B.slice(-n), s = [...R].sort((p, q) => p - q);
+  const lo = s[Math.floor(s.length * 0.05)], hi = s[Math.floor(s.length * 0.95)], mid = (lo + hi) / 2;
+  const first = !E.ready; E.lo = first ? lo : ema(E.lo, lo, 0.25, 1.5); E.hi = first ? hi : ema(E.hi, hi, 0.25, 1.5); E.ready = true;
+  let cross = 0, side = B[0] > mid; for (const v of B) { const sd = v > mid + (hi - lo) * 0.15 ? true : v < mid - (hi - lo) * 0.15 ? false : side; if (sd !== side) { cross++; side = sd; } }
+  if (cross >= 2) E.period = clamp(ema(E.period, (B.length * 0.05) / (cross / 2), 0.25, 6), 2.5, 25);
+  // which way is in, while it is not settled: out is where the chest comes to rest on the same floor every time
+  // (the turning points on that side scatter less), and in is the quicker way; both vote, a knock overrules
+  if (E.locked || E.w > 0.05 || B.length < 400) return;
+  const W = Math.round(E.period * 20), pk = [], tr = [];
+  for (let i = 0; i + W <= B.length; i += W) { let a = -1e9, c = 1e9; for (let k = i; k < i + W; k++) { if (B[k] > a) a = B[k]; if (B[k] < c) c = B[k]; } pk.push(a); tr.push(c); }
+  if (pk.length < 4) return;
+  const sd = (v) => { const m = v.reduce((x, y) => x + y) / v.length; return Math.sqrt(v.reduce((x, y) => x + (y - m) ** 2, 0) / v.length); }, amp = Math.max(hi - lo, 1e-5);
+  const floor = (sd(pk) - sd(tr)) / amp;            // > 0: rests low, so in is up
+  const lean = E.sk / E.sq;                           // > 0: up is quicker, so in is up
+  E.score = ema(E.score, clamp(floor * 4, -1, 1) + clamp(lean * 2, -1, 1), 0.25, 8);
+  const want = E.score > 0.25 ? 1 : E.score < -0.25 ? -1 : E.pol;
+  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, by: "auto", floor: +floor.toFixed(2), lean: +lean.toFixed(2) }); }
 }
 function eTick() {
   if (!E.on) return;
   const t = eNow(), ctx = E.ctx;
   if (t > E.quietUntil && t > 6) { E.buf.push(E.xs); if (E.buf.length > 600) E.buf.shift(); }
-  if (t > E.nextEnv) { E.nextEnv = t + 1; envelope(t); }
+  if (t > E.nextEnv) { E.nextEnv = t + 0.25; envelope(t); }
   // you, slowly: from 45 s on, over about four minutes, while the chest moves clearly enough; back to the sea if lost
   const clear = E.ready ? clamp(((E.hi - E.lo) - 0.0015) / 0.002, 0, 1) : 0;
   const goal = clear * EASE.weich.f(clamp((t - 45) / 240, 0, 1));
   E.w = goal > E.w ? Math.min(goal, E.w + 0.05 / 20) : ema(E.w, goal, 0.05, 10);
   // the sound, 0.3 s ahead on the audio clock: one ramp every 50 ms, from smooth values only
-  const T = Math.max(ctx.currentTime + 0.3, E.tAud + 0.01), sd = sound(T); E.tAud = T;
+  const T = Math.max(ctx.currentTime + 0.2, E.tAud + 0.01), sd = sound(T); E.tAud = T;
   E.body.gain.linearRampToValueAtTime(sd.body, T); E.lp.frequency.linearRampToValueAtTime(sd.freq, T); E.air.gain.linearRampToValueAtTime(sd.air, T);
   // the log, 20 rows a second
   const n = E.acc[3] || 1, r5 = (v) => +v.toFixed(5), r3 = (v) => +v.toFixed(3);
@@ -431,7 +453,7 @@ function eStop() {
 }
 function eLog() {
   const name = `einschwingen-${new Date(E.started).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
-  const head = { format: "changes-einschwingen/2", started: E.started, ua: navigator.userAgent,
+  const head = { format: "changes-einschwingen/3", started: E.started, ua: navigator.userAgent,
     about: "rows (20/s): [t s, g.x, g.y, g.z (mean of the 50 ms, incl. gravity, m/s²), x (tilt along the main axis, rad), lo, hi (envelope), polarity, b (your breath 0 out..1 in), f (your air flow 0..1), sea brightness, sea level (its own waves), w (0 sea .. 1 you), body gain, low-pass Hz]",
     settings: { vol: +$("#vol").value, floor: +$("#floor").value } };
   return new File([JSON.stringify({ ...head, events: E.events, period: E.period, rows: E.rows })], name, { type: "application/json" });
