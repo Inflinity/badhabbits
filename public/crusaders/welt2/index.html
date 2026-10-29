@@ -460,7 +460,17 @@ const COMMON = `
     float th = 0.5 + 0.2 * smoothstep(0.0, reach, shore);
     // beyond their reach only where the sea floor really is shallow (the height model knows a shelf)
     th += 0.4 * smoothstep(reach, reach * 1.6, shore) * smoothstep(25.0, 60.0, dem);
-    return smoothstep(th, th + 0.02, n);
+    return smoothstep(th, th + 0.05, n);
+  }
+  // the shelf in front of a shore, as a gradient and not as a strip: how far the shallows reach changes along the
+  // coast (wide fans in the bays, narrow at the headlands), the floor sinks in a long curve, and patches of sand
+  // and weed make it lighter and darker here and there
+  float shelfDepth(vec2 p, float sd, float cliff) {
+    float wide = nz(p * 0.16 + 0.13) * 0.6 + nz(p * 0.05 + 0.71) * 0.4;
+    float reach = mix(1700.0, 140.0, cliff) * (0.25 + 1.5 * wide * wide);
+    float u = sd / reach;
+    float d = mix(0.4, 3.0, cliff) + 22.0 * pow(u, 1.5) + pow(max(u - 1.0, 0.0), 2.0) * 300.0 + pow(sd / 1500.0, 6.0) * 3000.0;
+    return d * (0.7 + 0.6 * nz(p * 0.55 + 0.4));
   }
   float depthAt(vec2 uv, float shore, vec2 p) {
     // where the height model has no depth (its coarse land spills into the sea) the coast alone decides
@@ -470,9 +480,7 @@ const COMMON = `
     // the height model is coarse at the shore: in front of a beach the floor drops 1–2 m per 100 m (wide turquoise
     // shallows), under a cliff up to 30 m: deep blue right at the rock
     float cliff = texture2D(uDist, uv).b;
-    float slope = mix(0.012, 0.32, cliff) * (0.6 + 0.8 * texture2D(uCloud, p * 0.12).r);
-    // and away from the shore it falls ever faster: a kilometre out it is deep everywhere
-    float shelf = mix(0.4, 3.0, cliff) + shore * slope + pow(shore / 1000.0, 2.0) * 60.0 + pow(shore / 1500.0, 6.0) * 3000.0;
+    float shelf = shelfDepth(p, shore, cliff);
     float dd = min(d, shelf);
     // the shoals; little sand holes in them; and the white line where the swell breaks on their seaward rim
     gReef = shoal(p, shore, cliff, d);
@@ -762,7 +770,7 @@ function seaSurface() {
           // how steeply the land rises behind this shore: the highest ground within a kilometre and a half
           float e = 1.5, hl = max(max(regH(vP.xz + vec2(e, 0.0)), regH(vP.xz - vec2(e, 0.0))), max(regH(vP.xz + vec2(0.0, e)), regH(vP.xz - vec2(0.0, e))));
           rcliff = smoothstep(40.0, 320.0, hl);
-          float shelf = mix(0.5, 3.0, rcliff) + sd * mix(0.012, 0.26, rcliff) * (0.6 + 0.8 * nz(vP.xz * 0.12)) + pow(sd / 1000.0, 2.0) * 60.0 + pow(sd / 1500.0, 6.0) * 3000.0;
+          float shelf = shelfDepth(vP.xz, sd, rcliff);
           d = min(dem, shelf);
           gReef = shoal(vP.xz, sd, rcliff, dem); d = mix(d, min(d, 0.4 + 3.0 * nz(vP.xz * 0.8 + 0.3) + 2.0 * nz(vP.xz * 3.1)), gReef); d = max(d, 0.3);
         }
