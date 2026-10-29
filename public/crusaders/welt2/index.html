@@ -349,13 +349,21 @@ const COMMON = `
   float useRhodes(vec2 p) { return lod(p) < 0.5 ? 1.0 : 0.0; }
   // close spots (Stuttgart, Salach, Trégastel): inside their box they draw everything, land and water; the last
   // 1.5 km of the box is mixed with the world pixel by pixel
-  uniform vec4 uSB[3];
+  uniform vec4 uSB[3], uMB[2];
   float spotHere(vec2 p) {
     if (uWorldOn < 0.5) return 0.0;
     float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     for (int i = 0; i < 3; i++) if (uSB[i].z > 0.0 && r < smoothstep(0.0, 1.5, edgeIn(p, uSB[i]))) return 1.0;
     return 0.0;
   }
+  // the middle level of these spots (South-West Germany, Brittany): mixed with the world over its last 15 km
+  float midHere(vec2 p) {
+    if (uWorldOn < 0.5) return 0.0;
+    float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    for (int i = 0; i < 2; i++) if (uMB[i].z > 0.0 && r < smoothstep(0.0, 15.0, edgeIn(p, uMB[i]))) return 1.0;
+    return 0.0;
+  }
+  float anySpot(vec2 p) { return max(spotHere(p), midHere(p)); }
   vec2 regUv(vec2 p) { return vec2((p.x - uRBox.x) / uRBox.z, 1.0 - (p.y - uRBox.y) / uRBox.w); }
   float regH(vec2 p) { float v = texture2D(uRegH, regUv(p)).r * 255.0; return v > 128.0 ? pow((v - 128.0) / 127.0, 2.0) * 7000.0 : -pow((128.0 - v) / 128.0, 2.0) * 11000.0; }
   float worldH(vec2 p) { float v = texture2D(uWorld, worldUv(p)).r * 255.0; return v > 128.0 ? pow((v - 128.0) / 127.0, 2.0) * 7000.0 : -pow((128.0 - v) / 128.0, 2.0) * 11000.0; }
@@ -526,7 +534,7 @@ const U = {
   uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
   uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
   uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null }, uGeo: { value: null }, uShadow: { value: null },
-  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
+  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uMB: { value: [new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
   uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
 };
 
@@ -688,7 +696,7 @@ function regionMesh() {
   region = new THREE.Mesh(g, shader(`
     uniform float uSea;
     void main() {
-      if (abs(lod(vP.xz) - 1.0) > 0.5 || spotHere(vP.xz) > 0.5) discard;
+      if (abs(lod(vP.xz) - 1.0) > 0.5 || anySpot(vP.xz) > 0.5) discard;
       vec2 ru = regUv(vP.xz); vec4 rm = texture2D(uRegM, ru); float h = regH(vP.xz);
       vec2 nn = texture2D(uRegN, ru).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
       float diff = max(dot(N, uSun), 0.0), sh = cloudShadow(vP); vec3 col;
@@ -718,12 +726,14 @@ const SPOTS = [
   { id: "salach", name: "Salach im Filstal", sub: "Fils, Lauter und der Hohenstaufen", look: [9.74, 48.69, 13, 0.75] },
   { id: "tregastel", name: "Trégastel", sub: "Grève Blanche bis Île Renote", look: [-3.505, 48.826, 6, 0.8] },
 ];
+const MIDS = [{ id: "suedwest", dir: "mitte", lake: 3000, look: [9.05, 48.4] }, { id: "bretagne", dir: "mitte", lake: 3000, look: [-3.1, 48.07] }];
 const spotsOn = [];
 async function loadSpot(sp, slot) {
-  const meta = await (await fetch(`data/orte/${sp.id}.json`)).json(), [lonc, latc] = meta.center, k = KX / Math.cos((latc * Math.PI) / 180);
+  const dir = sp.dir || "orte", mid = dir === "mitte";
+  const meta = await (await fetch(`data/${dir}/${sp.id}.json`)).json(), [lonc, latc] = meta.center, k = KX / Math.cos((latc * Math.PI) / 180);
   const [cx, cz] = G(lonc, latc), w = meta.km[0] * k, h = meta.km[1] * k;
   Object.assign(sp, { box: [cx - w / 2, cz - h / 2, w, h], k });
-  const [hi, wi] = await Promise.all([loadImage(`data/orte/${sp.id}-hoehe.png`), loadImage(`data/orte/${sp.id}-wasser.png`)]);
+  const [hi, wi] = await Promise.all([loadImage(`data/${dir}/${sp.id}-hoehe.png`), loadImage(`data/${dir}/${sp.id}-wasser.png`)]);
   const c = document.createElement("canvas"); c.width = hi.width; c.height = hi.height; const x = c.getContext("2d"); x.drawImage(hi, 0, 0);
   const d = x.getImageData(0, 0, hi.width, hi.height).data, HW_ = hi.width, HH_ = hi.height, HM_ = new Float32Array(HW_ * HH_);
   for (let i = 0; i < HM_.length; i++) HM_[i] = d[i * 4] * 256 + d[i * 4 + 1] - 10000;
@@ -737,7 +747,7 @@ async function loadSpot(sp, slot) {
   }
   nx.putImageData(ni, 0, 0);
   const tex = (img) => { const t = new THREE.Texture(img); t.needsUpdate = true; t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; return t; };
-  const sat = await new THREE.TextureLoader().loadAsync(`data/orte/${sp.id}.jpg`); sat.anisotropy = 4;
+  const sat = await new THREE.TextureLoader().loadAsync(`data/${dir}/${sp.id}.jpg`); sat.anisotropy = 4;
   // the mesh: 2 heights per vertex step, water lying flat as the heights say
   const NX = Math.min(HW_, 300), NZ = Math.round(NX * HH_ / HW_), pos = new Float32Array(NX * NZ * 3), idx = new Uint32Array((NX - 1) * (NZ - 1) * 6); let n = 0;
   for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
@@ -748,9 +758,9 @@ async function loadSpot(sp, slot) {
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
   g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(NX * NZ * 2), 2));
   const m = shader(`
-    uniform vec4 uBoxS; uniform sampler2D uSSat, uSN, uSW;
+    uniform vec4 uBoxS; uniform sampler2D uSSat, uSN, uSW; uniform float uMid, uLakeR;
     void main() {
-      if (spotHere(vP.xz) < 0.5 && uWorldOn > 0.5) discard;
+      if (uWorldOn > 0.5 && (uMid > 0.5 ? (midHere(vP.xz) < 0.5 || spotHere(vP.xz) > 0.5) : spotHere(vP.xz) < 0.5)) discard;
       vec2 su = vec2((vP.x - uBoxS.x) / uBoxS.z, 1.0 - (vP.z - uBoxS.y) / uBoxS.w);
       if (su.x < 0.0 || su.y < 0.0 || su.x > 1.0 || su.y > 1.0) discard;
       vec3 N = unpackN(texture2D(uSN, su).rg), V = normalize(uCam - vP);
@@ -758,7 +768,7 @@ async function loadSpot(sp, slot) {
       vec4 wt = texture2D(uSW, su); vec3 s0 = texture2D(uSSat, su).rgb, sat = pow(s0, vec3(2.2)) * 1.25, col;
       if (wt.r > 0.5) {
         // water: the sea by its shelf, a lake or a river by how far its shore is; lakes and rivers are green-brown
-        bool isSea = wt.b > 0.5; float sd = isSea ? wt.g * wt.g * 2000.0 : pow(wt.g / 0.5, 2.0) * 400.0;
+        bool isSea = wt.b > 0.5; float sd = isSea ? wt.g * wt.g * 2000.0 : pow(wt.g / 0.5, 2.0) * uLakeR;
         // a lake here is not clear: humus and algae make it dark, olive to brown-green, its floor gone after a metre or two
         float depth = isSea ? shelfDepth(vP.xz, sd, 0.8) * 1.6 : 30.0 + sd * 0.1;
         col = waterCol(vP, depth, sd, waves(vP.xz, dist / max(V.y, 0.1)), V, sh, 0.0, isSea ? 0.5 : 1.0);
@@ -779,9 +789,9 @@ async function loadSpot(sp, slot) {
       gl_FragColor = vec4(finish(col, vP), 1.0);
       ${TAIL}
     }`, {}, "w.y *= uWEx;");
-  m.uniforms = { ...U, uBoxS: { value: new THREE.Vector4(...sp.box) }, uSSat: { value: sat }, uSN: { value: ctex(nc) }, uSW: { value: tex(wi) } };
+  m.uniforms = { ...U, uBoxS: { value: new THREE.Vector4(...sp.box) }, uSSat: { value: sat }, uSN: { value: ctex(nc) }, uSW: { value: tex(wi) }, uMid: { value: mid ? 1 : 0 }, uLakeR: { value: sp.lake || 400 } };
   sp.mesh = new THREE.Mesh(g, m); sp.mesh.frustumCulled = false; sp.mesh.visible = !gen; scene.add(sp.mesh);
-  U.uSB.value[slot].set(...sp.box); spotsOn.push(sp);
+  (mid ? U.uMB : U.uSB).value[slot].set(...sp.box); spotsOn.push(sp); if (mid) spotsOn.sort((a, b) => (a.dir === "mitte") - (b.dir === "mitte"));
 }
 function spotHAt(sp, u, v) {
   const gx = clamp(u * sp.HW - 0.5, 0, sp.HW - 1.001), gz = clamp(v * sp.HH - 0.5, 0, sp.HH - 1.001), i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j, H_ = (a, b) => sp.HM[b * sp.HW + a];
@@ -801,7 +811,7 @@ function worldMesh() {
   world = new THREE.Mesh(g, shader(`
     uniform float uSea; uniform sampler2D uSat;
     void main() {
-      if (lod(vP.xz) < 1.5 || spotHere(vP.xz) > 0.5) discard;      // Rhodes, the Aegean and the spots are drawn by their own, finer models
+      if (lod(vP.xz) < 1.5 || anySpot(vP.xz) > 0.5) discard;      // Rhodes, the Aegean and the spots are drawn by their own, finer models
       vec2 wu = worldUv(vP.xz); float h = worldH(vP.xz);
       vec2 nn = texture2D(uWorldN, wu).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
       // the raised shade is for the map from afar; close by, the coarse cells would show as bumps
@@ -856,7 +866,7 @@ function seaSurface() {
   sea = new THREE.Mesh(seaRings(40000), shader(`
     uniform sampler2D uSat;
     void main() {
-      if (spotHere(vP.xz) > 0.5) discard;
+      if (anySpot(vP.xz) > 0.5) discard;
       vec2 uv = boxUv(vP.xz); float lv = lod(vP.xz), inside = lv < 0.5 ? 1.0 : 0.0;
       vec4 mk = inside > 0.5 ? texture2D(uMask, uv) : vec4(0.0);
       float sd, d, rcliff = 0.45; gUv = uv; gIn = inside;
@@ -1021,7 +1031,7 @@ function showLayer() {
 $("#bSchicht").onclick = () => { layer = (layer + 1) % LAYERS.length; try { localStorage.setItem("mundi2-schicht", LAYERS[layer][0]); } catch (e) {} showLayer(); };
 $("#bGenesis").onclick = () => genesis();
 // places: a flight there, out high enough to see both ends and down again
-const PLACES = [["Rhodos", "die Insel", [28.0, 36.25, 95, 0.75]], ["Ostägäis", "Dodekanes und Karien", [27.6, 36.7, 520, 0.95]], ...SPOTS.map((sp) => [sp.name, sp.sub, sp.look]), ["Welt", "die ganze Karte", [15, 30, 26000, 1.3]]];
+const PLACES = [["Rhodos", "die Insel", [28.0, 36.25, 95, 0.75]], ["Ostägäis", "Dodekanes und Karien", [27.6, 36.7, 520, 0.95]], ["Südwestdeutschland", "Schwarzwald, Alb, Bodensee", [9.0, 48.4, 260, 0.95]], ...SPOTS.map((sp) => [sp.name, sp.sub, sp.look]), ["Bretagne", "die Côte de Granit Rose und mehr", [-3.1, 48.1, 340, 0.95]], ["Welt", "die ganze Karte", [15, 30, 26000, 1.3]]];
 $("#bOrte").onclick = () => { const o = $("#orte"); o.hidden = !o.hidden; };
 $("#orte").innerHTML = PLACES.map((p, i) => `<button type="button" data-i="${i}">${p[0]}<small>${p[1]}</small></button>`).join("");
 $("#orte").querySelectorAll("button").forEach((b) => (b.onclick = () => { $("#orte").hidden = true; const [, , [lon, lat, dist, pitch]] = PLACES[+b.dataset.i]; const [x, z] = G(lon, lat); flyTo(x, z, dist, pitch); }));
@@ -1135,7 +1145,15 @@ function loop(now) {
   U.uGeo.value = geoTex; U.uShadow.value = shadowTex;
   terrain(); cutSides(); worldMesh(); seaSurface(); cloudLayer(); light(); weather();
   loadRegion();      // the middle level comes a moment later; until then the world stands in
-  SPOTS.forEach((sp, i) => loadSpot(sp, i).catch((e) => console.warn("Ort", sp.id, e)));
+  // spots and middle levels load only when you come near (within a few times their size), so Rhodes stays light
+  const near = [...SPOTS.map((sp, i) => [sp, i, sp.look]), ...MIDS.map((sp, i) => [sp, i, sp.look])];
+  setInterval(() => {
+    for (const it of near) {
+      const [sp, i, [lon, lat]] = it; if (sp.loading) continue;
+      const [x, z] = G(lon, lat), d = Math.hypot(cam.x - x, cam.z - z);
+      if (d < Math.max(cam.dist * 1.5, 50) + (sp.dir ? 600 : 80)) { sp.loading = true; loadSpot(sp, i).catch((e) => console.warn("Ort", sp.id, e)); }
+    }
+  }, 700);
   if (q.get("ziel")) { const [lon, lat, dist, yaw, pitch] = q.get("ziel").split(",").map(Number); [cam.x, cam.z] = G(lon, lat); if (dist) cam.dist = dist; if (pitch) cam.pitch = pitch; }
   showLayer();
   $("#loading").hidden = true;
