@@ -26,15 +26,19 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; fon
 #info { position: fixed; left: 10px; top: calc(max(10px, env(safe-area-inset-top)) + 50px); font-size: 12px; opacity: 0.85; text-shadow: 0 0 4px #000; }
 #cap { position: fixed; left: 74px; right: 16px; bottom: 26%; text-align: center; font: 600 17px/1.35 "Cinzel", serif; letter-spacing: 0.06em; text-shadow: 0 1px 10px #000, 0 0 3px #000; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
 #cap.on { opacity: 1; }
+#orte { position: fixed; left: 72px; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+#orte button { text-align: left; padding: 9px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,20,30,0.72); color: #fff; font: 600 14px "Figtree", sans-serif; backdrop-filter: blur(6px); }
+#orte button small { display: block; font-weight: 400; font-size: 11.5px; opacity: 0.75; }
 #cap small { display: block; font: italic 13px "Figtree", sans-serif; letter-spacing: 0; opacity: 0.85; margin-top: 4px; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1a2a; font: italic 18px "Cinzel", serif; letter-spacing: 0.1em; z-index: 9; }
 </style>
 </head>
 <body>
 <div id="world"></div>
-<div class="top"><a href="../" aria-label="Zurück">‹</a><h1>MUNDI II<small>Rhodos, wie aus dem Flugzeug</small></h1></div>
+<div class="top"><a href="../" aria-label="Zurück">‹</a><h1>MUNDI II<small>Die Welt, wie aus dem Flugzeug</small></h1></div>
 <div id="info"></div>
 <div class="bar">
+  <button type="button" id="bOrte"><span>📍</span>Orte</button>
   <button type="button" id="bGenesis"><span>🌋</span>Genesis</button>
   <button type="button" id="bSchicht"><span>🌿</span>Natur</button>
   <button type="button" id="bTauch"><span>🤿</span>Tauchen</button>
@@ -43,6 +47,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; fon
 </div>
 <div id="src">Küste © OpenStreetMap-Mitwirkende (ODbL) · Höhen: Terrain Tiles (AWS/Mapzen: SRTM, ETOPO1, GEBCO) · Satellit: Sentinel-2 cloudless 2020 von EOX (s2maps.eu, CC BY-NC-SA 4.0, enthält veränderte Copernicus-Sentinel-Daten)</div>
 <div id="cap"></div>
+<div id="orte" hidden></div>
 <div id="loading">Rhodos erhebt sich …</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -164,6 +169,7 @@ const cdAt = (x, z) => CD[clamp(Math.floor((z - D0) / (MRES * CR)), 0, CH - 1) *
 // the surface as drawn: exaggerated, on the right side of the water line wherever the coast says so,
 // and sloping to it: no higher than a steep cliff allows at that distance from the shore
 function yAt(x, z) {
+  for (const sp of spotsOn) { const u = (x - sp.box[0]) / sp.box[2], v = (z - sp.box[1]) / sp.box[3]; if (u > 0 && v > 0 && u < 1 && v < 1) return spotHAt(sp, u, v) * 0.001 * EX_LAND * wEx; }
   if (!inRhodes(x, z) && RHM && inRegion(x, z)) { const land = regLand(x, z), w = land ? Math.max(hRegion(x, z), 4) : Math.min(hRegion(x, z), -6); return w * 0.001 * (land ? EX_LAND : EX_SEA) * wEx; }
   if (!inRhodes(x, z)) { const w = hWorld(x, z); return w * 0.001 * (w > 0 ? EX_LAND : EX_SEA) * wEx; }
   const h = hAt(x, z), d = cdAt(x, z);
@@ -172,7 +178,11 @@ function yAt(x, z) {
 /* ---------------- The world, top level: a flat map in the same km frame, so Rhodes sits in it seamlessly ---------------- */
 // heights in one grey channel: 128 is sea level, above it the square root of the height up to 7000 m, below it the depth to 11000 m
 const WW = 2048, WHT = 1024; let WH = null, worldNTex = null, worldHTex = null, worldSatTex = null;
-const lonOf = (x) => LON0 + x / (KM * KX), latOf = (z) => LAT0 - z / KM;
+// the world map is a Mercator map in the km frame of Rhodes: true to angle, so every place keeps its shape (scaled by
+// cos 36.17° / cos of its latitude); around Rhodes it matches the island's own frame within a few hundred metres
+const MS = (KM * KX * 180) / Math.PI, mercY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)), M0 = mercY(LAT0);
+const G = (lon, lat) => [(lon - LON0) * KM * KX, (M0 - mercY(lat)) * MS];
+const lonOf = (x) => LON0 + x / (KM * KX), latOf = (z) => ((2 * Math.atan(Math.exp(M0 - z / MS)) - Math.PI / 2) * 180) / Math.PI;
 async function loadWorld() {
   const img = await loadImage("data/welt-hoehe.png"), cv = document.createElement("canvas"); cv.width = WW; cv.height = WHT;
   const c = cv.getContext("2d"); c.drawImage(img, 0, 0); const d = c.getImageData(0, 0, WW, WHT).data; WH = new Float32Array(WW * WHT);
@@ -323,7 +333,7 @@ const COMMON = `
   uniform vec3 uSun, uSunCol, uZen, uHor, uCam; uniform float uTime, uHaze, uCloudCov, uCloudH, uClouds;
   uniform sampler2D uMask, uRelief, uNormal, uCloud, uDist, uGeo, uShadow; uniform vec4 uBox; uniform vec2 uCloudOff;
   uniform float uLife, uVeg, uHeat, uGrow, uLevel, uShadowK, uNear, uWEx; uniform sampler2D uWorld, uWorldN, uWorldSat;
-  vec2 worldUv(vec2 p) { float lon = ${LON0.toFixed(4)} + p.x / ${(KM * KX).toFixed(4)}, lat = ${LAT0.toFixed(4)} - p.y / ${KM.toFixed(4)}; return vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0); }
+  vec2 worldUv(vec2 p) { float lon = ${LON0.toFixed(4)} + p.x / ${(KM * KX).toFixed(4)}, lat = degrees(2.0 * atan(exp(${M0.toFixed(6)} - p.y / ${MS.toFixed(4)})) - 1.5707963); return vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0); }
   // three levels of detail: Rhodes (0), the eastern Aegean (1), the world (2). At their seams they are mixed pixel by
   // pixel: over the last 10 km inside the Rhodes box, over the last 25 km inside the Aegean one
   uniform float uWorldOn, uRegOn; uniform vec4 uRBox; uniform sampler2D uRegH, uRegM, uRegL, uRegN, uRegSat;
@@ -337,6 +347,15 @@ const COMMON = `
     return 2.0;
   }
   float useRhodes(vec2 p) { return lod(p) < 0.5 ? 1.0 : 0.0; }
+  // close spots (Stuttgart, Salach, Trégastel): inside their box they draw everything, land and water; the last
+  // 1.5 km of the box is mixed with the world pixel by pixel
+  uniform vec4 uSB[3];
+  float spotHere(vec2 p) {
+    if (uWorldOn < 0.5) return 0.0;
+    float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    for (int i = 0; i < 3; i++) if (uSB[i].z > 0.0 && r < smoothstep(0.0, 1.5, edgeIn(p, uSB[i]))) return 1.0;
+    return 0.0;
+  }
   vec2 regUv(vec2 p) { return vec2((p.x - uRBox.x) / uRBox.z, 1.0 - (p.y - uRBox.y) / uRBox.w); }
   float regH(vec2 p) { float v = texture2D(uRegH, regUv(p)).r * 255.0; return v > 128.0 ? pow((v - 128.0) / 127.0, 2.0) * 7000.0 : -pow((128.0 - v) / 128.0, 2.0) * 11000.0; }
   float worldH(vec2 p) { float v = texture2D(uWorld, worldUv(p)).r * 255.0; return v > 128.0 ? pow((v - 128.0) / 127.0, 2.0) * 7000.0 : -pow((128.0 - v) / 128.0, 2.0) * 11000.0; }
@@ -507,7 +526,7 @@ const U = {
   uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
   uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
   uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null }, uGeo: { value: null }, uShadow: { value: null },
-  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
+  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
   uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
 };
 
@@ -669,7 +688,7 @@ function regionMesh() {
   region = new THREE.Mesh(g, shader(`
     uniform float uSea;
     void main() {
-      if (abs(lod(vP.xz) - 1.0) > 0.5) discard;
+      if (abs(lod(vP.xz) - 1.0) > 0.5 || spotHere(vP.xz) > 0.5) discard;
       vec2 ru = regUv(vP.xz); vec4 rm = texture2D(uRegM, ru); float h = regH(vP.xz);
       vec2 nn = texture2D(uRegN, ru).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
       float diff = max(dot(N, uSun), 0.0), sh = cloudShadow(vP); vec3 col;
@@ -692,12 +711,88 @@ function regionMesh() {
     }`, {}, "w.y *= (w.y > 0.0 ? " + EX_LAND.toFixed(1) + " : " + EX_SEA.toFixed(1) + ") * uWEx;"));
   region.frustumCulled = false; region.visible = !gen; scene.add(region);
 }
+/* ---------------- Close spots: small boxes anywhere, each in its own km frame, set into the Mercator world ---------------- */
+// k: how much bigger a kilometre there is drawn than at Rhodes (Mercator); heights are raised like the world's (×3 there)
+const SPOTS = [
+  { id: "stuttgart", name: "Stuttgarter Kessel", sub: "mit den Bärenseen", look: [9.14, 48.768, 16, 0.75] },
+  { id: "salach", name: "Salach im Filstal", sub: "Fils, Lauter und der Hohenstaufen", look: [9.74, 48.69, 13, 0.75] },
+  { id: "tregastel", name: "Trégastel", sub: "Grève Blanche bis Île Renote", look: [-3.505, 48.826, 6, 0.8] },
+];
+const spotsOn = [];
+async function loadSpot(sp, slot) {
+  const meta = await (await fetch(`data/orte/${sp.id}.json`)).json(), [lonc, latc] = meta.center, k = KX / Math.cos((latc * Math.PI) / 180);
+  const [cx, cz] = G(lonc, latc), w = meta.km[0] * k, h = meta.km[1] * k;
+  Object.assign(sp, { box: [cx - w / 2, cz - h / 2, w, h], k });
+  const [hi, wi] = await Promise.all([loadImage(`data/orte/${sp.id}-hoehe.png`), loadImage(`data/orte/${sp.id}-wasser.png`)]);
+  const c = document.createElement("canvas"); c.width = hi.width; c.height = hi.height; const x = c.getContext("2d"); x.drawImage(hi, 0, 0);
+  const d = x.getImageData(0, 0, hi.width, hi.height).data, HW_ = hi.width, HH_ = hi.height, HM_ = new Float32Array(HW_ * HH_);
+  for (let i = 0; i < HM_.length; i++) HM_[i] = d[i * 4] * 256 + d[i * 4 + 1] - 10000;
+  Object.assign(sp, { HM: HM_, HW: HW_, HH: HH_ });
+  // normals, for a light that shows every slope of the land
+  const [nc, nx, ni] = cv2d(HW_, HH_), dx = (meta.km[0] / HW_) * 1000, dz = (meta.km[1] / HH_) * 1000;
+  for (let j = 0; j < HH_; j++) for (let i = 0; i < HW_; i++) {
+    const kk = j * HW_ + i, ex = 2.0;
+    const hx = (HM_[j * HW_ + Math.min(HW_ - 1, i + 1)] - HM_[j * HW_ + Math.max(0, i - 1)]) / (2 * dx) * ex, hz = (HM_[Math.min(HH_ - 1, j + 1) * HW_ + i] - HM_[Math.max(0, j - 1) * HW_ + i]) / (2 * dz) * ex;
+    const L = Math.hypot(hx, 1, hz); ni.data[kk * 4] = (-hx / L * 0.5 + 0.5) * 255; ni.data[kk * 4 + 1] = (-hz / L * 0.5 + 0.5) * 255; ni.data[kk * 4 + 3] = 255;
+  }
+  nx.putImageData(ni, 0, 0);
+  const tex = (img) => { const t = new THREE.Texture(img); t.needsUpdate = true; t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; return t; };
+  const sat = await new THREE.TextureLoader().loadAsync(`data/orte/${sp.id}.jpg`); sat.anisotropy = 4;
+  // the mesh: 2 heights per vertex step, water lying flat as the heights say
+  const NX = Math.min(HW_, 300), NZ = Math.round(NX * HH_ / HW_), pos = new Float32Array(NX * NZ * 3), idx = new Uint32Array((NX - 1) * (NZ - 1) * 6); let n = 0;
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const u = i / (NX - 1), v = j / (NZ - 1), kk = j * NX + i;
+    pos[kk * 3] = sp.box[0] + u * w; pos[kk * 3 + 1] = spotHAt(sp, u, v) * 0.001 * EX_LAND; pos[kk * 3 + 2] = sp.box[1] + v * h;
+    if (i < NX - 1 && j < NZ - 1) { idx[n++] = kk; idx[n++] = kk + NX; idx[n++] = kk + 1; idx[n++] = kk + 1; idx[n++] = kk + NX; idx[n++] = kk + NX + 1; }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(NX * NZ * 2), 2));
+  const m = shader(`
+    uniform vec4 uBoxS; uniform sampler2D uSSat, uSN, uSW;
+    void main() {
+      if (spotHere(vP.xz) < 0.5 && uWorldOn > 0.5) discard;
+      vec2 su = vec2((vP.x - uBoxS.x) / uBoxS.z, 1.0 - (vP.z - uBoxS.y) / uBoxS.w);
+      if (su.x < 0.0 || su.y < 0.0 || su.x > 1.0 || su.y > 1.0) discard;
+      vec3 N = unpackN(texture2D(uSN, su).rg), V = normalize(uCam - vP);
+      float diff = max(dot(N, uSun), 0.0), sh = cloudShadow(vP), dist = length(uCam - vP), far = clamp(dist / 12.0, 0.0, 1.0);
+      vec4 wt = texture2D(uSW, su); vec3 s0 = texture2D(uSSat, su).rgb, sat = pow(s0, vec3(2.2)) * 1.25, col;
+      if (wt.r > 0.5) {
+        // water: the sea by its shelf, a lake or a river by how far its shore is; lakes and rivers are green-brown
+        bool isSea = wt.b > 0.5; float sd = isSea ? wt.g * wt.g * 2000.0 : pow(wt.g / 0.5, 2.0) * 400.0;
+        // a lake here is not clear: humus and algae make it dark, olive to brown-green, its floor gone after a metre or two
+        float depth = isSea ? shelfDepth(vP.xz, sd, 0.8) * 1.6 : 30.0 + sd * 0.1;
+        col = waterCol(vP, depth, sd, waves(vP.xz, dist / max(V.y, 0.1)), V, sh, 0.0, isSea ? 0.5 : 1.0);
+        if (!isSea) col = mix(col * vec3(0.42, 0.72, 0.38), col * vec3(0.7, 0.72, 0.5), smoothstep(30.0, 0.0, sd));
+        col = mix(col, sat * (uSunCol * 0.95 + uZen * 0.3) * sh * 1.05, PROJ);
+      } else {
+        // land: the picture, lit by the relief; crowns and gaps in the woods when close
+        float green = smoothstep(-0.09, 0.03, s0.g - s0.r) * smoothstep(0.42, 0.2, dot(s0, vec3(0.3, 0.55, 0.15)));
+        vec2 so = vP.xz + uSun.xz / max(uSun.y, 0.15) * 0.006;
+        float crw = smoothstep(0.35, 0.65, nz(vP.xz * 28.0)), crs = smoothstep(0.35, 0.65, nz(so * 28.0));
+        sat *= mix(1.0, (0.72 + 0.56 * crw) * (1.0 - 0.4 * crs * (1.0 - crw)), green * (1.0 - far) * 0.8);
+        vec3 life = sat * (uSunCol * (0.3 + 0.9 * diff) * sh + uZen * 0.25);
+        float lum = dot(s0, vec3(0.3, 0.55, 0.15));
+        vec3 bare = pow(vec3(0.6, 0.53, 0.43) * (0.7 + 0.6 * lum), vec3(2.2));
+        col = mix(bare * (uSunCol * (0.15 + 1.0 * diff) * sh + uZen * 0.3), life, max(uLife, uVeg));
+        col = mix(col, life, PROJ);
+      }
+      gl_FragColor = vec4(finish(col, vP), 1.0);
+      ${TAIL}
+    }`, {}, "w.y *= uWEx;");
+  m.uniforms = { ...U, uBoxS: { value: new THREE.Vector4(...sp.box) }, uSSat: { value: sat }, uSN: { value: ctex(nc) }, uSW: { value: tex(wi) } };
+  sp.mesh = new THREE.Mesh(g, m); sp.mesh.frustumCulled = false; sp.mesh.visible = !gen; scene.add(sp.mesh);
+  U.uSB.value[slot].set(...sp.box); spotsOn.push(sp);
+}
+function spotHAt(sp, u, v) {
+  const gx = clamp(u * sp.HW - 0.5, 0, sp.HW - 1.001), gz = clamp(v * sp.HH - 0.5, 0, sp.HH - 1.001), i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j, H_ = (a, b) => sp.HM[b * sp.HW + a];
+  return H_(i, j) * (1 - fx) * (1 - fz) + H_(i + 1, j) * fx * (1 - fz) + H_(i, j + 1) * (1 - fx) * fz + H_(i + 1, j + 1) * fx * fz;
+}
 // the world map: a coarse grid of the whole earth around the Rhodes box, which it leaves out
 let world = null;
 function worldMesh() {
   const NX = 640, NZ = 320, pos = new Float32Array(NX * NZ * 3), idx = new Uint32Array((NX - 1) * (NZ - 1) * 6); let n = 0;
   for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
-    const lon = -180 + (i / (NX - 1)) * 360, lat = 90 - (j / (NZ - 1)) * 180, x = (lon - LON0) * KM * KX, z = (LAT0 - lat) * KM, k = j * NX + i;
+    const lon = -180 + (i / (NX - 1)) * 360, lat = 84 - (j / (NZ - 1)) * 168, [x, z] = G(lon, lat), k = j * NX + i;
     pos[k * 3] = x; pos[k * 3 + 1] = hWorld(x, z) * 0.001; pos[k * 3 + 2] = z;
     if (i < NX - 1 && j < NZ - 1) { idx[n++] = k; idx[n++] = k + NX; idx[n++] = k + 1; idx[n++] = k + 1; idx[n++] = k + NX; idx[n++] = k + NX + 1; }
   }
@@ -706,7 +801,7 @@ function worldMesh() {
   world = new THREE.Mesh(g, shader(`
     uniform float uSea; uniform sampler2D uSat;
     void main() {
-      if (lod(vP.xz) < 1.5) discard;      // Rhodes and the Aegean are drawn by their own, finer models
+      if (lod(vP.xz) < 1.5 || spotHere(vP.xz) > 0.5) discard;      // Rhodes, the Aegean and the spots are drawn by their own, finer models
       vec2 wu = worldUv(vP.xz); float h = worldH(vP.xz);
       vec2 nn = texture2D(uWorldN, wu).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
       // the raised shade is for the map from afar; close by, the coarse cells would show as bumps
@@ -761,6 +856,7 @@ function seaSurface() {
   sea = new THREE.Mesh(seaRings(40000), shader(`
     uniform sampler2D uSat;
     void main() {
+      if (spotHere(vP.xz) > 0.5) discard;
       vec2 uv = boxUv(vP.xz); float lv = lod(vP.xz), inside = lv < 0.5 ? 1.0 : 0.0;
       vec4 mk = inside > 0.5 ? texture2D(uMask, uv) : vec4(0.0);
       float sd, d, rcliff = 0.45; gUv = uv; gIn = inside;
@@ -924,11 +1020,32 @@ function showLayer() {
 }
 $("#bSchicht").onclick = () => { layer = (layer + 1) % LAYERS.length; try { localStorage.setItem("mundi2-schicht", LAYERS[layer][0]); } catch (e) {} showLayer(); };
 $("#bGenesis").onclick = () => genesis();
+// places: a flight there, out high enough to see both ends and down again
+const PLACES = [["Rhodos", "die Insel", [28.0, 36.25, 95, 0.75]], ["Ostägäis", "Dodekanes und Karien", [27.6, 36.7, 520, 0.95]], ...SPOTS.map((sp) => [sp.name, sp.sub, sp.look]), ["Welt", "die ganze Karte", [15, 30, 26000, 1.3]]];
+$("#bOrte").onclick = () => { const o = $("#orte"); o.hidden = !o.hidden; };
+$("#orte").innerHTML = PLACES.map((p, i) => `<button type="button" data-i="${i}">${p[0]}<small>${p[1]}</small></button>`).join("");
+$("#orte").querySelectorAll("button").forEach((b) => (b.onclick = () => { $("#orte").hidden = true; const [, , [lon, lat, dist, pitch]] = PLACES[+b.dataset.i]; const [x, z] = G(lon, lat); flyTo(x, z, dist, pitch); }));
+let fly = null;
+function flyTo(x, z, dist, pitch) {
+  if (dived) dive();
+  const span = Math.hypot(x - cam.x, z - cam.z), top = Math.max(cam.dist, dist, span * 1.1);
+  fly = { t: 0, T: clamp(2 + Math.log10(1 + span) * 1.2, 2, 7), a: { ...cam }, x, z, dist, pitch, lTop: Math.log(top) };
+}
+function flyStep(dt) {
+  const f = fly; f.t += dt; const e = ease(Math.min(1, f.t / f.T)), la = Math.log(f.a.dist), lb = Math.log(f.dist);
+  // the camera slides over in the middle of the flight, when it is high
+  const m = ease(clamp((f.t / f.T - 0.25) / 0.5, 0, 1));
+  cam.x = f.a.x + (f.x - f.a.x) * m; cam.z = f.a.z + (f.z - f.a.z) * m;
+  const up = Math.sin(Math.PI * e), base = la + (lb - la) * e; cam.dist = Math.exp(base + Math.max(0, f.lTop - Math.max(la, lb)) * up);
+  cam.pitch = f.a.pitch + (f.pitch - f.a.pitch) * e;
+  if (f.t >= f.T) fly = null;
+}
+el.addEventListener("pointerdown", () => { fly = null; });
 // diving: find clear water a little off the nearest shore and go under, looking up at the surface
 let dived = null;
 function dive() {
   if (dived) { Object.assign(cam, dived); dived = null; $("#bTauch").classList.remove("on"); $("#info").textContent = ""; return; }
-  const from = [[cam.x, cam.z], P(28.087, 36.088)];
+  const from = [[cam.x, cam.z], G(28.087, 36.088)];
   for (const [x0, z0] of from) for (let r = 0; r <= 4; r += 0.05) for (let a = 0; a < 6.28; a += 0.3) {
     const x = x0 + Math.cos(a) * r, z = z0 + Math.sin(a) * r;
     if (x < W0 || x > W1 || z < D0 || z > D1 || isLand(x, z)) continue;
@@ -951,13 +1068,13 @@ const ACTS = [
 let gen = null;
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 function genesis() {
-  gen = { t: 0, act: -1, cov: cloudBase, covNow: 0, cam: { ...cam } }; if (world) world.visible = false; if (region) region.visible = false; U.uWorldOn.value = 0;
+  gen = { t: 0, act: -1, cov: cloudBase, covNow: 0, cam: { ...cam } }; if (world) world.visible = false; if (region) region.visible = false; for (const sp of spotsOn) sp.mesh.visible = false; U.uWorldOn.value = 0;
   cam.dist = 135; cam.pitch = 0.5; cam.x = 40; cam.z = 36; cam.yaw = 0;
   U.uSea.value = 0; sea.visible = true; skirt.visible = true; $("#info").textContent = "";
 }
 function genEnd() {
   if (!gen) return;
-  U.uHeat.value = 0; U.uGrow.value = 1; U.uLevel.value = 0; U.uShadowK.value = 1; U.uLife.value = life; U.uVeg.value = veg; if (world) world.visible = true; if (region) region.visible = true; U.uWorldOn.value = 1;
+  U.uHeat.value = 0; U.uGrow.value = 1; U.uLevel.value = 0; U.uShadowK.value = 1; U.uLife.value = life; U.uVeg.value = veg; if (world) world.visible = true; if (region) region.visible = true; for (const sp of spotsOn) sp.mesh.visible = true; U.uWorldOn.value = 1;
   U.uSea.value = 1; sea.visible = true; skirt.visible = false; $("#bMeer").classList.add("on");
   $("#cap").classList.remove("on"); gen = null; light();
 }
@@ -993,6 +1110,7 @@ function loop(now) {
   if (cam.dist > 1500 && !ptrs.size && !gen) { const t = Math.min(1, dt * 1.5) * clamp((cam.dist - 1500) / 2000, 0, 1); cam.pitch += (Math.max(cam.pitch, 1.15) - cam.pitch) * t; }
   if (!dived) cam.yaw = 0;
   if (gen) genStep(dt);
+  if (fly && !gen) flyStep(dt);
   U.uTime.value = now / 1000;
   const wr = (wind[1] * Math.PI) / 180, ws = (wind[0] / 3600) * 6 / 22;      // clouds drift with the real wind, a little faster
   U.uCloudOff.value.x += -Math.sin(wr) * ws * dt; U.uCloudOff.value.y -= Math.cos(wr) * ws * dt;
@@ -1017,7 +1135,8 @@ function loop(now) {
   U.uGeo.value = geoTex; U.uShadow.value = shadowTex;
   terrain(); cutSides(); worldMesh(); seaSurface(); cloudLayer(); light(); weather();
   loadRegion();      // the middle level comes a moment later; until then the world stands in
-  if (q.get("ziel")) { const [lon, lat, dist, yaw, pitch] = q.get("ziel").split(",").map(Number); [cam.x, cam.z] = P(lon, lat); if (dist) cam.dist = dist; if (pitch) cam.pitch = pitch; }
+  SPOTS.forEach((sp, i) => loadSpot(sp, i).catch((e) => console.warn("Ort", sp.id, e)));
+  if (q.get("ziel")) { const [lon, lat, dist, yaw, pitch] = q.get("ziel").split(",").map(Number); [cam.x, cam.z] = G(lon, lat); if (dist) cam.dist = dist; if (pitch) cam.pitch = pitch; }
   showLayer();
   $("#loading").hidden = true;
   if (q.get("genesis") !== "0" && !q.get("ziel")) genesis();
