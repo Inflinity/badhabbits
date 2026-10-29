@@ -65,6 +65,12 @@ label.tog { display: flex; gap: 8px; align-items: center; color: var(--muted); m
     <div class="row" style="margin-top:10px"><button type="button" id="go">Starten</button></div>
   </section>
 
+  <section class="card">
+    <b>Neu: Seebriese</b>
+    <p style="margin:6px 0 10px">Das Meeresrauschen atmet für dich, ganz ohne Sensor. Ein, oben halten, aus, unten halten, jede Phase mit eigener Dauer und weicher Kurve, ohne Knacken. Nach einer Kalibrierung hier kennt es dein Tempo.</p>
+    <a href="../seebriese/" style="display:inline-block;font:600 17px var(--body);border-radius:12px;padding:12px 16px;background:var(--guide);color:#201608;text-decoration:none">Seebriese öffnen</a>
+  </section>
+
   <section class="card" id="live" hidden>
     <div id="now">…</div>
     <div id="trial"></div>
@@ -224,6 +230,20 @@ function calResult() {
   return out;
 }
 
+// the timing of your breath, for the Seebriese: knock to knock, split into breathing and holding as measured on
+// 29.10. (in: the first 45 % of bottom-to-top is the breath, the rest the hold; out: 82 % breath, 18 % hold)
+function saveTiming() {
+  const med = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; }, out = {};
+  for (const block of ["flach", "tief"]) {
+    const t = CAL.taps.filter((x) => x.block === block), up = [], down = [];
+    for (let i = 0; i + 1 < t.length; i++) { const d = t[i + 1].t - t[i].t; if (d > 0.8 && d < 40) (t[i].at === "unten" ? up : down).push(d); }
+    const u = med(up), d = med(down); if (!u || !d) return;
+    out[block] = { ein: +(u * 0.45).toFixed(1), oben: +(u * 0.55).toFixed(1), aus: +(d * 0.82).toFixed(1), unten: +(d * 0.18).toFixed(1) };
+  }
+  out.date = new Date().toLocaleDateString("de-DE");
+  try { localStorage.setItem("atem-kalibrierung", JSON.stringify(out)); } catch (e) {}
+}
+
 /* ---------------- The session ---------------- */
 let run = null, wake = null;
 async function start() {
@@ -264,6 +284,7 @@ async function finish() {
   window.removeEventListener("devicemotion", onMotion); Klopf.stop();
   try { if (wake) wake.release(); } catch (e) {}
   run.calib = CAL.taps.length ? { taps: CAL.taps, result: calResult(), stream: CAL.stream } : null;
+  if (run.calib) saveTiming();
   const byB = BLOCKS.filter((B) => run.trials.some((t) => t.block === B.id)).map((B) => { const l = run.trials.filter((t) => t.block === B.id); return { B, n: l.length, ok: l.filter((t) => t.ok).length, l }; });
   $("#live").hidden = true; $("#result").hidden = false;
   $("#tab").innerHTML = (byB.length ? `<tr><th>Geste</th><th>erkannt</th><th>verwechselt mit</th></tr>` : "") + byB.map(({ B, n, ok, l }) => {
