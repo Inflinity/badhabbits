@@ -47,7 +47,7 @@ label.l { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-i
 
   <section class="card" id="ein">
     <b>Einschwingen</b>
-    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. Das Meer brandet leise, mit tiefem Grund, der nie ganz verstummt, und Wellen, die brechen und auslaufen. Nach einer Dreiviertelminute beginnt es, über etwa vier Minuten, zu deinem Atem zu werden. Wenn du magst, hilf ihm einmal: tief einatmen, oben kurz halten und <b>einmal</b> auf die Rückseite klopfen; dann weiß es sicher, wo bei dir „ein“ ist. Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
+    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. Das Meer brandet leise, mit tiefem Grund, der nie ganz verstummt, und Wellen, die brechen und auslaufen. Nach einer Dreiviertelminute beginnt es, über etwa vier Minuten, zu deinem Atem zu werden. Wenn du magst, hilf ihm einmal: tief einatmen, oben kurz halten und <b>einmal</b> auf die Rückseite klopfen; ein leiser heller Ton sagt, dass es angekommen ist. Dann weiß es sicher, wo bei dir „ein“ ist (nur der erste Klopfer zählt). Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
     <canvas id="eCv" aria-label="Dein Atem und das Meer" hidden></canvas>
     <div id="eState" style="font:600 18px var(--display);color:var(--guide);min-height:26px;margin-top:6px"></div>
     <div class="row" style="margin-top:8px"><button type="button" id="eGo">Einschwingen starten</button>
@@ -325,15 +325,22 @@ function eStart() {
     const tk = g.t - E.t0; E.events.push({ t: +tk.toFixed(2), knock: g.kind }); E.quietUntil = eNow() + 1.5;
     if (g.kind === "doppel") { eStop(); return; }
     // one knock while holding at the top of a breath in: where the chest was just before says which way is in
-    if (g.kind === "tipp" && E.ready && tk > 8) {
+    if (g.kind === "tipp" && E.ready && tk > 8 && E.locked !== "klopf") {
       const before = E.hist.filter((h) => h[0] > tk - 0.9 && h[0] < tk - 0.2); if (before.length < 5) return;
       const xk = before.reduce((a, h) => a + h[1], 0) / before.length, pos = (xk - E.lo) / Math.max(E.hi - E.lo, 1e-5);
-      if (pos > 0.62 || pos < 0.38) { E.pol = pos > 0.5 ? 1 : -1; E.locked = "klopf"; E.events.push({ t: +tk.toFixed(2), polarity: E.pol, by: "klopf", pos: +pos.toFixed(2) }); }
+      // only the first clear knock counts; a soft high tone says it arrived, so there is no need to knock again
+      if (pos > 0.62 || pos < 0.38) { E.pol = pos > 0.5 ? 1 : -1; E.locked = "klopf"; E.events.push({ t: +tk.toFixed(2), polarity: E.pol, by: "klopf", pos: +pos.toFixed(2) }); eChime(); }
     }
   });
   E.timer = setInterval(eTick, 50);
 }
 const eNow = () => performance.now() / 1000 - E.t0;
+// a quiet glassy tone, to say: understood
+function eChime() {
+  const c = E.ctx, t = c.currentTime + 0.05, o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain();
+  o.frequency.value = 880; o2.frequency.value = 1320; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05 * +$("#vol").value, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+  o.connect(g); o2.connect(g); g.connect(c.destination); o.start(t); o2.start(t); o.stop(t + 1.7); o2.stop(t + 1.7);
+}
 
 /* ---- the sea: a low surf that never quite stops, and waves that break and run out ----
    Each wave swells over 1.2-2.2 s, breaks (loudest, brightest), then runs out over several seconds: the body of the
@@ -418,10 +425,12 @@ function envelope(t) {
   if (pk.length < 4) return;
   const sd = (v) => { const m = v.reduce((x, y) => x + y) / v.length; return Math.sqrt(v.reduce((x, y) => x + (y - m) ** 2, 0) / v.length); }, amp = Math.max(hi - lo, 1e-5);
   const floor = (sd(pk) - sd(tr)) / amp;            // > 0: rests low, so in is up
+  // and deep breaths reach further on the side of breathing in: how far each side strays from the usual turn
+  const med = (v) => [...v].sort((x, y) => x - y)[Math.floor(v.length / 2)], reach = ((Math.max(...pk) - med(pk)) - (med(tr) - Math.min(...tr))) / amp;      // > 0: in is up
   const lean = E.sk / E.sq;                           // > 0: up is quicker, so in is up
-  E.score = ema(E.score, clamp(floor * 4, -1, 1) + clamp(lean * 2, -1, 1), 0.25, 8);
+  E.score = ema(E.score, clamp(floor * 4, -1, 1) + clamp(reach * 2, -1, 1) + clamp(lean * 1.5, -0.6, 0.6), 0.25, 8);
   const want = E.score > 0.25 ? 1 : E.score < -0.25 ? -1 : E.pol;
-  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, by: "auto", floor: +floor.toFixed(2), lean: +lean.toFixed(2) }); }
+  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, by: "auto", floor: +floor.toFixed(2), reach: +reach.toFixed(2), lean: +lean.toFixed(2) }); }
 }
 function eTick() {
   if (!E.on) return;
