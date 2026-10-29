@@ -209,10 +209,11 @@ function hRegion(x, z) {
 }
 const regLand = (x, z) => { const i = clamp(Math.floor(((x - RX0) / (RX1 - RX0)) * RMW), 0, RMW - 1), j = clamp(Math.floor(((z - RZ0) / (RZ1 - RZ0)) * RMH), 0, RMH - 1); return RMK[j * RMW + i] > 127; };
 async function loadRegion() {
-  const [hi, mi] = await Promise.all([loadImage("data/ost-hoehe.png"), loadImage("data/ost-kueste.png")]);
+  // ost-land: the coast at 120 m from OSM's full land polygons, the contract here; ost-kueste: at 250 m with the distance to land
+  const [hi, mi, li] = await Promise.all([loadImage("data/ost-hoehe.png"), loadImage("data/ost-kueste.png"), loadImage("data/ost-land.png")]);
   const read = (img) => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d"); x.drawImage(img, 0, 0); return x.getImageData(0, 0, img.width, img.height).data; };
   const hd = read(hi); RHW = hi.width; RHH = hi.height; RHM = new Float32Array(RHW * RHH); for (let i = 0; i < RHM.length; i++) RHM[i] = greyH(hd[i * 4]);
-  const md = read(mi); RMW = mi.width; RMH = mi.height; RMK = new Uint8Array(RMW * RMH); for (let i = 0; i < RMK.length; i++) RMK[i] = md[i * 4];
+  const md = read(li); RMW = li.width; RMH = li.height; RMK = new Uint8Array(RMW * RMH); for (let i = 0; i < RMK.length; i++) RMK[i] = md[i * 4];
   // normals for the shade, raised a little more than at Rhodes
   const [nc, nx, ni] = cv2d(RHW, RHH), dx = ((RX1 - RX0) / RHW) * 1000, dz = ((RZ1 - RZ0) / RHH) * 1000;
   for (let j = 0; j < RHH; j++) for (let i = 0; i < RHW; i++) {
@@ -222,7 +223,7 @@ async function loadRegion() {
   }
   nx.putImageData(ni, 0, 0);
   const tex = (img) => { const t = new THREE.Texture(img); t.needsUpdate = true; t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; return t; };
-  U.uRegH.value = tex(hi); U.uRegM.value = tex(mi); U.uRegN.value = ctex(nc); U.uRBox.value.set(RX0, RZ0, RX1 - RX0, RZ1 - RZ0);
+  U.uRegH.value = tex(hi); U.uRegM.value = tex(mi); U.uRegL.value = tex(li); U.uRegN.value = ctex(nc); U.uRBox.value.set(RX0, RZ0, RX1 - RX0, RZ1 - RZ0);
   const sat = await new THREE.TextureLoader().loadAsync("data/ost.jpg"); sat.anisotropy = 4; U.uRegSat.value = sat;
   regionMesh(); U.uRegOn.value = 1;
 }
@@ -325,7 +326,7 @@ const COMMON = `
   vec2 worldUv(vec2 p) { float lon = ${LON0.toFixed(4)} + p.x / ${(KM * KX).toFixed(4)}, lat = ${LAT0.toFixed(4)} - p.y / ${KM.toFixed(4)}; return vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0); }
   // three levels of detail: Rhodes (0), the eastern Aegean (1), the world (2). At their seams they are mixed pixel by
   // pixel: over the last 10 km inside the Rhodes box, over the last 25 km inside the Aegean one
-  uniform float uWorldOn, uRegOn; uniform vec4 uRBox; uniform sampler2D uRegH, uRegM, uRegN, uRegSat;
+  uniform float uWorldOn, uRegOn; uniform vec4 uRBox; uniform sampler2D uRegH, uRegM, uRegL, uRegN, uRegSat;
   float edgeIn(vec2 p, vec4 b) { return min(min(p.x - b.x, b.x + b.z - p.x), min(p.y - b.y, b.y + b.w - p.y)); }
   float lod(vec2 p) {
     float inR = edgeIn(p, uBox);
@@ -502,7 +503,7 @@ const U = {
   uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
   uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
   uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null }, uGeo: { value: null }, uShadow: { value: null },
-  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
+  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
   uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
 };
 
@@ -667,7 +668,7 @@ function regionMesh() {
       vec2 ru = regUv(vP.xz); vec4 rm = texture2D(uRegM, ru); float h = regH(vP.xz);
       vec2 nn = texture2D(uRegN, ru).rg * 2.0 - 1.0; vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
       float diff = max(dot(N, uSun), 0.0), sh = cloudShadow(vP); vec3 col;
-      if (rm.r > 0.5) {
+      if (texture2D(uRegL, ru).r > 0.5) {
         vec3 s0 = texture2D(uRegSat, ru).rgb, sat = pow(s0, vec3(2.2)) * 1.25;
         vec3 life = sat * (uSunCol * (0.3 + 0.9 * diff) * sh + uZen * 0.25);
         float lum = dot(s0, vec3(0.3, 0.55, 0.15));
@@ -765,7 +766,7 @@ function seaSurface() {
         if (inside > 0.5) { sd = shoreAt(uv); d = depthAt(uv, sd, vP.xz); }
         else if (lv < 1.5) {
           // the eastern Aegean: its OSM coast decides, a shelf grows from it, shoals as at Rhodes
-          vec4 rm = texture2D(uRegM, regUv(vP.xz)); if (rm.r > 0.5) discard;
+          vec4 rm = texture2D(uRegM, regUv(vP.xz)); if (texture2D(uRegL, regUv(vP.xz)).r > 0.5) discard;
           float hr = regH(vP.xz), dem = hr < -3.0 ? -hr : 4500.0; sd = rm.g * rm.g * 4000.0;
           // how steeply the land rises behind this shore: the highest ground within a kilometre and a half
           float e = 1.5, hl = max(max(regH(vP.xz + vec2(e, 0.0)), regH(vP.xz - vec2(e, 0.0))), max(regH(vP.xz + vec2(0.0, e)), regH(vP.xz - vec2(0.0, e))));
