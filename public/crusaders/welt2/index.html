@@ -40,7 +40,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a2a; fon
 <div class="bar">
   <button type="button" id="bOrte"><span>📍</span>Orte</button>
   <button type="button" id="bGenesis"><span>🌋</span>Genesis</button>
-  <button type="button" id="bSchicht"><span>🌿</span>Natur</button>
   <button type="button" id="bTauch"><span>🤿</span>Tauchen</button>
   <button type="button" id="bWolken" class="on"><span>☁</span>Wolken</button>
   <button type="button" id="bMeer" class="on"><span>🌊</span>Meer</button>
@@ -337,8 +336,12 @@ const COMMON = `
   // three levels of detail: Rhodes (0), the eastern Aegean (1), the world (2). At their seams they are mixed pixel by
   // pixel: over the last 10 km inside the Rhodes box, over the last 25 km inside the Aegean one
   uniform float uWorldOn, uRegOn; uniform vec4 uRBox; uniform sampler2D uRegH, uRegM, uRegL, uRegN, uRegSat;
+  // which model draws a pixel is decided where the pixel's ray meets sea level, the same point for every model,
+  // not where each model's own surface happens to be: otherwise at a seam sometimes none of them draws
+  vec2 refP(vec2 p) { if (uCam.y < 0.002 || uCam.y <= vP.y + 0.001) return p; return uCam.xz + (vP.xz - uCam.xz) * (uCam.y / (uCam.y - vP.y)); }
   float edgeIn(vec2 p, vec4 b) { return min(min(p.x - b.x, b.x + b.z - p.x), min(p.y - b.y, b.y + b.w - p.y)); }
   float lod(vec2 p) {
+    p = refP(p);
     float inR = edgeIn(p, uBox);
     if (uWorldOn < 0.5) return inR > 0.0 ? 0.0 : 3.0;
     float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
@@ -352,6 +355,7 @@ const COMMON = `
   uniform vec4 uSB[3], uMB[2];
   float spotHere(vec2 p) {
     if (uWorldOn < 0.5) return 0.0;
+    p = refP(p);
     float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     for (int i = 0; i < 3; i++) if (uSB[i].z > 0.0 && r < smoothstep(0.0, 1.5, edgeIn(p, uSB[i]))) return 1.0;
     return 0.0;
@@ -359,6 +363,7 @@ const COMMON = `
   // the middle level of these spots (South-West Germany, Brittany): mixed with the world over its last 15 km
   float midHere(vec2 p) {
     if (uWorldOn < 0.5) return 0.0;
+    p = refP(p);
     float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     for (int i = 0; i < 2; i++) if (uMB[i].z > 0.0 && r < smoothstep(0.0, 15.0, edgeIn(p, uMB[i]))) return 1.0;
     return 0.0;
@@ -1019,16 +1024,10 @@ el.addEventListener("contextmenu", (e) => e.preventDefault());
 $("#bWolken").onclick = () => { U.uClouds.value = 1 - U.uClouds.value; $("#bWolken").classList.toggle("on", U.uClouds.value > 0.5); clouds.visible = U.uClouds.value > 0.5; };
 $("#bMeer").onclick = () => { U.uSea.value = 1 - U.uSea.value; sea.visible = U.uSea.value > 0.5; $("#bMeer").classList.toggle("on", sea.visible); $("#info").textContent = sea.visible ? "" : `Ohne Wasser: der Meeresboden, ${String(EX_SEA).replace(".", ",")}-fach überhöht`; };
 
-// the layer: the land as it lives (satellite, without people), or bare rock as the geologist sees it
-// three layers: Natur (the satellite picture, without people), Fels (bare geology), Flora (the geology with plants we draw)
-const LAYERS = [["natur", "🛰", "Natur"], ["fels", "🪨", "Fels"], ["flora", "🌲", "Flora"]];
-let layer = 0; try { layer = Math.max(0, LAYERS.findIndex((l) => l[0] === localStorage.getItem("mundi2-schicht"))); } catch (e) {}
-let life = 1, veg = 0;
-function showLayer() {
-  const b = $("#bSchicht"); b.firstChild.textContent = LAYERS[layer][1]; b.lastChild.textContent = LAYERS[layer][2];
-  life = layer === 0 ? 1 : 0; veg = layer === 2 ? 1 : 0; if (!gen) { U.uLife.value = life; U.uVeg.value = veg; }
-}
-$("#bSchicht").onclick = () => { layer = (layer + 1) % LAYERS.length; try { localStorage.setItem("mundi2-schicht", LAYERS[layer][0]); } catch (e) {} showLayer(); };
+// one picture of everything: the geology with the plants we reason out, and the satellite (people and fields painted
+// out) laid over it at a little over half, so the real pattern of woods and scrub and our relief both carry
+const life = 0.55, veg = 1;
+function showLayer() { if (!gen) { U.uLife.value = life; U.uVeg.value = veg; } }
 $("#bGenesis").onclick = () => genesis();
 // places: a flight there, out high enough to see both ends and down again
 const PLACES = [["Rhodos", "die Insel", [28.0, 36.25, 95, 0.75]], ["Ostägäis", "Dodekanes und Karien", [27.6, 36.7, 520, 0.95]], ["Südwestdeutschland", "Schwarzwald, Alb, Bodensee", [9.0, 48.4, 260, 0.95]], ...SPOTS.map((sp) => [sp.name, sp.sub, sp.look]), ["Bretagne", "die Côte de Granit Rose und mehr", [-3.1, 48.1, 340, 0.95]], ["Welt", "die ganze Karte", [15, 30, 26000, 1.3]]];
