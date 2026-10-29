@@ -66,10 +66,10 @@ label.l { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-i
 
   <section class="card">
     <b>Klang</b>
-    <div class="row" style="margin-top:8px"><label class="l" style="flex:1">Unten noch hörbar <input type="range" id="floor" min="0" max="0.4" step="0.01" value="0.12" style="flex:1; accent-color: var(--breath)"></label></div>
+    <div class="row" style="margin-top:8px"><label class="l" style="flex:1">In den Pausen noch hörbar <input type="range" id="floor" min="0" max="0.3" step="0.01" value="0.04" style="flex:1; accent-color: var(--breath)"></label></div>
     <div class="row"><label class="l" style="flex:1">Böen <input type="range" id="gust" min="0" max="0.4" step="0.01" value="0.15" style="flex:1; accent-color: var(--breath)"></label></div>
     <div class="row"><label class="l" style="flex:1">Langsamer werden bis zum Ende <input type="range" id="slow" min="0" max="0.5" step="0.05" value="0" style="flex:1; accent-color: var(--breath)"></label></div>
-    <p style="margin:6px 0 0; font-size:14px">Beim Einatmen wird der Wind lauter und heller, beim Ausatmen leiser und dunkler. Die Böen sind ein langsames, zufälliges Schwanken darüber. „Langsamer werden“ dehnt jeden Atemzug nach und nach, bis er am Ende um so viel länger ist.</p>
+    <p style="margin:6px 0 0; font-size:14px">Der Wind rauscht, solange Luft fließt: beim Einatmen steigt er in der Tonhöhe, beim Ausatmen sinkt er. Im Halten oben und unten steht die Luft still, das Rauschen klingt kurz aus (höchstens eine gute halbe Sekunde) und setzt mit dem nächsten Atemzug weich wieder ein. Die Böen sind ein langsames, zufälliges Schwanken darüber. „Langsamer werden“ dehnt jeden Atemzug nach und nach, bis er am Ende um so viel länger ist.</p>
   </section>
 </main>
 
@@ -173,19 +173,29 @@ function audioStart() {
   const body = ctx.createGain();
   const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2800;
   const air = ctx.createGain();
-  const gust = ctx.createGain(), master = ctx.createGain(); master.gain.value = 0; body.gain.value = map(0).body; air.gain.value = 0;
+  const gust = ctx.createGain(), master = ctx.createGain(); master.gain.value = 0; body.gain.value = map(0, 0).body; air.gain.value = 0;
   src.connect(lp).connect(body).connect(gust); src.connect(hp).connect(air).connect(gust); gust.connect(master).connect(ctx.destination);
   const t = ctx.currentTime + 0.05;
-  for (const [p, v] of [[body.gain, map(0).body], [lp.frequency, map(0).freq], [air.gain, 0], [gust.gain, 1], [master.gain, 0]]) p.setValueAtTime(v, t);
+  for (const [p, v] of [[body.gain, map(0, 0).body], [lp.frequency, map(0, 0).freq], [air.gain, 0], [gust.gain, 1], [master.gain, 0]]) p.setValueAtTime(v, t);
   master.gain.linearRampToValueAtTime(+$("#vol").value, t + 6);      // the breeze comes up over six seconds
   src.start(t);
   A = { ctx, src, lp, body, air, gust, master, cycles: [{ t0: t, c: JSON.parse(JSON.stringify(cfg)) }], tS: t, g0: t, gS: t, gV: 1, start: t, end: null };
   plan();
 }
-// the breath, as sound: louder and brighter in, softer and darker out
-function map(b) {
-  const fl = +$("#floor").value, l = fl + (1 - fl) * Math.pow(b, 1.25);
-  return { body: 0.9 * l, freq: 240 * Math.pow(2, b * 2.7), air: 0.22 * b * b };
+// how much air flows: it rushes while you breathe and stops while you hold. It swells in over at most 0.3 s and
+// dies away over at most 0.55 s (never more than a third of the phase), and follows how fast the breath moves
+function flow(c, s) {
+  const [b, ph, t, d] = breathIn(c, s);
+  if (ph === "oben" || ph === "unten" || d <= 0) return 0;
+  const a = Math.min(0.3, 0.15 * d), r = Math.min(0.55, 0.33 * d), sanft = EASE.sanft.f;
+  const env = sanft(clamp(t / a, 0, 1)) * sanft(clamp((d - t) / r, 0, 1));
+  const f = EASE[(ph === "ein" ? c.ein : c.aus)[1]].f, e = 0.02, speed = Math.abs(f(clamp(t / d + e, 0, 1)) - f(clamp(t / d - e, 0, 1))) / (2 * e);      // 1 = the average pace
+  return env * (0.65 + 0.35 * clamp(speed / 1.6, 0, 1));
+}
+// the breath, as sound: the rush of air is as loud as the flow; its pitch climbs as you fill and sinks as you empty
+function map(b, f) {
+  const fl = +$("#floor").value, l = fl + (1 - fl) * Math.pow(f, 1.1);
+  return { body: 0.9 * l, freq: 240 * Math.pow(2, b * 2.7), air: 0.22 * b * b * f };
 }
 // the cycle that holds audio time T; new cycles take the pattern as it is now, stretched if "slower" is on
 function cycleAt(T) {
@@ -204,7 +214,7 @@ function plan() {
   if (!A) return;
   const ctx = A.ctx, ahead = ctx.currentTime + (document.hidden ? 100 : 1.5);
   while (A.tS < ahead) {
-    const T = A.tS + STEP, cy = cycleAt(T), [b] = breathIn(cy.c, T - cy.t0), m = map(b);
+    const T = A.tS + STEP, cy = cycleAt(T), [b] = breathIn(cy.c, T - cy.t0), m = map(b, flow(cy.c, T - cy.t0));
     A.body.gain.linearRampToValueAtTime(m.body, T); A.lp.frequency.linearRampToValueAtTime(m.freq, T); A.air.gain.linearRampToValueAtTime(m.air, T);
     A.tS = T;
   }
@@ -255,6 +265,8 @@ function drawCurve() {
   for (const k of ["ein", "oben", "aus", "unten"]) { const d = Array.isArray(cy.c[k]) ? cy.c[k][0] : cy.c[k]; s += d; c.beginPath(); c.moveTo(x(s), 8); c.lineTo(x(s), H - 8); c.stroke(); }
   c.beginPath(); for (let i = 0; i <= 200; i++) { const t = (i / 200) * L, [b] = breathIn(cy.c, t); i ? c.lineTo(x(t), y(b)) : c.moveTo(x(t), y(b)); }
   c.strokeStyle = "#7fd1c1"; c.lineWidth = 2.5; c.stroke();
+  c.beginPath(); for (let i = 0; i <= 300; i++) { const t = (i / 300) * L, f = flow(cy.c, t), yy = H - 18 - f * 26; i ? c.lineTo(x(t), yy) : c.moveTo(x(t), yy); }
+  c.strokeStyle = "rgba(233,194,127,0.55)"; c.lineWidth = 1.5; c.stroke();
   c.fillStyle = "#e9c27f"; s = 0;
   for (const k of ["ein", "oben", "aus", "unten"]) { const [b] = breathIn(cy.c, Math.min(s, L - 1e-4)); c.beginPath(); c.arc(x(s), y(b), 4, 0, 7); c.fill(); s += Array.isArray(cy.c[k]) ? cy.c[k][0] : cy.c[k]; }
   if (A) {
