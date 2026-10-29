@@ -45,6 +45,15 @@ label.l { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-i
   <h1><a href="../gesten/" id="back" aria-label="Zurück">‹</a>See<span>briese</span></h1>
   <p>Das Rauschen des Meeres atmet für dich, ganz ohne Sensor. Das Telefon erzeugt den Wind selbst. Du legst fest, wie lange ein, oben halten, aus und unten halten dauern, und mit welcher Kurve der Klang anschwillt und abebbt. Jeder Übergang ist eine weiche Kurve, ohne Knacken.</p>
 
+  <section class="card" id="ein">
+    <b>Einschwingen</b>
+    <p style="margin:6px 0 10px">Ohne Stimme, ohne Muster. Leg das Handy mit dem Bildschirm nach unten auf die Brust, oben Richtung Kinn, und atme einfach. Du hörst ein leises Meer mit eigenen Wellen. Ganz langsam, über einige Minuten, wird das Rauschen zu deinem Atem. Zum Beenden zweimal auf die Rückseite klopfen. Danach das Log teilen.</p>
+    <canvas id="eCv" aria-label="Dein Atem und das Meer" hidden></canvas>
+    <div id="eState" style="font:600 18px var(--display);color:var(--guide);min-height:26px;margin-top:6px"></div>
+    <div class="row" style="margin-top:8px"><button type="button" id="eGo">Einschwingen starten</button>
+      <button type="button" class="ghost" id="eShare" hidden>Log teilen</button><button type="button" class="ghost" id="eSave" hidden>Log speichern</button></div>
+  </section>
+
   <section class="card">
     <canvas id="curve" aria-label="Ein Atemzug als Kurve"></canvas>
     <div id="state" style="margin-top:10px">Bereit</div>
@@ -250,6 +259,7 @@ function stop() {
 let wake = null, timer = null;
 $("#go").onclick = async () => {
   if (A) { stop(); return; }
+  if (typeof E !== "undefined" && E.on) eStop();
   audioStart(); $("#go").textContent = "Beenden";
   try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) {}
 };
@@ -284,6 +294,118 @@ function drawCurve() {
 addEventListener("resize", drawCurve);
 
 if (!cfg) usePreset("tief"); else { build(); markPreset(); const p = PRESETS.find((x) => x[0] === presetId); $("#pnote").textContent = p ? p[3] : "Dein eigenes Muster."; drawCurve(); }
+</script>
+<script src="../klopf.js"></script>
+<script>
+"use strict";
+/* Einschwingen: one mode for both. The phone on the chest reads the breath from how the chest tilts it (the gravity
+   vector, its main axis of movement found as it goes); the sea starts with waves of its own, quiet, and over some
+   minutes, too slowly to notice, its rush turns into the sound of your own breath: louder and rising as you breathe in,
+   sinking as you breathe out, silent while you hold. Everything is logged for tuning.
+   Which way is "in"? Breathing in is the quicker half: the direction the chest moves faster in is taken as in. */
+const E = { on: false };
+const ema = (old, x, dt, tau) => old + (x - old) * (1 - Math.exp(-dt / tau));
+function eStart() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "playback" });
+  const src = ctx.createBufferSource(); src.buffer = makeNoise(ctx); src.loop = true;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.Q.value = 0.7; lp.frequency.value = map(0, 0).freq;
+  const body = ctx.createGain(); body.gain.value = 0; const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2800;
+  const air = ctx.createGain(); air.gain.value = 0; const master = ctx.createGain(); master.gain.value = 0;
+  src.connect(lp).connect(body).connect(master); src.connect(hp).connect(air).connect(master); master.connect(ctx.destination);
+  const t = ctx.currentTime + 0.05; src.start(t);
+  master.gain.setValueAtTime(0, t); master.gain.linearRampToValueAtTime(+$("#vol").value * 0.4, t + 12);      // quiet, and it comes up slowly
+  Object.assign(E, { on: true, ctx, src, lp, body, air, master, t0: performance.now() / 1000, last: null,
+    g: null, m: null, C: [[1e-8, 0, 0], [0, 1e-8, 0], [0, 0, 1e-8]], a: [1, 0, 0], x: 0, xs: 0, hi: 0.001, lo: -0.001, dx: 0, rise: 6, fall: 6, pol: 1,
+    b: 0, bs: 0, db: 0, f: 0, w: 0, amb: { t0: 0, c: null }, acc: [0, 0, 0, 0], rows: [], events: [], lastRow: 0, lastPlan: 0, phases: [], dirSince: 0, dir: 0 });
+  E.amb.c = ambWave(); E.amb.t0 = 0;
+  window.addEventListener("devicemotion", eMotion);
+  if (window.Klopf) Klopf.start((g) => { E.events.push({ t: +(eNow()).toFixed(2), knock: g.kind }); if (g.kind === "doppel") eStop(); });
+  E.timer = setInterval(eTick, 50);
+}
+const eNow = () => performance.now() / 1000 - E.t0;
+// the sea's own waves before it knows you: no holds, 4-6 s up, 5-7 s down, gently eased
+function ambWave() { return { ein: [4 + Math.random() * 2, "sanft"], oben: 0, aus: [5 + Math.random() * 2, "weich"], unten: 0.3 + Math.random() * 0.8 }; }
+function eMotion(e) {
+  const g = e.accelerationIncludingGravity; if (!g || g.x == null) return;
+  const t = eNow(), dt = E.last == null ? 0.016 : clamp(t - E.last, 0.001, 0.2); E.last = t;
+  E.acc[0] += g.x; E.acc[1] += g.y; E.acc[2] += g.z; E.acc[3]++;
+  const raw = [g.x, g.y, g.z];
+  E.g = E.g ? E.g.map((v, k) => ema(v, raw[k], dt, 0.35)) : raw;
+  const n = Math.hypot(...E.g) || 1, u = E.g.map((v) => v / n);
+  E.m = E.m ? E.m.map((v, k) => ema(v, u[k], dt, 20)) : u.slice();
+  const d = u.map((v, k) => v - E.m[k]);
+  // the main axis of the chest's rocking: a slowly kept covariance, one step of power iteration per sample
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) E.C[i][j] = ema(E.C[i][j], d[i] * d[j], dt, 30);
+  let a = [0, 1, 2].map((i) => E.C[i][0] * E.a[0] + E.C[i][1] * E.a[1] + E.C[i][2] * E.a[2]); const an = Math.hypot(...a) || 1; a = a.map((v) => v / an);
+  if (a[0] * E.a[0] + a[1] * E.a[1] + a[2] * E.a[2] < 0) a = a.map((v) => -v); E.a = a;
+  const x = d[0] * a[0] + d[1] * a[1] + d[2] * a[2];
+  // the envelope of the last breaths: the extremes, each drawing slowly back toward the middle
+  const mid = (E.hi + E.lo) / 2; E.hi = Math.max(x, E.hi - (E.hi - mid) * dt / 25); E.lo = Math.min(x, E.lo + (mid - E.lo) * dt / 25);
+  const prev = E.xs; E.xs = ema(E.xs, x, dt, 0.25); E.dx = ema(E.dx, (E.xs - prev) / dt, dt, 0.4); E.x = x;
+  // how long the chest moves each way: the shorter way is breathing in
+  const span = Math.max(E.hi - E.lo, 1e-4), sp = E.dx / span, dir = sp > 0.04 ? 1 : sp < -0.04 ? -1 : 0;
+  if (dir !== E.dir) { if (E.dir !== 0 && t - E.dirSince > 0.6) { (E.dir > 0 ? (E.rise = ema(E.rise, t - E.dirSince, 1, 3)) : (E.fall = ema(E.fall, t - E.dirSince, 1, 3))); E.phases.push([+t.toFixed(2), E.dir, +(t - E.dirSince).toFixed(2)]); } E.dir = dir; E.dirSince = t; }
+  // the fast way is in: the cube of the speed, kept over a minute, leans toward the quicker direction
+  E.sk = ema(E.sk || 0, Math.pow(sp, 3), dt, 60); E.sq = ema(E.sq || 1e-6, Math.pow(Math.abs(sp), 3), dt, 60);
+  const lean = E.sk / E.sq, want = lean > 0.12 ? 1 : lean < -0.12 ? -1 : E.pol;
+  if (want !== E.pol) { E.pol = want; E.events.push({ t: +t.toFixed(2), polarity: want, lean: +lean.toFixed(3), rise: +E.rise.toFixed(2), fall: +E.fall.toFixed(2) }); }
+  let b = clamp((E.xs - E.lo) / span, 0, 1); if (E.pol < 0) b = 1 - b;
+  const pb = E.b; E.b = b; E.db = ema(E.db, (b - pb) / dt, dt, 0.3);
+  // the rush as the breath moves: 1 at the pace of an average half breath, nothing while you hold
+  const half = (E.rise + E.fall) / 2, speed = Math.abs(E.db) * half, target = (0.65 + 0.35 * clamp(speed / 1.6, 0, 1)) * (speed < 0.12 ? 0 : clamp((speed - 0.12) / 0.35, 0, 1));
+  E.f = ema(E.f, target, dt, target > E.f ? 0.18 : (E.db * E.pol > 0 || b > 0.7 ? 0.45 : 0.3));
+}
+function eTick() {
+  if (!E.on) return;
+  const t = eNow(), ctx = E.ctx, at = ctx.currentTime + 0.07;
+  // the sea's own wave at this moment
+  let s = t - E.amb.t0; if (s > cycleLen(E.amb.c)) { E.amb.t0 += cycleLen(E.amb.c); E.amb.c = ambWave(); s = t - E.amb.t0; }
+  const [ba] = breathIn(E.amb.c, s), fa = flow(E.amb.c, s);
+  // you, slowly: from 40 s on, over about four minutes, if the chest moves clearly enough
+  const clear = clamp(((E.hi - E.lo) - 0.0012) / 0.002, 0, 1), goal = clear * EASE.weich.f(clamp((t - 40) / 240, 0, 1));
+  E.w = ema(E.w, goal, 0.05, 6);
+  const bm = ba + (E.b - ba) * E.w, fm = fa + (E.f - fa) * E.w, mm = map(bm, fm);
+  E.body.gain.linearRampToValueAtTime(mm.body, at); E.lp.frequency.linearRampToValueAtTime(mm.freq, at); E.air.gain.linearRampToValueAtTime(mm.air, at);
+  // the log, 20 rows a second
+  const n = E.acc[3] || 1, r5 = (v) => +v.toFixed(5), r3 = (v) => +v.toFixed(3);
+  E.rows.push([r3(t), r3(E.acc[0] / n), r3(E.acc[1] / n), r3(E.acc[2] / n), r5(E.x), r5(E.lo), r5(E.hi), E.pol, r3(E.b), r3(E.f), r3(ba), r3(fa), r3(E.w), r3(mm.body), Math.round(mm.freq)]);
+  E.acc = [0, 0, 0, 0];
+  $("#eState").textContent = E.w < 0.05 ? "Das Meer wiegt sich …" : E.w < 0.95 ? `Das Meer findet deinen Atem … ${Math.round(E.w * 100)} %` : "Das Meer ist dein Atem.";
+  eDraw();
+}
+function eStop() {
+  if (!E.on) return; E.on = false; clearInterval(E.timer);
+  window.removeEventListener("devicemotion", eMotion); if (window.Klopf) Klopf.stop();
+  const ctx = E.ctx, t = ctx.currentTime; E.master.gain.cancelScheduledValues(t); E.master.gain.setValueAtTime(E.master.gain.value, t); E.master.gain.linearRampToValueAtTime(0, t + 4);
+  setTimeout(() => { try { E.src.stop(); ctx.close(); } catch (e) {} }, 4500);
+  try { if (wake) wake.release(); } catch (e) {}
+  $("#eGo").textContent = "Einschwingen starten"; $("#eShare").hidden = $("#eSave").hidden = false;
+  $("#eState").textContent = `Beendet nach ${Math.floor(eNow() / 60)}:${String(Math.floor(eNow() % 60)).padStart(2, "0")}. Schick mir das Log.`;
+}
+function eLog() {
+  const name = `einschwingen-${new Date(E.started).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
+  const head = { format: "changes-einschwingen/1", started: E.started, ua: navigator.userAgent,
+    about: "rows (20/s): [t s, g.x, g.y, g.z (mean of the 50 ms, incl. gravity, m/s²), x (tilt along the main axis, rad), lo, hi (envelope), polarity, b (your breath 0 out..1 in), f (your air flow 0..1), b sea, f sea (its own wave), w (0 sea .. 1 you), body gain, low-pass Hz]; phases: [t, direction of x, seconds]",
+    settings: { vol: +$("#vol").value, floor: +$("#floor").value } };
+  return new File([JSON.stringify({ ...head, events: E.events, phases: E.phases, rows: E.rows })], name, { type: "application/json" });
+}
+$("#eGo").onclick = async () => {
+  if (E.on) { eStop(); return; }
+  if (A) stop();
+  if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") { try { await DeviceMotionEvent.requestPermission(); } catch (e) {} }
+  eStart(); E.started = new Date().toISOString(); $("#eGo").textContent = "Beenden"; $("#eCv").hidden = false; $("#eShare").hidden = $("#eSave").hidden = true;
+  try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) {}
+};
+$("#eShare").onclick = async () => { const f = eLog(); try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: f.name }); return; } } catch (e) { if (e.name === "AbortError") return; } $("#eSave").click(); };
+$("#eSave").onclick = () => { const f = eLog(), a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(f), download: f.name }); document.body.append(a); a.click(); a.remove(); };
+// the last 40 seconds: your breath (sea glass), the sea's own wave (faint), what you hear (amber)
+function eDraw() {
+  const cv = $("#eCv"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = 150; if (!W) return; cv.width = W * dpr; cv.height = H * dpr;
+  const c = cv.getContext("2d"); c.scale(dpr, dpr); const R = E.rows.slice(-800); if (R.length < 2) return; const t1 = R[R.length - 1][0];
+  const line = (k, col, w) => { c.beginPath(); R.forEach((r, i) => { const x = W - ((t1 - r[0]) / 40) * W, y = H - 12 - r[k] * (H - 24); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.strokeStyle = col; c.lineWidth = w; c.stroke(); };
+  line(10, "rgba(127,209,193,0.25)", 1.5); line(8, "#7fd1c1", 2);
+  c.beginPath(); R.forEach((r, i) => { const x = W - ((t1 - r[0]) / 40) * W, bm = r[10] + (r[8] - r[10]) * r[12], y = H - 12 - bm * (H - 24); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.strokeStyle = "#e9c27f"; c.lineWidth = 1.5; c.stroke();
+}
 </script>
 </body>
 </html>
