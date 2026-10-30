@@ -312,6 +312,9 @@ const COMMON = `
   float regH(vec2 p) { float v = texture2D(uRegH, regUv(p)).r * 255.0; return v > 128.0 ? pow((v - 128.0) / 127.0, 2.0) * 7000.0 : -pow((128.0 - v) / 128.0, 2.0) * 11000.0; }
   float worldH(vec2 p) { float v = texture2D(uWorld, worldUv(p)).r * 255.0; return v > 128.0 ? pow((v - 128.0) / 127.0, 2.0) * 7000.0 : -pow((128.0 - v) / 128.0, 2.0) * 11000.0; }
   float nz0(vec2 p) { return texture2D(uCloud, p).r; }
+  // the game's map of the land (Mundi I): G holds its main roads (about 0.6) and its beaches (high)
+  uniform sampler2D uGame; uniform vec4 uGBox; uniform float uGameOn;
+  float ghash(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }
   // the noise tile repeats every so often, and the eye finds the grid: so always two copies, turned and scaled apart
   float nz(vec2 p) {
     p += (vec2(nz0(p * 0.047 + 0.1), nz0(p * 0.047 + 0.6)) - 0.5) * 9.0;      // a slow warp: no straight rows left to follow
@@ -428,6 +431,29 @@ const COMMON = `
     gRough = 1.0 - kept / 0.23;
     return normalize(vec3(-s.x, 1.0, -s.y));
   }
+  // close to the eye the land becomes the model landscape of Mundi I: a patchwork of fields on the flat lowland
+  // (wheat, olive groves, green, ploughed) with hedges between, and the main roads as pale bands. Far away it fades
+  // back into the real picture, so from a plane it is the true island, and on foot a little model railway
+  vec3 gameGround(vec3 col, vec3 p, float h, float steep, vec3 lit) {
+    if (uGameOn < 0.5) return col;
+    float dist = length(uCam - p), nearK = 1.0 - smoothstep(1.5, 6.0, dist);
+    vec2 gu = vec2((p.x - uGBox.x) / uGBox.z, 1.0 - (p.z - uGBox.y) / uGBox.w);
+    vec4 gm = (gu.x > 0.0 && gu.y > 0.0 && gu.x < 1.0 && gu.y < 1.0) ? texture2D(uGame, gu) : vec4(0.0);
+    if (nearK > 0.001) {
+      vec2 fp = mat2(0.88, -0.47, 0.47, 0.88) * p.xz * 6.5; fp.y += floor(fp.x) * 0.37;
+      vec2 cell = floor(fp), fr = fract(fp); float hc = ghash(cell);
+      float flat_ = smoothstep(0.1, 0.03, steep) * (1.0 - smoothstep(160.0, 380.0, h)) * smoothstep(0.42, 0.56, nz(p.xz * 0.09 + 7.0)) * (1.0 - smoothstep(0.55, 0.8, gm.g)) * step(0.5, gm.r);
+      vec3 field = hc < 0.28 ? vec3(0.86, 0.73, 0.42) : hc < 0.52 ? vec3(0.42, 0.53, 0.26) : hc < 0.74 ? vec3(0.56, 0.70, 0.30) : hc < 0.9 ? vec3(0.62, 0.46, 0.30) : vec3(0.78, 0.66, 0.38);
+      field *= 0.9 + 0.2 * nz(p.xz * 23.0);
+      float hedge = 1.0 - smoothstep(0.0, 0.05, min(min(fr.x, 1.0 - fr.x), min(fr.y, 1.0 - fr.y)));
+      field = mix(field, vec3(0.30, 0.40, 0.20), hedge * 0.7);
+      col = mix(col, field * field * lit, flat_ * 0.72 * nearK);
+    }
+    // the main roads: pale dust, from near to quite far
+    float road = smoothstep(0.2, 0.45, gm.g) * (1.0 - smoothstep(0.62, 0.8, gm.g)) * step(0.5, gm.r);
+    col = mix(col, vec3(0.74, 0.66, 0.53) * lit, road * (1.0 - smoothstep(10.0, 40.0, dist)) * 0.85);
+    return col;
+  }
   float shoreAt(vec2 uv) { float s = texture2D(uDist, uv).r; return s * s * 2000.0; }
   // rocky shoals and reef flats: platforms that hug the shore (wide off flat land, narrow under cliffs) and now and
   // then lie offshore; their rim is sharp, the floor drops from a metre or two into the blue
@@ -478,7 +504,7 @@ const U = {
   uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
   uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
   uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null }, uGeo: { value: null }, uShadow: { value: null },
-  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uMB: { value: [new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
+  uLife: { value: 1 }, uWEx: { value: 1 }, uGame: { value: null }, uGBox: { value: new THREE.Vector4() }, uGameOn: { value: 0 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uMB: { value: [new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
   uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
 };
 
@@ -588,6 +614,7 @@ function terrain() {
           vec3 life = sat * (uSunCol * (0.3 + 0.9 * diff * shd) * cloudShadow(vP) + uZen * 0.25 * ao);
           col = mix(bare * (uSunCol * diff * sh * 1.05 + sky), life, uLife);
           col = mix(col, life, PROJ);
+          col = gameGround(col, vP, h, steep, uSunCol * diff * sh * 1.05 + sky);
         } else {
           vec3 fl = mix(vec3(0.46, 0.62, 0.68), vec3(0.13, 0.28, 0.48), smoothstep(0.02, 0.35, dn));
           fl = mix(fl, vec3(0.03, 0.08, 0.2), smoothstep(0.35, 0.9, dn));
@@ -722,6 +749,7 @@ async function loadSpot(sp, slot) {
         vec3 bare = pow(vec3(0.6, 0.53, 0.43) * (0.7 + 0.6 * lum), vec3(2.2));
         col = mix(bare * (uSunCol * (0.15 + 1.0 * diff) * sh + uZen * 0.3), life, max(uLife, uVeg));
         col = mix(col, life, PROJ);
+        col = gameGround(col, vP, vP.y / ${(0.001 * EX_LAND).toFixed(4)}, 1.0 - N.y, uSunCol * diff * sh * 1.05 + uZen * 0.3);
       }
       gl_FragColor = vec4(finish(col, vP), 1.0);
       ${TAIL}
@@ -941,7 +969,9 @@ function step(dt, now, f) {
     for (const [sp, i, [lon, lat]] of near) { if (sp.loading) continue; const [x, z] = G(lon, lat);
       if (Math.hypot(f.x - x, f.z - z) < Math.max(f.dist * 1.5, 50) + (sp.dir ? 600 : 80)) { sp.loading = true; loadSpot(sp, i).catch((e) => console.warn("Ort", sp.id, e)); } } }
 }
-const api = { step, yAt, isLand, G, places: PLACES, terrain: null, U };
+const api = { step, yAt, isLand, G, places: PLACES, terrain: null, U, scene };
+// the game hands over its map of the land: fields and roads near the eye come from it
+api.gameMask = (tex, box) => { U.uGame.value = tex; U.uGBox.value.set(...box); U.uGameOn.value = 1; };
 api.ready = async function (geo) {
   const [sat] = await Promise.all([new THREE.TextureLoader().loadAsync(base + "data/natur.jpg"), loadHeights(), loadWorld()]);
   U.uWorld.value = worldHTex; U.uWorldN.value = worldNTex;
