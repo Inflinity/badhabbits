@@ -929,7 +929,9 @@ window.CrusadersGeo.load().then(async (geo) => {
   terrain = buildLand(feats, geo.roads);
   ERDE.gameMask(maskTex, [W0, D0, W1 - W0, D1 - D0]);
   window.Wege.init({ THREE, scene, heightAt });
-  window.Feralis.init({ THREE, scene, camera, isLand, heightAt, toast, onOpen: () => { pl.tx = null; tgtMark.visible = false; }, onClose: () => { hud(); last = performance.now(); } });
+  window.Feralis.init({ THREE, scene, camera, isLand, heightAt, toast, onOpen: () => { pl.tx = null; tgtMark.visible = false; }, onClose: () => { hud(); last = performance.now(); },
+    // the catch becomes a postcard, stamped with the nearest town
+    onCatch: (kind, img) => { const [lat, lon] = unP(pl.x, pl.z); let best = null, bd = 1e9; for (const [name, la, lo] of TOWNS) { const d = Math.hypot(la - lat, (lo - lon) * KX); if (d < bd) { bd = d; best = name; } } window.Postcards.catchCard("fang-" + kind, img, best); } });
   $("#src").textContent = "© OSM-Mitwirkende · Terrain Tiles · Sentinel-2 cloudless 2020, EOX (CC BY-NC-SA 4.0) · Natural Earth";
   landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes);
   window.SIGHTS = geo.regions.flatMap((r) => r.data.sights || []); window.Route.build(geo.roads);

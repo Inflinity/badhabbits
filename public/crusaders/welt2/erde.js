@@ -449,9 +449,9 @@ const COMMON = `
       field = mix(field, vec3(0.30, 0.40, 0.20), hedge * 0.7);
       col = mix(col, field * field * lit, flat_ * 0.72 * nearK);
     }
-    // the main roads: pale dust, from near to quite far
+    // the main roads from the map: pale dust seen from afar; close up the exact ways (wege.js) take over, so the two never sit side by side
     float road = smoothstep(0.2, 0.45, gm.g) * (1.0 - smoothstep(0.62, 0.8, gm.g)) * step(0.5, gm.r);
-    col = mix(col, vec3(0.74, 0.66, 0.53) * lit, road * (1.0 - smoothstep(10.0, 40.0, dist)) * 0.85);
+    col = mix(col, vec3(0.74, 0.66, 0.53) * lit, road * smoothstep(6.0, 10.0, dist) * (1.0 - smoothstep(10.0, 40.0, dist)) * 0.85);
     return col;
   }
   float shoreAt(vec2 uv) { float s = texture2D(uDist, uv).r; return s * s * 2000.0; }
