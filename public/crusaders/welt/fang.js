@@ -180,8 +180,8 @@
     // the mesh: a knotted diamond pattern, drawn once, laid over the round net between the weights
     const meshTex = (() => {
       const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
-      x.strokeStyle = "rgba(236,226,200,0.95)"; x.lineWidth = 3; x.beginPath(); x.moveTo(0, 0); x.lineTo(64, 64); x.moveTo(64, 0); x.lineTo(0, 64); x.stroke();
-      x.fillStyle = "rgba(200,186,150,1)"; for (const [a, b] of [[0, 0], [64, 0], [0, 64], [64, 64], [32, 32]]) { x.beginPath(); x.arc(a, b, 3.2, 0, 7); x.fill(); }      // the knots
+      x.strokeStyle = "rgba(236,226,200,0.95)"; x.lineWidth = 7; x.beginPath(); x.moveTo(0, 0); x.lineTo(64, 64); x.moveTo(64, 0); x.lineTo(0, 64); x.stroke();
+      x.fillStyle = "rgba(200,186,150,1)"; for (const [a, b] of [[0, 0], [64, 0], [0, 64], [64, 64], [32, 32]]) { x.beginPath(); x.arc(a, b, 5.5, 0, 7); x.fill(); }      // the knots
       const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
     })();
     const RN = 7;      // rings of the mesh, from the centre out to the rim
@@ -193,10 +193,10 @@
       const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0xe8dcc0, transparent: true, opacity: 0.9 })); g.add(lines);
       // the mesh between them: a disc of (N + 1) × (RN + 1) points, the pattern repeating round and out
       const mg = new THREE.BufferGeometry(), pos = new Float32Array((N + 1) * (RN + 1) * 3), uv = [], idx = [];
-      for (let j = 0; j <= RN; j++) for (let i = 0; i <= N; i++) uv.push((i / N) * 10, (j / RN) * 5);
+      for (let j = 0; j <= RN; j++) for (let i = 0; i <= N; i++) uv.push((i / N) * 14, (j / RN) * 6);
       for (let j = 0; j < RN; j++) for (let i = 0; i < N; i++) { const a = j * (N + 1) + i, b = a + 1, c = a + N + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
       mg.setAttribute("position", new THREE.BufferAttribute(pos, 3)); mg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); mg.setIndex(idx);
-      const mesh = new THREE.Mesh(mg, new THREE.MeshBasicMaterial({ map: meshTex, transparent: true, alphaTest: 0.25, side: THREE.DoubleSide, depthWrite: false, color: 0xd8ccb0 }));
+      const mesh = new THREE.Mesh(mg, new THREE.MeshBasicMaterial({ map: meshTex, transparent: true, alphaTest: 0.12, side: THREE.DoubleSide, depthWrite: false, color: 0xf4ead2 }));
       mesh.frustumCulled = false; g.add(mesh);
       sc.add(g); return { g, w, lines, mesh, N };
     }
@@ -267,9 +267,11 @@
     let photoAt = 0, photo = null;
     function takePhoto() {
       const w = 900, h = 600, at = (net ? net.c : target.m.position).clone();
-      rr.setPixelRatio(1); rr.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); cam.lookAt(at.x * 0.7, Math.max(at.y, -0.5), at.z);
+      rr.setPixelRatio(1); rr.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+      // from close by, a little above and behind the catch, so it fills the picture and the bow stays out
+      const y0 = cam.position.y; cam.position.set(at.x * 0.6, 2.4, at.z + 4.2); cam.lookAt(at.x, Math.max(at.y, shallow ? floorY + 0.6 : -0.3), at.z);
       rr.render(sc, cam); try { photo = cv.toDataURL("image/jpeg", 0.82); } catch (e) {}
-      rr.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); cam.lookAt(0, 0, -12); resize();
+      rr.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); cam.position.set(0, y0, 0); cam.lookAt(0, 0, -12); resize();
     }
     function netStep(dt) {
       const n = net; if (!n) return; n.t += dt; n.rot += n.rs * dt;
