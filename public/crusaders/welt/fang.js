@@ -270,7 +270,9 @@
       rr.setPixelRatio(1); rr.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
       // from close by, a little above and behind the catch, so it fills the picture and the bow stays out
       const y0 = cam.position.y; cam.position.set(at.x * 0.6, 2.4, at.z + 4.2); cam.lookAt(at.x, Math.max(at.y, shallow ? floorY + 0.6 : -0.3), at.z);
+      const hull = sc.children.filter((o) => o.material === wood || o.material === dark); hull.forEach((o) => (o.visible = false));
       rr.render(sc, cam); try { photo = cv.toDataURL("image/jpeg", 0.82); } catch (e) {}
+      hull.forEach((o) => (o.visible = true));
       rr.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); cam.position.set(0, y0, 0); cam.lookAt(0, 0, -12); resize();
     }
     function netStep(dt) {
@@ -286,7 +288,7 @@
         }
       } else {
         // the lead pulls the net down; over an urchin it closes around it
-        if (n.c.y > floorY + 0.4) n.c.y -= dt * (shallow ? 0.9 : 1.5);
+        if (n.c.y > floorY + 0.4 && (shallow || !target.caught)) n.c.y -= dt * (shallow ? 0.9 : 1.5);
         if (n.sinking && shallow && n.c.y <= target.y + 0.3 && !target.caught) caught();
         if (n.t > 2.6 && !target.caught) { sc.remove(n.g); net = null; }
       }
@@ -297,6 +299,7 @@
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       sea.material.uniforms.uT.value = now / 1000;
       if (shallow) { target.m.rotation.y += dt * 0.15; if (target.caught && net) target.m.position.copy(net.c).setY(Math.max(net.c.y, floorY + 0.6)); }
+      else if (target.caught && net) { target.m.position.set(net.c.x, 0.12, net.c.z); target.m.rotation.z = Math.sin(now / 90) * 0.4; }      // in the net, thrashing
       else fishStep(dt);
       netStep(dt);
       for (let i = drops.length - 1; i >= 0; i--) { const d = drops[i]; d.userData.v.y -= 9.81 * dt; d.position.addScaledVector(d.userData.v, dt); if (d.position.y < 0) { sc.remove(d); drops.splice(i, 1); } }
