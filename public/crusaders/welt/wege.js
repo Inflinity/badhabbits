@@ -9,9 +9,9 @@
   const TW = 0.036, TH = 0.024;      // one square, in degrees
   // width in metres (drawn 1.6 times, like everything on the map) and colour
   const KIND = {
-    primary: [11, "#cbbfa8"], secondary: [9, "#cbbfa8"], tertiary: [7, "#cbbfa8"], unclassified: [6, "#c8bca4"], residential: [5, "#c8bca4"],
-    living_street: [5, "#c8bca4"], service: [3.5, "#c2b59b"], track: [4, "#b39a73"], path: [2, "#d6c6a2"], footway: [2, "#d6c6a2"],
-    bridleway: [2.5, "#c9b28a"], steps: [2, "#d6c6a2"], pedestrian: [4, "#d6c6a2"], cycleway: [2, "#d6c6a2"],
+    primary: [11, "#b3a68e"], secondary: [9, "#b3a68e"], tertiary: [7, "#b3a68e"], unclassified: [6, "#ad9f86"], residential: [5, "#ad9f86"],
+    living_street: [5, "#ad9f86"], service: [3.5, "#a6987d"], track: [4, "#9a8160"], path: [2, "#b9a783"], footway: [2, "#b9a783"],
+    bridleway: [2.5, "#ab966f"], steps: [2, "#b9a783"], pedestrian: [4, "#b9a783"], cycleway: [2, "#b9a783"],
   };
   let ctx = null; const tiles = new Map(); let busy = false, group = null;
   function init(c) { ctx = c; group = new ctx.THREE.Group(); ctx.scene.add(group); }

@@ -125,6 +125,7 @@
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(200, 200, 60, 60), new THREE.MeshPhongMaterial({ color: shallow ? 0xd8c49a : 0x0a2a4a, flatShading: true, shininess: 12 }));
     fl.rotation.x = -Math.PI / 2; fl.position.y = floorY; { const p = fl.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, (Math.sin(p.getX(i) * 0.7) + Math.cos(p.getY(i) * 0.9)) * 0.12); fl.geometry.computeVertexNormals(); } sc.add(fl);
     const target = { kind, x: 0, y: 0, z: -9, caught: false, gone: false };
+    Feralis.peek = () => ({ target, net });      // for trying it out
     if (shallow) {
       const rm = new THREE.MeshPhongMaterial({ color: 0x6f6a62, flatShading: true, shininess: 12 });
       for (let i = 0; i < 9; i++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6 + Math.random() * 0.9, 0), rm); r.position.set((Math.random() - 0.5) * 14, floorY + 0.2, -5 - Math.random() * 14); r.scale.y = 0.6; r.rotation.set(Math.random(), Math.random(), Math.random()); sc.add(r); }
@@ -176,20 +177,40 @@
     // the net: lead weights on a ring, and the mesh between them
     let nets = 3, net = null;
     const navNets = () => (root.querySelector(".nets").textContent = `Netze: ${"◯ ".repeat(nets)}`.trim()); navNets();
+    // the mesh: a knotted diamond pattern, drawn once, laid over the round net between the weights
+    const meshTex = (() => {
+      const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+      x.strokeStyle = "rgba(236,226,200,0.95)"; x.lineWidth = 3; x.beginPath(); x.moveTo(0, 0); x.lineTo(64, 64); x.moveTo(64, 0); x.lineTo(0, 64); x.stroke();
+      x.fillStyle = "rgba(200,186,150,1)"; for (const [a, b] of [[0, 0], [64, 0], [0, 64], [64, 64], [32, 32]]) { x.beginPath(); x.arc(a, b, 3.2, 0, 7); x.fill(); }      // the knots
+      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+    })();
+    const RN = 7;      // rings of the mesh, from the centre out to the rim
     function makeNet() {
       const g = new THREE.Group(), N = 16, lead = new THREE.MeshLambertMaterial({ color: 0x55585e }), w = [];
       for (let i = 0; i < N; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), lead); g.add(s); w.push(s); }
-      const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array((N * 2 + N * 4) * 3), 3));
+      // the lines: the rim between the weights, and the cords from the hand line in the middle to each weight
+      const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(N * 4 * 3), 3));
       const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0xe8dcc0, transparent: true, opacity: 0.9 })); g.add(lines);
-      sc.add(g); return { g, w, lines, N };
+      // the mesh between them: a disc of (N + 1) × (RN + 1) points, the pattern repeating round and out
+      const mg = new THREE.BufferGeometry(), pos = new Float32Array((N + 1) * (RN + 1) * 3), uv = [], idx = [];
+      for (let j = 0; j <= RN; j++) for (let i = 0; i <= N; i++) uv.push((i / N) * 10, (j / RN) * 5);
+      for (let j = 0; j < RN; j++) for (let i = 0; i < N; i++) { const a = j * (N + 1) + i, b = a + 1, c = a + N + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+      mg.setAttribute("position", new THREE.BufferAttribute(pos, 3)); mg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); mg.setIndex(idx);
+      const mesh = new THREE.Mesh(mg, new THREE.MeshBasicMaterial({ map: meshTex, transparent: true, alphaTest: 0.25, side: THREE.DoubleSide, depthWrite: false, color: 0xd8ccb0 }));
+      mesh.frustumCulled = false; g.add(mesh);
+      sc.add(g); return { g, w, lines, mesh, N };
     }
     function drawNet(n) {
-      const { w, lines, N } = n, p = lines.geometry.attributes.position, r = n.r, droop = n.landed ? 0.05 : 0.35 * r;
-      const pt = (i, f) => { const a = (i / N) * Math.PI * 2 + n.rot; return [n.c.x + Math.cos(a) * r * f, n.c.y - droop * (1 - f * f) * (n.landed ? 0 : 1) + (n.landed ? 0 : (1 - f) * 0.25 * r), n.c.z + Math.sin(a) * r * f]; };
+      const { w, lines, mesh, N } = n, p = lines.geometry.attributes.position, r = n.r, droop = n.landed ? 0.05 : 0.35 * r;
+      // in flight the middle rides high and the weights pull the rim down: a bell; on the water it lies flat
+      const pt = (i, f) => { const a = (i / N) * Math.PI * 2 + n.rot, sag = n.landed ? 0 : droop * (1 - f * f) * 0.4 + Math.sin(i * 2.1 + n.t * 9) * 0.02 * f; return [n.c.x + Math.cos(a) * r * f, n.c.y - sag + (n.landed ? 0 : (1 - f) * 0.25 * r), n.c.z + Math.sin(a) * r * f]; };
       let k = 0; const put = (a) => { p.setXYZ(k++, a[0], a[1], a[2]); };
-      for (let i = 0; i < N; i++) { const [x, y, z] = pt(i, 1); w[i].position.set(x, y - (n.landed ? 0 : 0.05), z); put(pt(i, 1)); put(pt((i + 1) % N, 1)); }      // the rim
-      for (let i = 0; i < N; i++) { put([n.c.x, n.c.y + (n.landed ? 0 : 0.25 * r), n.c.z]); put(pt(i, 1)); put(pt(i, 0.5)); put(pt((i + 1) % N, 0.5)); }      // spokes and an inner ring
+      for (let i = 0; i < N; i++) { const [x, y, z] = pt(i, 1); w[i].position.set(x, y - (n.landed ? 0 : 0.05), z); put(pt(i, 1)); put(pt((i + 1) % N, 1)); put(pt(i, 0)); put(pt(i, 1)); }
       p.needsUpdate = true;
+      // the mesh follows the same bell, a touch lower in the middle of each ring
+      const mp = mesh.geometry.attributes.position;
+      for (let j = 0; j <= RN; j++) { const f = j / RN; for (let i = 0; i <= N; i++) { const q = pt(i, f); mp.setXYZ(j * (N + 1) + i, q[0], q[1] - (n.landed ? 0 : 0.03 * Math.sin(Math.PI * f)), q[2]); } }
+      mp.needsUpdate = true;
     }
     // the thumb: it circles (spin), then flicks
     const ring = root.querySelector(".ring"); let tr = null;
@@ -240,7 +261,15 @@
       target.caught = true; const s = window.Spiel.get(); s.inv[kind] = (s.inv[kind] || 0) + 1; s.log.feralis = (s.log.feralis || 0) + 1; window.Spiel.save(s);
       const up = window.Spiel.reward(K.exp, K.gold); msg(`Gefangen! ${K.icon}`, 2400);
       root.querySelector(".tip").style.opacity = "1"; root.querySelector(".tip").textContent = `+${K.exp} Erfahrung · +${K.gold} Gold${up ? " · eine Stufe höher!" : ""}. Du hast jetzt ${s.inv[kind]} ${s.inv[kind] === 1 ? K.name : K.plural}.`;
-      setTimeout(close, 3200);
+      photoAt = performance.now() + 450; setTimeout(close, 3200);
+    }
+    // the moment of the catch as a photo for the postcard: drawn once more, wide (3 : 2) and turned towards the catch
+    let photoAt = 0, photo = null;
+    function takePhoto() {
+      const w = 900, h = 600, at = (net ? net.c : target.m.position).clone();
+      rr.setPixelRatio(1); rr.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); cam.lookAt(at.x * 0.7, Math.max(at.y, -0.5), at.z);
+      rr.render(sc, cam); try { photo = cv.toDataURL("image/jpeg", 0.82); } catch (e) {}
+      rr.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); cam.lookAt(0, 0, -12); resize();
     }
     function netStep(dt) {
       const n = net; if (!n) return; n.t += dt; n.rot += n.rs * dt;
@@ -270,10 +299,12 @@
       netStep(dt);
       for (let i = drops.length - 1; i >= 0; i--) { const d = drops[i]; d.userData.v.y -= 9.81 * dt; d.position.addScaledVector(d.userData.v, dt); if (d.position.y < 0) { sc.remove(d); drops.splice(i, 1); } }
       cam.position.y = 2.6 + Math.sin(now / 900) * 0.06; cam.rotation.z = Math.sin(now / 1300) * 0.015;      // the boat rocks a little
+      if (photoAt && now > photoAt) { photoAt = 0; takePhoto(); }
       rr.render(sc, cam); raf = requestAnimationFrame(loop);
     }
     raf = requestAnimationFrame(loop);
-    function close() { cancelAnimationFrame(raf); removeEventListener("resize", resize); rr.dispose(); root.remove(); open = false; C.onClose && C.onClose(); }
+    let closed = false;
+    function close() { if (closed) return; closed = true; cancelAnimationFrame(raf); removeEventListener("resize", resize); rr.dispose(); root.remove(); open = false; C.onClose && C.onClose(); if (target.caught && C.onCatch) C.onCatch(kind, photo); }
     root.querySelector(".x").onclick = close;
   }
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));

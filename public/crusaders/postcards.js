@@ -221,8 +221,8 @@ Object.assign(SCENES, {
     caption("Argonautika · Iolkos, wo die Argo in See stach"),
 });
 // what can be collected; every find is a card
-const KINDS = { postkarte: "Postkarte", gesetzesrolle: "Gesetzesrolle", filmposter: "Filmposter", flora: "Flora", skulptur: "Bildhauerwerk", literatur: "Literatur" };
-const KINDS_PL = { postkarte: "Postkarten", gesetzesrolle: "Gesetzesrollen", filmposter: "Filmposter", flora: "Flora", skulptur: "Bildhauerwerke", literatur: "Literatur" };
+const KINDS = { postkarte: "Postkarte", gesetzesrolle: "Gesetzesrolle", filmposter: "Filmposter", flora: "Flora", skulptur: "Bildhauerwerk", literatur: "Literatur", fang: "Fang" };
+const KINDS_PL = { postkarte: "Postkarten", gesetzesrolle: "Gesetzesrollen", filmposter: "Filmposter", flora: "Flora", skulptur: "Bildhauerwerke", literatur: "Literatur", fang: "Fänge" };
 const titleOf = (s) => s.title || "Grüße aus " + s.name;
 const SPOTS = [
   { id: "rhodos", name: "Rhodos", lat: 36.4495, lon: 28.2265, r: 1.5 },
@@ -249,9 +249,13 @@ const SPOTS = [
   { id: "argonautika-alexandria", kind: "literatur", item: "Argonautika", name: "Argonautika", place: "Alexandria", title: "Argonautika · Alexandria", hint: "in Alexandria", lat: 31.2089, lon: 29.9092, r: 0.6 },
   { id: "argonautika-volos", kind: "literatur", item: "Argonautika", name: "Argonautika", place: "Volos", title: "Argonautika · Iolkos", hint: "in Volos, dem alten Iolkos", lat: 39.3616, lon: 22.9422, r: 1 },
 ];
+// catches (Crusaders): no place to reach; the card is the photo taken in the moment the net closed
+SPOTS.push(
+  { id: "fang-seeigel", kind: "fang", name: "Seeigel", place: "Seeigel", title: "Gefangen: ein Seeigel", hint: "im Flachwasser an der Küste" },
+  { id: "fang-flugfisch", kind: "fang", name: "Fliegender Fisch", place: "Flugfisch", title: "Gefangen: ein Fliegender Fisch", hint: "draußen auf offenem Meer" });
 SPOTS.forEach((s) => { s.kind = s.kind || "postkarte"; });
 const sceneSVG = (id) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="1500" height="1000">${SCENES[id]()}</svg>`;
-const sceneURL = (id) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sceneSVG(id));
+const sceneURL = (id) => (PC[id] && PC[id].img) || "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sceneSVG(id));
 const PC_KEY = "rhodos-postkarten";
 let PC = {};
 try { PC = JSON.parse(localStorage.getItem(PC_KEY) || "{}"); } catch (e) {}
@@ -263,7 +267,7 @@ function pcBadge() { $("#pcBtn").textContent = "✉" + (pcCount() ? " " + pcCoun
 function postcardCheck(f) {
   // the smallest circles first: a hidden find inside a postcard's circle pops before the postcard
   for (const s of [...SPOTS].sort((a, b) => a.r - b.r)) {
-    if (PC[s.id] || popping === s.id || (snoozed[s.id] && Date.now() - snoozed[s.id] < 120000)) continue;
+    if (s.lat == null || PC[s.id] || popping === s.id || (snoozed[s.id] && Date.now() - snoozed[s.id] < 120000)) continue;
     if (distKm([f.lat, f.lon], [s.lat, s.lon]) <= s.r && f.acc < 300) { popCard(s); break; }
   }
 }
@@ -437,5 +441,19 @@ pcBadge();
 const testId = new URLSearchParams(location.search).get("postkarte");
 if (testId && SPOTS.find((s) => s.id === testId)) setTimeout(() => popCard(SPOTS.find((s) => s.id === testId)), 800);
 
-window.Postcards = Object.assign(window.Postcards || {}, { check: postcardCheck, count: pcCount, spots: SPOTS, found: () => PC, sceneURL, kinds: KINDS, title: titleOf, open: () => $("#pcBtn") && $("#pcBtn").click() });
+// a catch: the photo becomes the card (a newer catch of the same kind gives a newer photo, your writing stays)
+function catchCard(id, img, where) {
+  const s = SPOTS.find((x) => x.id === id); if (!s || !img) return;
+  const first = !PC[id];
+  if (first) PC[id] = { at: new Date().toISOString(), items: [{ ...stampItem(s), t: (where || s.place).toUpperCase() }] };
+  PC[id].img = img;
+  try { pcSave(); } catch (e) {}
+  pcBadge();
+  const pop = $("#pcPop"); popping = id;
+  pop.querySelector("img").src = img; pop.querySelector("b").textContent = titleOf(s);
+  pop.querySelector("small").textContent = (first ? "Neue Postkarte" : "Neues Foto") + " · Tippen zum Beschriften";
+  pop.hidden = false; pop.classList.remove("in"); void pop.offsetWidth; pop.classList.add("in");
+  pop.onclick = () => { pop.hidden = true; popping = null; openEditor(id); };
+}
+window.Postcards = Object.assign(window.Postcards || {}, { catchCard, check: postcardCheck, count: pcCount, spots: SPOTS, found: () => PC, sceneURL, kinds: KINDS, title: titleOf, open: () => $("#pcBtn") && $("#pcBtn").click() });
 })();
