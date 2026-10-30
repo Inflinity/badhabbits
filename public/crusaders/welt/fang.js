@@ -118,7 +118,7 @@
     // the sky
     const sky = new THREE.Mesh(new THREE.SphereGeometry(500, 24, 12), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
       vertexShader: "varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-      fragmentShader: "varying vec3 d; void main(){ float h = clamp(d.y, 0.0, 1.0); vec3 c = mix(vec3(0.78, 0.86, 0.92), vec3(0.22, 0.48, 0.82), pow(h, 0.5)); gl_FragColor = vec4(c, 1.0);\n#include <tonemapping_fragment>\n#include <encodings_fragment>\n}" }));
+      fragmentShader: "varying vec3 d; void main(){ float h = clamp(d.y, 0.0, 1.0); vec3 c = mix(vec3(0.62, 0.78, 0.92), vec3(0.10, 0.34, 0.74), pow(h, 0.5)); gl_FragColor = vec4(c, 1.0);\n#include <tonemapping_fragment>\n#include <encodings_fragment>\n}" }));
     sc.add(sky);
     // the floor of the shallows: sand, and rocks with the urchin on one
     const floorY = shallow ? -2.0 : -40;
@@ -147,7 +147,7 @@
           s += vec2(0.97, -0.24) * cos(dot(vec2(0.97, -0.24), p) * 5.3 + uT * 3.0) * 0.04 / (1.0 + dist * 0.1);
           vec3 N = normalize(vec3(-s.x, 1.0, -s.y)), V = normalize(cameraPosition - vP);
           float fr = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
-          vec3 R = reflect(-V, N); vec3 sky = mix(vec3(0.78, 0.86, 0.92), vec3(0.22, 0.48, 0.82), pow(clamp(R.y, 0.0, 1.0), 0.5));
+          vec3 R = reflect(-V, N); vec3 sky = mix(vec3(0.62, 0.78, 0.92), vec3(0.10, 0.34, 0.74), pow(clamp(R.y, 0.0, 1.0), 0.5));
           vec3 deep = mix(vec3(0.02, 0.12, 0.3), vec3(0.08, 0.55, 0.6), uShallow);
           vec3 col = mix(deep, sky, fr);
           float sp = pow(max(dot(R, normalize(vec3(-0.5, 0.75, -0.35))), 0.0), 200.0); col += vec3(1.0, 0.95, 0.85) * sp * 3.0;
@@ -167,7 +167,7 @@
       beam(back, tip, 0.16, 0.1, dark);
       for (let k = 1; k <= 4; k++) { const dy = k * 0.22, sh = 1 - k * 0.07; beam(new THREE.Vector3(back.x * sh, back.y - dy, back.z), new THREE.Vector3(0, tip.y - dy, tip.z + k * 0.12), 0.08, 0.2, k % 2 ? wood : dark); }
     }
-    beam(new THREE.Vector3(0, 0.4, -2.2), new THREE.Vector3(0, 1.5, -2.8), 0.13, 0.13, dark);      // the stem, raked forward
+    beam(new THREE.Vector3(0, 0.4, -2.2), new THREE.Vector3(0, 1.42, -2.78), 0.13, 0.13, dark);      // the stem, raked forward
     const deckShape = new THREE.Shape([new THREE.Vector2(-1.0, -0.6), new THREE.Vector2(1.0, -0.6), new THREE.Vector2(0, 2.6)]);
     const deck = new THREE.Mesh(new THREE.ShapeGeometry(deckShape), wood); deck.rotation.x = -Math.PI / 2; deck.position.y = 1.2; sc.add(deck);
     // splashes: little white sprites that fly and fall
@@ -204,8 +204,10 @@
       ring.style.background = `conic-gradient(rgba(255,215,106,0.9) ${spin * 360}deg, rgba(255,255,255,0.15) 0)`; ring.style.webkitMask = ring.style.mask = "radial-gradient(circle, transparent 28px, #000 29px)";
     });
     const release = (e) => {
-      if (!tr) return; ring.style.display = "none"; const now = performance.now(), recent = tr.pts.filter((p) => now - p[2] < 110);
-      const t0 = tr; tr = null; if (recent.length < 2) return;
+      if (!tr) return; ring.style.display = "none"; const now = performance.now(), lastT = tr.pts[tr.pts.length - 1][2];
+      // the flick is the last tenth of a second of movement; a thumb that stopped before letting go threw nothing
+      let recent = tr.pts.filter((p) => lastT - p[2] < 110); if (recent.length < 2) recent = tr.pts.slice(-2);
+      const t0 = tr; tr = null; if (recent.length < 2 || now - lastT > 300) return;
       const a = recent[0], b = recent[recent.length - 1], dt = Math.max(0.016, (b[2] - a[2]) / 1000), vx = (b[0] - a[0]) / dt, vy = (b[1] - a[1]) / dt;
       if (vy > -350) return;      // a flick goes up the screen
       const spin = Math.min(1, Math.abs(t0.turn) / (Math.PI * 4)), speed = Math.min(3200, Math.hypot(vx, vy));
