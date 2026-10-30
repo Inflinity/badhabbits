@@ -57,6 +57,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   position: fixed; left: 50%; top: 70px; transform: translateX(-50%); max-width: 92%; background: rgba(241,228,196,0.96); border: 2px solid #d9b56e; border-radius: 10px;
   padding: 8px 14px; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
 }
+#orte { position: fixed; right: 74px; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 6px; z-index: 6; }
+#orte button { text-align: left; padding: 9px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,20,30,0.78); color: #fff; font: 600 14px "Figtree", sans-serif; }
+#orte button small { display: block; font-weight: 400; font-size: 11.5px; opacity: 0.75; }
 #wx { position: fixed; left: 14px; top: calc(max(10px, env(safe-area-inset-top)) + 74px); font: 600 12px "Figtree", sans-serif; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; pointer-events: none; }
 #src { position: fixed; left: 14px; top: calc(max(10px, env(safe-area-inset-top)) + 58px); font: 10px "Figtree", sans-serif; color: rgba(255,255,255,0.85); text-shadow: 0 0 3px #000; pointer-events: none; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1c140c url("../strand.jpg") center / cover; color: #fff; font: italic 22px "IM Fell English", serif; text-shadow: 0 2px 8px #000; z-index: 50; }
@@ -81,7 +84,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
   <button type="button" id="zOut"><span>－</span>weiter</button>
   <button type="button" id="centre"><span>◎</span>zu mir</button>
   <button type="button" id="viewBtn"><span>⛰</span>Blick</button>
+  <button type="button" id="orteBtn"><span>🗺</span>Orte</button>
 </div>
+<div id="orte" hidden></div>
 <div class="pad side">
   <button type="button" id="auraBtn"><span>✨</span>Aura</button>
   <a href="../lager/" id="lagerBtn"><span>⛺</span>Lager</a>
@@ -102,6 +107,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f5; fon
 <script src="../kampf.js"></script>
 <script src="../staedte.js"></script>
 <script src="../geo/geo.js"></script>
+<script src="../welt2/erde.js"></script>
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
@@ -131,7 +137,7 @@ const fbm = (x, z) => vnoise(x, z) * 0.5 + vnoise(x * 2.1, z * 2.1) * 0.27 + vno
 // the real summits of Rhodes: [lon, lat, height km, radius km]
 const PEAKS = [[27.86, 36.2, 1.2, 4.5], [27.79, 36.14, 0.8, 3.5], [27.94, 36.27, 0.79, 3.5], [28.05, 36.3, 0.42, 5], [27.9, 36.06, 0.45, 6],
   [27.84, 35.98, 0.35, 5], [28.0, 36.18, 0.4, 4], [28.087, 36.093, 0.12, 0.8], [28.14, 36.24, 0.3, 2]];
-const W0 = -6, W1 = 76, D0 = -6, D1 = 84, CELL = 0.34;
+const W0 = -6, W1 = 76, D0 = -16, D1 = 84, CELL = 0.34;      // north to Symi
 /* The coast and the land are kept apart. The land (hills, woods, towns) is a coarse grid and may be
    rough; where land ends is decided only by the coast data (geo/, from OpenStreetMap): its SVG paths
    are drawn into a mask, and the mask cuts the land exactly at the shore, paints the beach and lights
@@ -192,7 +198,10 @@ function withMask(material, frag) {
   return material;
 }
 let NX, NZ, H, LAND, DIST;
-function heightAt(x, z) {
+// everything stands on the ground of Erde (Mundi II): real heights, raised three times, as drawn
+let ERDE = null;
+const heightAt = (x, z) => (ERDE ? ERDE.yAt(x, z) : gridH(x, z));
+function gridH(x, z) {
   // bilinear from the grid
   const gx = clamp((x - W0) / CELL, 0, NX - 1.001), gz = clamp((z - D0) / CELL, 0, NZ - 1.001), i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
   const h = (a, b) => H[b * NX + a];
@@ -265,31 +274,24 @@ function buildLand(features, roads) {
      float beach = smoothstep(0.7, 0.9, mk.g), rocky = smoothstep(0.52, 0.62, vn(wp * 0.8 + 3.1));
      col = mix(col, mix(vec3(0.94, 0.87, 0.68), mix(vec3(0.55, 0.51, 0.46), vec3(0.70, 0.66, 0.58), n3), rocky * 0.85), beach);
      diffuseColor.rgb = col;`));
-  scene.add(land);
-  /* the sea floor: shallow and plain. The turquoise of the shallows is painted on the water's surface
-     (the sea's shader in himmel.js), not down here: seen at a slant through the water, a coloured floor deep below
-     slid away from the coast and the island seemed to float above its own shadow. */
-  const seaGeo = grid((k) => -Math.min(0.25, 0.01 + (LAND[k] ? 0 : DIST[k]) * 0.05), (c) => c.set("#1f5f96"));
-  const sea = new THREE.Mesh(seaGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  scene.add(sea);
+  // the land and the sea are drawn by Erde now; this grid only says where woods and towns may grow
   return land;
 }
 
 /* ---------------- Scene ---------------- */
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.outputEncoding = THREE.sRGBEncoding;
 $("#world").append(renderer.domElement);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#8fd0f5");
-scene.fog = new THREE.Fog("#a9dcf5", 30, 120);
-const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 400);
-const hemi = new THREE.HemisphereLight(0xffffff, 0x6a8a6a, 0.75); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2dc, 0.8); sun.position.set(-30, 60, 20); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 2500);
+// the light of Erde: a fixed sun from the west-south-west at 38°, the same for the land and for the houses on it
+const hemi = new THREE.HemisphereLight(0xdfeaff, 0x6a6a5a, 0.85); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.1); { const az = (250 * Math.PI) / 180, el = (38 * Math.PI) / 180; sun.position.set(Math.sin(az) * Math.cos(el) * 100, Math.sin(el) * 100, -Math.cos(az) * Math.cos(el) * 100); } scene.add(sun);
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
-// the sea: a sheet over the sea floor; its look (waves, sky, shallows, foam) comes from himmel.js
-const water = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshPhongMaterial({ color: 0x2a8fd0, transparent: true, opacity: 0.55, shininess: 90, specular: 0x9fdcff }));
-water.rotation.x = -Math.PI / 2; water.position.set(35, 0, 40); scene.add(water);
+// land, sea, sky and clouds: Erde, the world of Mundi II
+ERDE = window.Erde(renderer, scene, camera, "../welt2/");
 
 /* ---------------- Things on the land ---------------- */
 const lmat = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
@@ -492,6 +494,7 @@ function label(name, sub, x, z, cls = "") {
 const pv = new THREE.Vector3();
 function drawLabels() {
   const far = camDist * 6 + 3;
+  if (camDist > 120) { for (const l of labels) l.e.style.display = "none"; return; }
   for (const l of labels) {
     pv.copy(l.v).project(camera);
     const d = l.v.distanceTo(camera.position);
@@ -529,20 +532,19 @@ function panBy(dx, dz) {
 function panStep(dt) {
   const d = Math.hypot(pan.x, pan.z);
   if (pan.home) { pan.x *= Math.max(0, 1 - dt * 4); pan.z *= Math.max(0, 1 - dt * 4); if (d < 0.01) { pan.x = pan.z = 0; pan.home = false; } }
-  else if (!pan.held && d > LEASH) { const t = LEASH + (d - LEASH) * Math.max(0, 1 - dt * 6); pan.x *= t / d; pan.z *= t / d; }
+  else if (!pan.held && !pan.free && d > LEASH) { const t = LEASH + (d - LEASH) * Math.max(0, 1 - dt * 6); pan.x *= t / d; pan.z *= t / d; }
 }
 function placeCamera() {
   const fx = pl.x + pan.x, fz = pl.z + pan.z, y = Math.max(0, heightAt(fx, fz));
   const cx = fx + Math.sin(camYaw) * Math.cos(camPitch) * camDist, cz = fz + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
-  camera.position.set(cx, Math.max(heightAt(cx, cz) + 0.05, y + Math.sin(camPitch) * camDist), cz);
+  camera.position.set(cx, Math.max(heightAt(cx, cz) + Math.min(0.05, camDist * 0.1), y + Math.sin(camPitch) * camDist), cz);
   camera.lookAt(fx, y + 0.02, fz);
-  scene.fog.near = camDist * 4 + 4; scene.fog.far = camDist * 14 + 30;
-  // keep depth precise near the water line (land a few metres above the sea must not flicker)
-  const nr = clamp(camDist * 0.04, 0.005, 2); if (Math.abs(camera.near - nr) > nr * 0.2) { camera.near = nr; camera.updateProjectionMatrix(); }
+  // keep depth precise near the water line (land a few metres above the sea must not flicker), and see the whole earth from far
+  const nr = clamp(camDist * 0.02, 0.003, 40), fr = Math.max(2500, camDist * 8); if (Math.abs(camera.near - nr) > nr * 0.2 || camera.far !== fr) { camera.near = nr; camera.far = fr; camera.updateProjectionMatrix(); }
   $("#roseSvg").style.transform = `rotate(${(camYaw * 180) / Math.PI}deg)`;
 }
 $("#zIn").onclick = () => { camDist = Math.max(0.12, camDist / 1.6); };
-$("#zOut").onclick = () => { camDist = Math.min(60, camDist * 1.6); };
+$("#zOut").onclick = () => { camDist = Math.min(30000, camDist * 1.6); };
 let view = 0;
 $("#viewBtn").onclick = () => { view = (view + 1) % 3; camPitch = [0.95, 0.5, 1.35][view]; };
 // fingers: one drags the view round, two pinch; a tap walks there (without GPS)
@@ -558,7 +560,7 @@ el.addEventListener("pointermove", (e) => {
   if (ptrs.size === 1) { camYaw -= (e.clientX - prev[0]) * 0.008; camPitch = clamp(camPitch + (e.clientY - prev[1]) * 0.005, 0.25, 1.45); }
   else if (ptrs.size === 2) {
     const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    if (pinch) camDist = clamp(camDist * (pinch / d), 0.12, 60);
+    if (pinch) camDist = clamp(camDist * (pinch / d), 0.12, 30000);
     if (mid) {
       // move the ground under the fingers: screen pixels to kilometres at the current height
       const kmPerPx = (2 * camDist * Math.tan((camera.fov * Math.PI) / 360)) / innerHeight;
@@ -574,13 +576,22 @@ el.addEventListener("pointerup", (e) => {
   downAt = null;
 });
 el.addEventListener("pointercancel", (e) => { ptrs.delete(e.pointerId); pinch = null; mid = null; downAt = null; pan.held = ptrs.size >= 2; });
-el.addEventListener("wheel", (e) => { e.preventDefault(); camDist = clamp(camDist * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 0.12, 60); }, { passive: false });
+el.addEventListener("wheel", (e) => { e.preventDefault(); camDist = clamp(camDist * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 0.12, 30000); }, { passive: false });
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let terrain = null;
+// where a ray from the eye meets the ground: marched over the heights, then refined
+function groundHit() {
+  const o = ray.ray.origin, d = ray.ray.direction, far = Math.max(camDist * 6, 2);
+  let t0 = 0, t = camera.near, stp = Math.max(camDist / 200, 0.001);
+  while (t < far) { const x = o.x + d.x * t, z = o.z + d.z * t; if (o.y + d.y * t < Math.max(heightAt(x, z), 0)) break; t0 = t; t += stp; stp *= 1.02; }
+  if (t >= far) return null;
+  for (let i = 0; i < 20; i++) { const m = (t0 + t) / 2, x = o.x + d.x * m, z = o.z + d.z * m; if (o.y + d.y * m < Math.max(heightAt(x, z), 0)) t = m; else t0 = m; }
+  return { point: new THREE.Vector3(o.x + d.x * t, o.y + d.y * t, o.z + d.z * t) };
+}
 function tapWalk(px, py) {
   if (gps.on && gps.onIsland && !aura.on) { toast("Mit GPS gehst du selbst. Ohne GPS kannst du per Tippen wandern."); return; }
   ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObject(terrain)[0]; if (!hit) return;
+  const hit = groundHit(); if (!hit) return;
   if (!isLand(hit.point.x, hit.point.z)) { toast("Ohne Boot geht es nicht übers Wasser."); return; }
   pl.tx = hit.point.x; pl.tz = hit.point.z; tgtMark.position.set(pl.tx, hit.point.y + 0.003, pl.tz); tgtMark.visible = true;
 }
@@ -588,12 +599,16 @@ function tapWalk(px, py) {
 function teleport(px, py) {
   if (!aura.on) return;
   ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObject(terrain)[0]; if (!hit || !isLand(hit.point.x, hit.point.z)) return;
+  const hit = groundHit(); if (!hit || !isLand(hit.point.x, hit.point.z)) return;
   pl.x = hit.point.x; pl.z = hit.point.z; pl.tx = null; tgtMark.visible = false; pan.x = pan.z = 0;
   if (dog) dog.g.position.set(pl.x - 0.02, heightAt(pl.x, pl.z), pl.z + 0.02);
   toast("✨ Die Aura trägt dich hin.", 1500);
 }
-$("#centre").onclick = () => { camDist = 0.38; camPitch = 0.95; pan.home = true; };
+// places: the view flies there (the leash lets go until "zu mir")
+$("#orteBtn").onclick = () => { const o = $("#orte"); if (!o.innerHTML) { o.innerHTML = ERDE.places.map((p, i) => `<button type="button" data-i="${i}">${p[0]}<small>${p[1]}</small></button>`).join("");
+  o.querySelectorAll("button").forEach((b) => (b.onclick = () => { o.hidden = true; const [, , [lon, lat, dist, pitch]] = ERDE.places[+b.dataset.i], [x, z] = ERDE.G(lon, lat); pan.free = true; pan.home = false; pan.x = x - pl.x; pan.z = z - pl.z; camDist = dist; camPitch = clamp(pitch, 0.25, 1.45); })); }
+  o.hidden = !o.hidden; };
+$("#centre").onclick = () => { camDist = 0.38; camPitch = 0.95; pan.home = true; pan.free = false; };
 
 /* ---------------- GPS: you walk the island, and so does your figure ---------------- */
 const gps = { on: false, watch: null, onIsland: false, last: null };
@@ -890,18 +905,23 @@ function loop(now) {
   if (now - (loop.s || 0) > 5000) { loop.s = now; const s = window.Spiel.get(); s.pos = [pl.x, pl.z]; window.Spiel.save(s); }
   if (aura.on && now - (loop.a || 0) > 1000 && !busy()) { loop.a = now; window.Postcards.check(here()); }
   for (const sh of ships) shipStep(sh, dt);
-  panStep(dt); placeCamera(); window.Himmel.step(dt, now); window.Route.step(now); window.Himmel.render(); drawLabels();
+  // a map is read with north up: far out the view turns gently north and looks down
+  if (camDist > 1500 && !ptrs.size) { const k = Math.min(1, dt * 1.5) * clamp((camDist - 1500) / 2000, 0, 1), y0 = Math.round(camYaw / (2 * Math.PI)) * 2 * Math.PI; camYaw += (y0 - camYaw) * k; camPitch += (Math.max(camPitch, 1.15) - camPitch) * k; }
+  panStep(dt); placeCamera(); window.Route.step(now);
+  ERDE.step(dt, now, { x: pl.x + pan.x, z: pl.z + pan.z, dist: camDist });
+  renderer.render(scene, camera); drawLabels();
   if (now - (loop.q || 0) > 1000) { loop.q = now; quest(); companions(); if (!busy()) storyStep(); }
   requestAnimationFrame(loop);
 }
-window.CrusadersGeo.load().then((geo) => {
+window.CrusadersGeo.load().then(async (geo) => {
+  await ERDE.ready(geo);
   // where an exact region exists, its coast wins over the rough one
   const exact = geo.regions.filter((r) => r.quality === "genau").map((r) => r.bbox);
   const feats = geo.features.filter((f) => f.quality === "genau" || !f.rings.every((ring) => ring.every(([lon, lat]) => exact.some(([a, b, c, d]) => lon >= a && lon <= c && lat >= b && lat <= d))));
   TOWNS = geo.regions.flatMap((r) => (r.data.places || []).map((p) => [p.name, p.lat, p.lon, ...(SIZE[p.kind] || SIZE.village)]));
   terrain = buildLand(feats, geo.roads);
-  $("#src").textContent = "Küste © OpenStreetMap-Mitwirkende (ODbL) · Natural Earth";
-  landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes); window.Himmel.init();
+  $("#src").textContent = "© OSM-Mitwirkende · Terrain Tiles · Sentinel-2 cloudless 2020, EOX (CC BY-NC-SA 4.0) · Natural Earth";
+  landmarks(geo.landmarks); trees(); towns(); wreck(); seaLanes(geo.lanes);
   window.SIGHTS = geo.regions.flatMap((r) => r.data.sights || []); window.Route.build(geo.roads);
   $("#routeBtn").onclick = () => window.Route.pick();
   window.Besitz.init(geo);
@@ -923,7 +943,6 @@ window.CrusadersGeo.load().then((geo) => {
   requestAnimationFrame(loop);
 });
 </script>
-<script src="himmel.js"></script>
 <script src="route.js"></script>
 <script src="besitz.js"></script>
 </body>

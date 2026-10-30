@@ -18,6 +18,18 @@
    "seewege": "seewege-rhodos.json"
   },
   {
+   "id": "symi",
+   "file": "symi.json",
+   "name": "Symi",
+   "quality": "genau",
+   "bbox": [
+    27.74,
+    36.52,
+    27.93,
+    36.67
+   ]
+  },
+  {
    "id": "umland-rhodos",
    "file": "umland-rhodos.json",
    "name": "Umland von Rhodos",
