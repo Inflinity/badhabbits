@@ -352,12 +352,12 @@ const COMMON = `
   float useRhodes(vec2 p) { return lod(p) < 0.5 ? 1.0 : 0.0; }
   // close spots (Stuttgart, Salach, Trégastel): inside their box they draw everything, land and water; the last
   // 1.5 km of the box is mixed with the world pixel by pixel
-  uniform vec4 uSB[3], uMB[2];
+  uniform vec4 uSB[4], uMB[2];
   float spotHere(vec2 p) {
     if (uWorldOn < 0.5) return 0.0;
     p = refP(p);
     float r = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-    for (int i = 0; i < 3; i++) if (uSB[i].z > 0.0 && r < smoothstep(0.0, 1.5, edgeIn(p, uSB[i]))) return 1.0;
+    for (int i = 0; i < 4; i++) if (uSB[i].z > 0.0 && r < smoothstep(0.0, 1.5, edgeIn(p, uSB[i]))) return 1.0;
     return 0.0;
   }
   // the middle level of these spots (South-West Germany, Brittany): mixed with the world over its last 15 km
@@ -539,7 +539,7 @@ const U = {
   uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() },
   uTime: { value: 0 }, uHaze: { value: 0.006 }, uCloudCov: { value: 0.38 }, uCloudH: { value: 4.8 }, uClouds: { value: 1 }, uSea: { value: 1 },
   uMask: { value: null }, uRelief: { value: null }, uNormal: { value: null }, uCloud: { value: null }, uDist: { value: null }, uSat: { value: null }, uGeo: { value: null }, uShadow: { value: null },
-  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uMB: { value: [new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
+  uLife: { value: 1 }, uWEx: { value: 1 }, uWorldOn: { value: 1 }, uSB: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }, uMB: { value: [new THREE.Vector4(), new THREE.Vector4()] }, uRegOn: { value: 0 }, uRBox: { value: new THREE.Vector4() }, uRegH: { value: null }, uRegM: { value: null }, uRegL: { value: null }, uRegN: { value: null }, uRegSat: { value: null }, uWorld: { value: null }, uWorldN: { value: null }, uWorldSat: { value: null }, uVeg: { value: 0 }, uHeat: { value: 0 }, uGrow: { value: 1 }, uLevel: { value: 0 }, uShadowK: { value: 1 }, uNear: { value: 0.1 },
   uBox: { value: new THREE.Vector4(W0, D0, WX, DZ) }, uCloudOff: { value: new THREE.Vector2() },
 };
 
@@ -730,6 +730,7 @@ const SPOTS = [
   { id: "stuttgart", name: "Stuttgarter Kessel", sub: "mit den Bärenseen", look: [9.14, 48.768, 16, 0.75] },
   { id: "salach", name: "Salach im Filstal", sub: "Fils, Lauter und der Hohenstaufen", look: [9.74, 48.69, 13, 0.75] },
   { id: "tregastel", name: "Trégastel", sub: "Grève Blanche bis Île Renote", look: [-3.505, 48.826, 6, 0.8] },
+  { id: "symi", name: "Symi", sub: "Gialos, Panormitis und die Buchten", look: [27.84, 36.59, 14, 0.8] },
 ];
 const MIDS = [{ id: "suedwest", dir: "mitte", lake: 3000, look: [9.05, 48.4] }, { id: "bretagne", dir: "mitte", lake: 3000, look: [-3.1, 48.07] }];
 const spotsOn = [];
